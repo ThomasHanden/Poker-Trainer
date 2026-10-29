@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useMemo } from 'react';
 import { PracticeSettings, DIFFICULTIES, STACK_BANDS, StackBand } from '../../scenarios/types';
 import { matchingTemplates } from '../../scenarios/generator';
@@ -65,11 +66,11 @@ export function SettingsPanel({ settings, onChange }: { settings: PracticeSettin
         </div>
         <label className="field">
           <span className="field-label">Game format</span>
-          <select value={settings.format} onChange={(e) => set('format', e.target.value as PracticeSettings['format'])}>
+          <Select value={settings.format} onChange={(e) => set('format', e.target.value as PracticeSettings['format'])}>
             <option value="any">Any</option>
             <option value="cash">Cash game</option>
             <option value="tournament">Tournament</option>
-          </select>
+          </Select>
         </label>
       </div>
       <p className="note settings-help">
@@ -99,73 +100,73 @@ export function SettingsPanel({ settings, onChange }: { settings: PracticeSettin
         <div className="grid3">
           <label className="field">
             <span className="field-label">Table size</span>
-            <select value={String(settings.tableSize)} onChange={(e) => set('tableSize', e.target.value === 'any' ? 'any' : (Number(e.target.value) as 2 | 6 | 9))}>
+            <Select value={String(settings.tableSize)} onChange={(e) => set('tableSize', e.target.value === 'any' ? 'any' : (Number(e.target.value) as 2 | 6 | 9))}>
               <option value="any">Any</option>
               <option value="2">Heads-up</option>
               <option value="6">Six-handed</option>
               <option value="9">Full ring (9)</option>
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Effective stack</span>
-            <select value={settings.stack} onChange={(e) => set('stack', e.target.value as StackBand | 'any')}>
+            <Select value={settings.stack} onChange={(e) => set('stack', e.target.value as StackBand | 'any')}>
               <option value="any">Any</option>
               {(Object.keys(STACK_BANDS) as StackBand[]).map((k) => (
                 <option key={k} value={k}>
                   {STACK_BANDS[k].label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Your position</span>
-            <select value={settings.heroPosition} onChange={(e) => set('heroPosition', e.target.value)}>
+            <Select value={settings.heroPosition} onChange={(e) => set('heroPosition', e.target.value)}>
               {positions.map((p) => (
                 <option key={p} value={p}>
                   {p === 'any' ? 'Any' : p}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Starting street</span>
-            <select value={settings.street} onChange={(e) => set('street', e.target.value as PracticeSettings['street'])}>
+            <Select value={settings.street} onChange={(e) => set('street', e.target.value as PracticeSettings['street'])}>
               <option value="any">Any</option>
               <option value="preflop">Preflop</option>
               <option value="flop">Flop</option>
               <option value="turn">Turn</option>
               <option value="river">River</option>
               <option value="full">Complete hand</option>
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Players in the pot</span>
-            <select value={settings.players} onChange={(e) => set('players', e.target.value as PracticeSettings['players'])}>
+            <Select value={settings.players} onChange={(e) => set('players', e.target.value as PracticeSettings['players'])}>
               <option value="any">Any</option>
               <option value="headsup">Heads-up</option>
               <option value="multiway">Multiway</option>
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Pot type</span>
-            <select value={settings.potType} onChange={(e) => set('potType', e.target.value as PracticeSettings['potType'])}>
+            <Select value={settings.potType} onChange={(e) => set('potType', e.target.value as PracticeSettings['potType'])}>
               <option value="any">Any</option>
               <option value="limped">Limped</option>
               <option value="srp">Single-raised</option>
               <option value="3bp">3-bet pot</option>
               <option value="4bp">4-bet pot</option>
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span className="field-label">Opponents</span>
-            <select value={settings.opponent} onChange={(e) => set('opponent', e.target.value as PracticeSettings['opponent'])}>
+            <Select value={settings.opponent} onChange={(e) => set('opponent', e.target.value as PracticeSettings['opponent'])}>
               <option value="random">Mixed</option>
               {PROFILE_LIST.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         <div className="field">

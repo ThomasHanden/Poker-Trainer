@@ -1,3 +1,4 @@
+import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
@@ -29,24 +30,24 @@ export function ReviewListPage() {
       <div className="filters">
         <label>
           Show
-          <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+          <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
             <option value="all">All hands</option>
             <option value="bookmarked">Bookmarked</option>
             <option value="mistakes">With mistakes</option>
             <option value="unassisted">Unassisted only</option>
             <option value="assisted">Assisted only</option>
-          </select>
+          </Select>
         </label>
         <label>
           Scenario type
-          <select value={tpl} onChange={(e) => setTpl(e.target.value)}>
+          <Select value={tpl} onChange={(e) => setTpl(e.target.value)}>
             <option value="any">Any</option>
             {TEMPLATES.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       </div>
       {rows.length === 0 ? (

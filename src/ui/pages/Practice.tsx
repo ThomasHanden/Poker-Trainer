@@ -285,7 +285,7 @@ export function PracticePage() {
       <header className="practice-head">
         <div className="ph-main">
           <h1 className="ph-title">{sc ? sc.title : 'Practice'}</h1>
-          <p className="ph-sub">{sc ? sc.setupText : 'Fresh, varied poker spots with an honest review after every hand.'}</p>
+          <p className="ph-sub">{sc ? sc.setupText : 'Pick your settings and play. Every decision is graded when the hand ends.'}</p>
           <div className="ph-chips">
             {settingsSummary(settings)
               .split(' · ')

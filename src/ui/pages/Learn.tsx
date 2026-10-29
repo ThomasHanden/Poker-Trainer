@@ -1,3 +1,4 @@
+import { Select } from '../components/Select';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { LESSONS, LESSON_INDEX, SECTIONS, SEQUENCES, lessonsInSection } from '../../content/lessons';
@@ -30,12 +31,12 @@ export function LearnPage() {
         </label>
         <label>
           Level
-          <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
+          <Select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
             <option value="any">Any</option>
             <option value="beginner">Beginner</option>
             <option value="intermediate">Intermediate</option>
             <option value="advanced">Advanced</option>
-          </select>
+          </Select>
         </label>
       </div>
       {searching ? (

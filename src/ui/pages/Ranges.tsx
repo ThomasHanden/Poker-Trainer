@@ -1,3 +1,4 @@
+import { Select } from '../components/Select';
 import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { RangeMatrix, MatrixLegend, CellView } from '../components/RangeMatrix';
@@ -139,14 +140,14 @@ function Editor() {
           <button className="chip" onClick={() => setRange(Object.fromEntries(ALL_CLASSES.map((h) => [h, Math.max(0, 1 - (range[h] ?? 0))])))}>
             Invert
           </button>
-          <select aria-label="Load a preset into the editor" onChange={(e) => e.target.value && setRange(chartPlayRange(charts.find((c) => c.id === e.target.value)!))} value="">
+          <Select aria-label="Load a preset into the editor" onChange={(e) => e.target.value && setRange(chartPlayRange(charts.find((c) => c.id === e.target.value)!))} value="">
             <option value="">Load preset…</option>
             {charts.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div className="quick-tools">
           <div className="qt-row">
@@ -283,26 +284,26 @@ function Compare() {
         <div className="filters">
           <label className="grow">
             Range A
-            <select value={a} onChange={(e) => setA(e.target.value)}>
+            <Select value={a} onChange={(e) => setA(e.target.value)}>
               {opts.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <button className="btn small swap" onClick={() => { setA(b); setB(a); }} aria-label="Swap A and B">
             ⇄
           </button>
           <label className="grow">
             Range B
-            <select value={b} onChange={(e) => setB(e.target.value)}>
+            <Select value={b} onChange={(e) => setB(e.target.value)}>
               {opts.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         <RangeMatrix
@@ -569,13 +570,13 @@ function EquityCalc() {
         </label>
         <label>
           Opponent range
-          <select value={rid} onChange={(e) => { setRid(e.target.value); setCustom(''); }}>
+          <Select value={rid} onChange={(e) => { setRid(e.target.value); setCustom(''); }}>
             {opts.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label>
           …or type a range / exact hand

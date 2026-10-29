@@ -5506,3 +5506,121 @@ details.sequence[open] {
   text-align: center;
   color: var(--text-2);
 }
+
+/* ---------- custom dropdown (replaces the browser's native list) ---------- */
+.select-btn {
+  font: inherit;
+  font-size: 0.93rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  height: 40px;
+  padding: 0 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.select-btn:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.select-btn:focus-visible,
+.select-btn.open {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.select-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-chev {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.select-btn.open .select-chev {
+  transform: rotate(180deg);
+}
+.select-pop {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(28, 26, 22, 0.14), 0 2px 6px rgba(28, 26, 22, 0.06);
+  font-family: var(--sans);
+  font-size: 0.93rem;
+  color: var(--text);
+  animation: select-in 0.12s ease-out;
+  outline: none;
+}
+.select-pop.up {
+  transform: translateY(-100%);
+  animation-name: select-in-up;
+}
+@keyframes select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes select-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% + 4px));
+  }
+}
+.select-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.select-opt.active {
+  background: var(--surface-2);
+}
+.select-opt.sel {
+  color: var(--accent);
+  font-weight: 600;
+}
+.select-opt.dis {
+  opacity: 0.4;
+  cursor: default;
+}
+.select-group {
+  padding: 8px 10px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+label .select-btn {
+  margin-top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .select-pop {
+    animation: none;
+  }
+}
