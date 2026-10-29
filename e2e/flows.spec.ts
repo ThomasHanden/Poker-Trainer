@@ -109,3 +109,17 @@ test('full hands mode deals a complete hand from preflop', async ({ page }) => {
   // the board is empty at the first decision
   expect(await page.locator('.board .pcard:not(.empty)').count()).toBe(0);
 });
+
+test('daily puzzles can be completed and show on the scoreboard', async ({ page }) => {
+  await page.goto('/#/');
+  await page.evaluate(() => localStorage.removeItem('felt-school:puzzles'));
+  await page.reload();
+  for (let k = 0; k < 5; k++) {
+    await page.getByTestId('pz-option').first().click();
+    await page.getByRole('button', { name: /Next puzzle|See result/ }).click();
+  }
+  await expect(page.locator('.pz-big')).toBeVisible();
+  await expect(page.locator('.sb-table tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Go to practice →' }).click();
+  await expect(page).toHaveURL(/#\/practice/);
+});
