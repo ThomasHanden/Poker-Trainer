@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { HandState, potSize, ActionRecord, effectiveStack } from '../../engine/rules';
 import { PlayingCard, CardRow } from './Card';
 import { PROFILES, ProfileId } from '../../opponents/profiles';
@@ -18,7 +19,52 @@ function lastStreetAction(s: HandState, player: number): ActionRecord | undefine
   return undefined;
 }
 
-const ACTION_WORD: Record<string, string> = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise' };
+/** Point on a stadium (pill) outline, by fraction of the perimeter, starting at the bottom centre and going clockwise on screen. Returns percentages of the box. */
+function stadiumPoint(t: number, w: number, h: number, scale = 1): { x: number; y: number } {
+  const sw = w * scale;
+  const sh = h * scale;
+  const r = Math.min(sw, sh) / 2;
+  const segs: { len: number; at: (u: number) => [number, number] }[] = [];
+  const line = (x1: number, y1: number, x2: number, y2: number) => ({ len: Math.hypot(x2 - x1, y2 - y1), at: (u: number) => [x1 + (x2 - x1) * u, y1 + (y2 - y1) * u] as [number, number] });
+  const arc = (cx: number, cy: number, a1: number, a2: number) => ({ len: Math.abs(a2 - a1) * r, at: (u: number) => [cx + r * Math.cos(a1 + (a2 - a1) * u), cy + r * Math.sin(a1 + (a2 - a1) * u)] as [number, number] });
+  segs.push(line(sw / 2, sh, r, sh));
+  segs.push(arc(r, sh - r, Math.PI / 2, Math.PI));
+  segs.push(line(0, sh - r, 0, r));
+  segs.push(arc(r, r, Math.PI, 1.5 * Math.PI));
+  segs.push(line(r, 0, sw - r, 0));
+  segs.push(arc(sw - r, r, 1.5 * Math.PI, 2 * Math.PI));
+  segs.push(line(sw, r, sw, sh - r));
+  segs.push(arc(sw - r, sh - r, 0, Math.PI / 2));
+  segs.push(line(sw - r, sh, sw / 2, sh));
+  const total = segs.reduce((a, g) => a + g.len, 0);
+  let d = (((t % 1) + 1) % 1) * total;
+  for (const g of segs) {
+    if (d <= g.len || g === segs[segs.length - 1]) {
+      const [x, y] = g.at(g.len ? Math.min(1, d / g.len) : 0);
+      return { x: ((x + (w - sw) / 2) / w) * 100, y: ((y + (h - sh) / 2) / h) * 100 };
+    }
+    d -= g.len;
+  }
+  return { x: 50, y: 100 };
+}
+
+/** Matches the CSS breakpoint that switches the table to a portrait layout. */
+function useNarrow(): boolean {
+  const q = '(max-width: 680px)';
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setNarrow(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return narrow;
+}
+
+// felt proportions (must match .felt aspect-ratio in styles.css)
+const LANDSCAPE = { w: 2.1, h: 1 };
+const PORTRAIT = { w: 1, h: 1.75 };
+
 
 export function Table({
   state,
@@ -41,17 +87,24 @@ export function Table({
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
   const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - state.players[hero].streetCommitted, state.players[hero].stack)) : 0;
   const me = state.players[hero];
-  // seat geometry: hero at the bottom, others evenly spaced clockwise
+  // seat geometry: hero at the bottom centre, others evenly spaced clockwise along the rail
+  const narrow = useNarrow();
+  const box = narrow ? PORTRAIT : LANDSCAPE;
   const geo = (i: number) => {
-    const rel = (i - hero + n) % n;
-    const ang = Math.PI / 2 + (rel * 2 * Math.PI) / n;
-    const cos = Math.cos(ang);
-    const sin = Math.sin(ang);
+    const t = ((i - hero + n) % n) / n;
+    const seat = stadiumPoint(t, box.w, box.h, 1);
+    // bets sit between the seat and the middle, clear of the board and of the hole cards
+    const chip = narrow
+      ? { x: 50 + (seat.x - 50) * 0.72, y: 50 + (seat.y - 50) * 0.62 + (Math.abs(seat.y - 50) < 15 ? 10 : 0) }
+      : i === hero
+        ? { x: 63, y: 84 } // beside the hero's (large) hole cards
+        : { x: 50 + (seat.x - 50) * 0.5, y: 50 + (seat.y - 50) * 0.5 };
+    const btn = stadiumPoint(t + (narrow ? 0.05 : 0.04), box.w, box.h, narrow ? 0.86 : 0.76);
     return {
-      seat: { left: `${50 + 47 * cos}%`, top: `${50 + 47 * sin}%` },
-      chip: { left: `${50 + 35 * cos}%`, top: `${50 + 31 * sin}%` },
-      button: { left: `${50 + 33 * Math.cos(ang - 0.38)}%`, top: `${50 + 30 * Math.sin(ang - 0.38)}%` },
-      low: sin > 0.35, // seat is in the lower part of the table: show cards above the plate
+      seat: { left: `${seat.x}%`, top: `${seat.y}%` },
+      chip: { left: `${chip.x}%`, top: `${chip.y}%` },
+      button: { left: `${btn.x}%`, top: `${btn.y}%` },
+      low: seat.y > 60, // lower part of the table: cards sit above the plate
     };
   };
   return (
@@ -66,7 +119,7 @@ export function Table({
             <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} />
           </div>
           <div className="pot-sub">
-            {streetBets > 0 && !state.complete ? `${fmtBB(potBefore, bb)} in the middle + ${fmtBB(streetBets, bb)} bet this street` : '\u00a0'}
+            {streetBets > 0 && potBefore > 0 && !state.complete ? `${fmtBB(potBefore, bb)} in the middle + ${fmtBB(streetBets, bb)} bet this street` : '\u00a0'}
             {state.config.anteType !== 'none' && state.config.ante > 0 && (
               <span className="blinds-line">
                 Blinds {fmtBB(state.config.sb, bb)}/{fmtBB(state.config.bb, bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmtBB(state.config.ante, bb)}
@@ -86,12 +139,7 @@ export function Table({
                 <PlayingCard card={p.hole[0]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
                 <PlayingCard card={p.hole[1]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
               </div>
-            ) : (
-              <div className="seat-cards backs" aria-hidden="true">
-                <PlayingCard size="sm" />
-                <PlayingCard size="sm" />
-              </div>
-            );
+            ) : null;
           return (
             <div key={i}>
               <div
@@ -114,7 +162,7 @@ export function Table({
               {p.streetCommitted > 0 && !state.complete && (
                 <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmtBB(p.streetCommitted, bb)}`}>
                   <span className="chip-dot" aria-hidden="true" />
-                  {act && (act.type === 'bet' || act.type === 'raise') ? `${ACTION_WORD[act.type]} ` : ''}
+                  {!narrow && act && (act.type === 'bet' || act.type === 'raise') ? (p.allIn ? 'All-in ' : act.type === 'raise' ? 'Raise to ' : 'Bet ') : ''}
                   {fmtBB(p.streetCommitted, bb)}
                 </div>
               )}

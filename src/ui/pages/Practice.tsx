@@ -81,10 +81,6 @@ export function PracticePage() {
         decisionStart.current = Date.now();
         if (st.state.complete) await finish(st);
         else setPhase('playing');
-        // on small screens, bring the whole table into view
-        if (window.matchMedia('(max-width: 680px)').matches) {
-          requestAnimationFrame(() => document.querySelector('.scenario-head')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
-        }
       } catch (e) {
         setError({ msg: (e as Error).message });
         setPhase('error');
