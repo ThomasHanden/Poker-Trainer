@@ -11,6 +11,9 @@ export const STORAGE_KEY = 'poker-trainer:data';
 export const SCHEMA_VERSION = 1;
 export const MAX_HISTORY = 3000;
 
+/** How quickly opponents' actions play out on the table. */
+export type PlaySpeed = 'slow' | 'normal' | 'fast';
+
 export interface DecisionSummary {
   street: Street;
   actionLabel: string;
@@ -71,7 +74,7 @@ export interface AppData {
   lessons: Record<string, LessonProgress>;
   ranges: SavedRange[];
   recent: { fingerprints: string[]; templates: string[] };
-  prefs: { fourColor: boolean; showShortcuts: boolean; fastMode?: boolean };
+  prefs: { fourColor: boolean; showShortcuts: boolean; fastMode?: boolean; playSpeed?: PlaySpeed };
 }
 
 export function emptyData(): AppData {

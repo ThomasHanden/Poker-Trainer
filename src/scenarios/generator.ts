@@ -320,7 +320,7 @@ export function generateScenario(settings: PracticeSettings, opts: GenerateOptio
     const seed = attempt === 0 ? baseSeed : hashString(`${baseSeed}:${attempt}`);
     const rng = createRng(seed);
     const fresh = pool.filter((t) => !recentT.has(t.id));
-    const t = opts.templateId ? pool[0] : rng.pick(fresh.length ? fresh : pool);
+    const t = opts.templateId ? pool[0] : pickTemplate(fresh.length ? fresh : pool, rng.next());
     const ctx: BuildContext = {
       rng: childRng(seed, 'build'),
       difficulty: settings.difficulty,
@@ -383,4 +383,12 @@ export function rebuildScenario(id: string, settings: PracticeSettings): Generat
     return { scenario: sc, error: `Note: this scenario was created with template version ${version}; it has been rebuilt with version ${t.version}, so details may differ.` };
   }
   return { scenario: sc };
+}
+
+/** Multiway spots are dealt about twice as often as their share of the templates, since real tables produce plenty of them. */
+function pickTemplate(pool: ScenarioTemplate[], u: number): ScenarioTemplate {
+  const w = pool.map((t) => (t.multiway ? 2 : 1));
+  let x = u * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < pool.length; i++) if ((x -= w[i]) < 0) return pool[i];
+  return pool[pool.length - 1];
 }

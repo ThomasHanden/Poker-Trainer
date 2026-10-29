@@ -11,13 +11,21 @@ import { preflopRanking } from '../../ranges/preflopEquity';
 import { Difficulty, PracticeSettings, STACK_BANDS, Scenario, ScenarioTemplate } from '../types';
 import { cashConfig } from './helpers';
 
-const VERSION = 1;
+const VERSION = 2;
+
+// a typical table: some solid regulars, but also loose players who call a lot, so pots are often multiway
+const TABLE_MIX: Record<'beginner' | 'other', [ProfileId, number][]> = {
+  beginner: [['unknown', 0.45], ['station', 0.25], ['tag', 0.1], ['nit', 0.1], ['lag', 0.05], ['overfolder', 0.05]],
+  other: [['unknown', 0.25], ['station', 0.22], ['tag', 0.18], ['lag', 0.15], ['nit', 0.12], ['overfolder', 0.08]],
+};
 
 function pickProfile(settings: PracticeSettings, difficulty: Difficulty, u: () => number): ProfileId {
   if (settings.opponent !== 'random') return settings.opponent;
-  const all: ProfileId[] = ['unknown', 'tag', 'nit', 'station', 'lag', 'overfolder'];
-  const p = difficulty === 'beginner' ? 0.7 : difficulty === 'intermediate' ? 0.45 : 0;
-  return u() < p ? 'unknown' : all[Math.floor(u() * all.length)];
+  let x = u();
+  for (const [id, w] of TABLE_MIX[difficulty === 'beginner' ? 'beginner' : 'other']) {
+    if ((x -= w) < 0) return id;
+  }
+  return 'unknown';
 }
 
 /** Deal and run the hand up to the hero's first decision; null if the hand ends before the hero acts. */

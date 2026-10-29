@@ -29,7 +29,7 @@ const POSTFLOP_ASSUMPTIONS = [
   'Equities are exact on the turn/river (enumeration) and simulated on the flop vs the modeled range.',
 ];
 
-type Base = 'btn-bb' | 'co-btn' | 'bb-3bet-btn' | 'co-btn-bb';
+type Base = 'btn-bb' | 'co-btn' | 'bb-3bet-btn' | 'co-btn-bb' | 'co-btn-bb:btn' | 'co-btn-bb:bb';
 
 interface PreflopBase {
   heroRange: Range;
@@ -78,6 +78,22 @@ function preflopBase(kind: Base, heroSide: 'pfr' | 'caller'): PreflopBase {
         heroPos: 'CO',
         villains: ['BTN', 'BB'],
       };
+    // the same three-way pot seen from the callers' seats
+    case 'co-btn-bb:btn':
+    case 'co-btn-bb:bb': {
+      const btn = kind === 'co-btn-bb:btn';
+      return {
+        heroRange: btn ? getChart('cash6-BTN-vs-CO')!.call : getChart('cash6-BB-vs-CO')!.call,
+        preflop: [
+          { pos: 'CO', act: 'raise', size: { kind: 'bb', to: 2.5 } },
+          { pos: 'BTN', act: 'call' },
+          { pos: 'SB', act: 'fold' },
+          { pos: 'BB', act: 'call' },
+        ],
+        heroPos: btn ? 'BTN' : 'BB',
+        villains: btn ? ['CO', 'BB'] : ['CO', 'BTN'],
+      };
+    }
     case 'bb-3bet-btn':
       return {
         heroRange: getChart('cash6-BB-vs-BTN')!.raise,
@@ -1099,6 +1115,112 @@ const riverFacingRaise = postflopTemplate({
   },
 });
 
+const multiwayFacingBet = postflopTemplate({
+  meta: {
+    id: 'fl-multiway-facing-bet',
+    title: 'Facing a c-bet with a player behind',
+    summary: 'CO opened, you called on the button and the big blind called. The big blind checks and the CO bets.',
+    objectives: ['Continue with stronger hands when a player is still to act behind you.', 'Prefer hands that can make the nuts over weak pairs.'],
+    street: 'flop',
+    category: 'Multiway',
+    concepts: ['multiway', 'pot-odds', 'equity-realization'],
+    lessons: ['multiway', 'pot-odds', 'equity-denial-realization'],
+    heroPositions: ['BTN'],
+    stackBB: [100],
+    potType: 'srp',
+    multiway: true,
+    facing: 'bet',
+    difficulties: ['intermediate', 'advanced', 'expert'],
+    setupText: 'Three-way pot. The big blind checks, the cutoff bets, and the big blind is still to act behind you.',
+    hint: 'The price looks good, but the big blind can still raise or call behind you. Is your hand strong enough against two ranges?',
+  },
+  base: 'co-btn-bb:btn',
+  heroSide: 'caller',
+  streets: (ctx) => ({ flop: { cards: boards.notMonotone, actions: [btnCheck('BB'), { pos: 'CO', act: 'bet', size: { kind: ctx.rng.next() < 0.5 ? 'policy' : 'policy-large' } }] } }),
+  heroFilter: (ctx) => ({ weight: mixWeight(ctx, (h, b) => isStrong(h, b) || isAir(h, b), (h, b) => isMedium(h, b) || hasDraw(h, b)) }),
+  guide(ctx) {
+    const g = facingBetGuidance(ctx);
+    g.reasons.splice(
+      2,
+      0,
+      'The big blind still acts after you. It can raise (and you would often have to fold), and when it calls you split the pot’s chances three ways. So you need a bit more than the raw price suggests.',
+      'Hands that can make very strong hands — sets, strong draws to the nuts — gain value multiway. Weak one-pair hands lose value, because one of two players often has you beat.',
+    );
+    return g;
+  },
+});
+
+const multiwayBBOvercall = postflopTemplate({
+  meta: {
+    id: 'fl-multiway-bb-overcall',
+    title: 'Big blind: a bet and a call in front of you',
+    summary: 'CO opened, the button and you called. You check, the CO bets and the button calls.',
+    objectives: ['Use the better price you get when someone has already called.', 'Remember that out of position against two players you realize less equity.'],
+    street: 'flop',
+    category: 'Multiway',
+    concepts: ['multiway', 'pot-odds', 'equity-realization'],
+    lessons: ['multiway', 'pot-odds', 'equity-denial-realization'],
+    heroPositions: ['BB'],
+    stackBB: [100],
+    potType: 'srp',
+    multiway: true,
+    facing: 'bet',
+    difficulties: ['intermediate', 'advanced', 'expert'],
+    setupText: 'Three-way pot. You check, the cutoff bets and the button calls. You close the action.',
+    hint: 'The call in front of you makes the price better. But the button’s call also shows strength — how do you do against both ranges?',
+  },
+  base: 'co-btn-bb:bb',
+  heroSide: 'caller',
+  streets: () => ({ flop: { cards: boards.notMonotone, actions: [btnCheck('BB'), { pos: 'CO', act: 'bet', size: { kind: 'policy' } }, { pos: 'BTN', act: 'call' }] } }),
+  heroFilter: (ctx) => ({ weight: mixWeight(ctx, (h, b) => isStrong(h, b) || isAir(h, b), (h, b) => isMedium(h, b) || hasDraw(h, b)) }),
+  guide(ctx) {
+    const g = facingBetGuidance(ctx);
+    g.reasons.splice(
+      2,
+      0,
+      'Nobody can raise behind you, and the button’s call made the pot bigger, so the price is better than heads-up.',
+      'But you are out of position against two players for the rest of the hand, so you realize less of your equity, and the button’s call means its range is stronger than before. Draws to the nuts call more easily than weak pairs.',
+    );
+    return g;
+  },
+});
+
+const multiwayStab = postflopTemplate({
+  meta: {
+    id: 'fl-multiway-checked-to',
+    title: 'Checked to you in a three-way pot',
+    summary: 'CO opened, you called on the button and the big blind called. Both players check to you.',
+    objectives: ['Decide when a bet works against two players.', 'Bet for value and with strong draws; check medium hands.'],
+    street: 'flop',
+    category: 'Multiway',
+    concepts: ['multiway', 'bluff', 'position'],
+    lessons: ['multiway', 'value-bluff-semibluff', 'position'],
+    heroPositions: ['BTN'],
+    stackBB: [100],
+    potType: 'srp',
+    multiway: true,
+    facing: 'checked-to',
+    difficulties: ['beginner', 'intermediate', 'advanced', 'expert'],
+    setupText: 'Three-way pot. The big blind and the preflop raiser both check to you on the button.',
+    hint: 'Two checks often mean weakness, but a bet still has to get through two players. Which hands want a bet here?',
+  },
+  base: 'co-btn-bb:btn',
+  heroSide: 'caller',
+  streets: () => ({ flop: { cards: boards.notMonotone, actions: [btnCheck('BB'), btnCheck('CO')] } }),
+  heroFilter: (ctx) => ({ weight: mixWeight(ctx, (h, b) => isStrong(h, b) || isAir(h, b), (h, b) => isMedium(h, b) || hasDraw(h, b)) }),
+  guide(ctx) {
+    const g = bettingGuidance(ctx, { bluffOk: false });
+    g.reasons.unshift(
+      'Two checks usually mean neither player has a very strong hand, and you have position. But a pure bluff must get folds from both: if each folds 60% of the time, both fold only about 36%.',
+    );
+    if ((ctx.draws?.drawEquity ?? 0) >= 0.3 && g.ratings.bet === 'mixed') {
+      g.ratings.bet = 'preferred';
+      g.reasons.push('A strong draw is a good bet here: it wins the pot when both fold and has plenty of equity when called.');
+    }
+    return g;
+  },
+});
+
 export const POSTFLOP_TEMPLATES: ScenarioTemplate[] = [
   cbetDry,
   cbetWet,
@@ -1108,6 +1230,9 @@ export const POSTFLOP_TEMPLATES: ScenarioTemplate[] = [
   checkRaiseDraw,
   slowplayDry,
   multiwayCbet,
+  multiwayFacingBet,
+  multiwayBBOvercall,
+  multiwayStab,
   facingCheckRaise,
   turnBarrel,
   turnProbe,

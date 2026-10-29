@@ -14,7 +14,7 @@ import { ActionBar } from '../components/ActionBar';
 import { SettingsPanel, settingsSummary } from '../components/SettingsPanel';
 import { ReviewView, GradeBadge } from '../components/ReviewView';
 import { getTemplate } from '../../scenarios/templates';
-import { HandRecord, newId } from '../../persistence/storage';
+import { HandRecord, PlaySpeed, newId } from '../../persistence/storage';
 import { PROFILES } from '../../opponents/profiles';
 import { CONCEPTS, ConceptId } from '../../content/concepts';
 import { Term } from '../components/Term';
@@ -65,13 +65,15 @@ interface Playback {
   i: number;
 }
 
-/** How long a step stays on screen before the next action (ms). */
+const SPEED: Record<PlaySpeed, number> = { slow: 1.5, normal: 1, fast: 0.55 };
+
+/** How long a step stays on screen before the next action (ms), at normal speed. */
 function stepDelay(steps: TimelineStep[], i: number): number {
   const st = steps[i];
-  if (!st.record) return 800;
-  if (st.state.complete) return 1400;
-  if (i > 0 && steps[i - 1].state.board.length < st.state.board.length) return 1100;
-  return st.record.type === 'fold' ? 320 : 750;
+  if (!st.record) return 1300;
+  if (st.state.complete) return 2400;
+  if (i > 0 && steps[i - 1].state.board.length < st.state.board.length) return 2000;
+  return st.record.type === 'fold' ? 700 : 1400;
 }
 
 const isClean = (ev: ScenarioEvaluation) => ev.decisions.length > 0 && ev.decisions.every((d) => d.grade === 'best' || d.grade === 'good');
@@ -98,6 +100,7 @@ export function PracticePage() {
   const [fastShown, setFastShown] = useState(false);
   const [fastPaused, setFastPaused] = useState(false);
   const fastMode = !!data.prefs.fastMode;
+  const speed: PlaySpeed = data.prefs.playSpeed ?? 'normal';
   const scrolledFor = useRef<string | null>(null);
   const decisionStart = useRef(Date.now());
   const autoSeedUsed = useRef(false);
@@ -196,9 +199,9 @@ export function PracticePage() {
   useEffect(() => {
     if (!pb) return;
     const last = pb.steps.length - 1;
-    const t = setTimeout(() => setPb(pb.i >= last ? null : { ...pb, i: pb.i + 1 }), stepDelay(pb.steps, pb.i) * (fastMode ? 0.6 : 1));
+    const t = setTimeout(() => setPb(pb.i >= last ? null : { ...pb, i: pb.i + 1 }), stepDelay(pb.steps, pb.i) * SPEED[speed]);
     return () => clearTimeout(t);
-  }, [pb, fastMode]);
+  }, [pb, speed]);
 
   const finish = async (s: PlaySession) => {
     setPhase('evaluating');
@@ -626,9 +629,18 @@ export function PracticePage() {
               <span className="pb-caption">
                 {pbStep?.record && <strong className="street-tag">{cap(pbStep.record.street)}</strong>} {stepCaption(pb.steps, pb.i, sc.heroIndex)}
               </span>
-              <button className="btn small ghost pb-skip" onClick={() => setPb(null)} data-testid="skip-playback">
-                Skip <span aria-hidden="true">›</span>
-              </button>
+              <span className="pb-controls">
+                <span className="seg pb-speed" role="radiogroup" aria-label="Speed">
+                  {(['slow', 'normal', 'fast'] as const).map((v) => (
+                    <button key={v} role="radio" aria-checked={speed === v} className={speed === v ? 'on' : ''} onClick={() => update((d) => ({ ...d, prefs: { ...d.prefs, playSpeed: v } }))}>
+                      {cap(v)}
+                    </button>
+                  ))}
+                </span>
+                <button className="btn small ghost pb-skip" onClick={() => setPb(null)} data-testid="skip-playback">
+                  Skip <span aria-hidden="true">›</span>
+                </button>
+              </span>
             </div>
           )}
           {heroTurn && !pb && (

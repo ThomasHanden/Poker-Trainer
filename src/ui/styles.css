@@ -6059,3 +6059,35 @@ label > span:first-child:not(.select-value) {
     background: var(--surface);
   }
 }
+.pb-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.playback .seg.pb-speed {
+  display: inline-flex;
+  width: auto;
+  padding: 2px;
+  background: var(--surface);
+}
+.playback .seg.pb-speed button {
+  height: 28px;
+  padding: 0 9px;
+  font-size: 0.8rem;
+}
+.playback {
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  .playback {
+    gap: 6px 10px;
+  }
+  .pb-caption {
+    flex-basis: 100%;
+  }
+  .pb-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

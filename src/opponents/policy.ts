@@ -262,9 +262,17 @@ function preflopPolicy(view: PublicView, profile: OpponentProfile): ActionOption
   const chart = defendChartFor(s, actor, sit.lastRaiser, sit.callersAfterRaise > 0);
   if (chart) {
     const fr = chartFreq(chart, h);
+    if (sit.callersAfterRaise > 0 && me.position === 'BB') {
+      // the big blind closes the action with a caller already in: the price is better than heads-up,
+      // so it overcalls at least as wide as it would defend against the opener alone
+      const hu = defendChartFor(s, actor, sit.lastRaiser, false);
+      const play = hu ? chartFreq(hu, h) : null;
+      if (play) fr.call = Math.max(fr.call, Math.min(1 - fr.raise, play.call + play.raise - fr.raise));
+    }
     raiseP = clamp01(fr.raise * aggr);
     const transfer = fr.raise - raiseP; // passive players flat instead of raising
-    callP = clamp01(adjustFreq(fr.call + Math.max(0, transfer), h, share(chart.call), L));
+    // loose players also flat-call hands the baseline would 3-bet or fold, so widen from the whole playing range
+    callP = clamp01(adjustFreq(fr.call + Math.max(0, transfer), h, L > 0 ? share(chart.call) + share(chart.raise) : share(chart.call), L));
     if (raiseP + callP > 1) callP = 1 - raiseP;
   }
   return finishPreflop(s, actor, la, sit, raiseP, callP);
