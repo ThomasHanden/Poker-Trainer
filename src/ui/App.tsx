@@ -47,8 +47,8 @@ function Shell() {
         Skip to content
       </a>
       <header className="topbar">
-        <Link to="/" className="brand" aria-label="Poker Decision Trainer home">
-          <span aria-hidden="true">♠</span> Decision Trainer
+        <Link to="/" className="brand" aria-label="Felt School home">
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" aria-hidden="true" className="brand-logo" /> Felt School
         </Link>
         <button className="menu-btn" aria-expanded={menu} aria-controls="mainnav" onClick={() => setMenu((m) => !m)}>
           Menu

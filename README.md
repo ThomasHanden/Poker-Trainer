@@ -1,4 +1,4 @@
-# Poker Decision Trainer (No-Limit Hold’em)
+# Felt School — No-Limit Hold’em Decision Trainer
 
 A complete, local-first training web app that teaches better NLHE decisions through fresh practice scenarios, honest post-hand reviews, a theory library, a range explorer and progress tracking. No account, no paid API, no levels or unlocks.
 

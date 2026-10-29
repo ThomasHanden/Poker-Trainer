@@ -204,15 +204,11 @@ kbd {
   align-items: center;
   gap: 8px;
 }
-.brand span {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
+.brand-logo {
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 15px;
+  display: block;
 }
 #mainnav {
   display: flex;
