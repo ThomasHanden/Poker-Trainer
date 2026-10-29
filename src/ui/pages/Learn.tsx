@@ -131,6 +131,15 @@ export function LessonPage() {
   };
   const practiceHref = l.practice.templates?.length ? `/practice?template=${l.practice.templates[0]}` : l.practice.concepts?.length ? `/practice?concept=${l.practice.concepts[0]}` : '/practice?start=1';
   const section = SECTIONS.find((s) => s.id === l.section)!;
+  const toc: [string, string][] = [
+    ['s-idea', 'The idea'],
+    ...(l.terms?.length ? [['s-terms', 'Key terms'] as [string, string]] : []),
+    ...(l.deeper?.length ? [['s-deeper', 'Going deeper'] as [string, string]] : []),
+    ['s-examples', (l.examples?.length ?? 0) > 0 ? 'Worked examples' : 'Example'],
+    ...(l.apply?.length ? [['s-apply', 'Checklist'] as [string, string]] : []),
+    ['s-quiz', `Quiz (${l.quiz.length})`],
+  ];
+  const words = [...l.plain, ...(l.deeper ?? []).flatMap((d) => d.body), ...l.why, ...l.example.steps, ...(l.examples ?? []).flatMap((e) => e.steps), ...l.mistakes, ...(l.apply ?? [])].join(' ').split(/\s+/).length;
   return (
     <article className="page lesson">
       <p>
@@ -139,15 +148,49 @@ export function LessonPage() {
       <h1>{l.title}</h1>
       <p className="lead">{l.summary}</p>
       <p className="note">
-        Level: {l.level} · Applies to: {l.format === 'both' ? 'cash games and tournaments' : l.format === 'cash' ? 'cash games' : 'tournaments'}
+        Level: {l.level} · Applies to: {l.format === 'both' ? 'cash games and tournaments' : l.format === 'cash' ? 'cash games' : 'tournaments'} · about {Math.max(2, Math.round(words / 200))} min read
         {prog?.completed ? ' · ✓ completed' : ''}
       </p>
-      <section>
+      <nav className="lesson-toc" aria-label="On this page">
+        <span className="toc-l">On this page</span>
+        {toc.map(([id, label]) => (
+          <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+            {label}
+          </a>
+        ))}
+      </nav>
+      <section id="s-idea">
         <h2>The idea</h2>
         {l.plain.map((p, i) => (
           <p key={i}>{p}</p>
         ))}
       </section>
+      {l.terms && l.terms.length > 0 && (
+        <section className="terms" id="s-terms">
+          <h2>Key terms</h2>
+          <dl>
+            {l.terms.map(([t, d]) => (
+              <div key={t}>
+                <dt>{t}</dt>
+                <dd>{d}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+      {l.deeper && l.deeper.length > 0 && (
+        <section className="deeper" id="s-deeper">
+          <h2>Going deeper</h2>
+          {l.deeper.map((d) => (
+            <div key={d.heading} className="deeper-part">
+              <h3>{d.heading}</h3>
+              {d.body.map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
       <section>
         <h2>Why it matters</h2>
         <ul>
@@ -156,14 +199,28 @@ export function LessonPage() {
           ))}
         </ul>
       </section>
-      <section className="example">
-        <h2>Example: {l.example.title}</h2>
-        <ol>
-          {l.example.steps.map((p, i) => (
-            <li key={i}>{p}</li>
-          ))}
-        </ol>
-      </section>
+      {[l.example, ...(l.examples ?? [])].map((ex, k) => (
+        <section className="example" key={k} id={k === 0 ? 's-examples' : undefined}>
+          <h2>
+            {(l.examples?.length ?? 0) > 0 ? `Worked example ${k + 1}` : 'Example'}: {ex.title}
+          </h2>
+          <ol>
+            {ex.steps.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      {l.apply && l.apply.length > 0 && (
+        <section className="apply" id="s-apply">
+          <h2>At the table: a checklist</h2>
+          <ol className="checklist">
+            {l.apply.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ol>
+        </section>
+      )}
       <section>
         <h2>Common mistakes</h2>
         <ul>
@@ -197,7 +254,7 @@ export function LessonPage() {
           ))}
         </ul>
       </section>
-      <section className="quiz">
+      <section className="quiz" id="s-quiz">
         <h2>Knowledge check</h2>
         {l.quiz.map((q, i) => (
           <fieldset key={i} className="quiz-q">

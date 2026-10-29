@@ -27,6 +27,23 @@ export interface Lesson {
   practice: { label: string; templates?: string[]; concepts?: ConceptId[] };
   related: string[];
   sources: string[]; // ids in SOURCES
+  /** deeper explanation, split into short sub-sections */
+  deeper?: { heading: string; body: string[] }[];
+  /** step-by-step routine for using the idea at the table */
+  apply?: string[];
+  /** further worked examples */
+  examples?: { title: string; steps: string[] }[];
+  /** short definitions of the terms the lesson relies on */
+  terms?: [string, string][];
+}
+
+/** Extra study material merged into a lesson by id (kept in lessons/extra/*). */
+export interface LessonExtra {
+  deeper: { heading: string; body: string[] }[];
+  apply: string[];
+  examples?: { title: string; steps: string[] }[];
+  terms?: [string, string][];
+  quiz?: QuizQuestion[];
 }
 
 export const SECTIONS: { id: SectionId; title: string; blurb: string }[] = [

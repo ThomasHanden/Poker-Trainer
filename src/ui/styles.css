@@ -3331,3 +3331,78 @@ button.grow-row:hover,
     padding: 0 10px;
   }
 }
+
+/* ---------- lesson page: deeper material ---------- */
+.lesson-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.toc-l {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.lesson-toc a {
+  font-size: 0.86rem;
+  text-decoration: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.lesson-toc a:hover {
+  color: var(--text);
+}
+.lesson section[id] {
+  scroll-margin-top: 80px;
+}
+.terms dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.terms dl > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.terms dt {
+  font-weight: 650;
+  margin-bottom: 2px;
+}
+.terms dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.deeper-part h3 {
+  font-size: 1.02rem;
+  margin: 18px 0 6px;
+}
+.deeper-part:first-of-type h3 {
+  margin-top: 6px;
+}
+.apply {
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--accent-soft);
+  border-radius: 14px;
+  padding: 4px 18px 10px;
+}
+.checklist {
+  padding-left: 1.3em;
+}
+.checklist li {
+  margin: 6px 0;
+}

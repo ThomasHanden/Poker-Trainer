@@ -8,8 +8,14 @@ import { RANGES } from './ranges';
 import { ADAPTATION } from './adaptation';
 import { TOURNAMENT } from './tournament';
 import { DISCIPLINE } from './discipline';
+import { EXTRAS } from './extra';
 
-export const LESSONS: Lesson[] = [...FOUNDATIONS, ...PREFLOP, ...POSTFLOP, ...SIZING, ...MATH, ...RANGES, ...ADAPTATION, ...TOURNAMENT, ...DISCIPLINE];
+const BASE: Lesson[] = [...FOUNDATIONS, ...PREFLOP, ...POSTFLOP, ...SIZING, ...MATH, ...RANGES, ...ADAPTATION, ...TOURNAMENT, ...DISCIPLINE];
+export const LESSONS: Lesson[] = BASE.map((l) => {
+  const x = EXTRAS[l.id];
+  if (!x) return l;
+  return { ...l, deeper: x.deeper, apply: x.apply, examples: x.examples, terms: x.terms, quiz: [...l.quiz, ...(x.quiz ?? [])] };
+});
 export const LESSON_INDEX: Record<string, Lesson> = Object.fromEntries(LESSONS.map((l) => [l.id, l]));
 export const lessonsInSection = (s: SectionId) => LESSONS.filter((l) => l.section === s);
 export { SECTIONS };
