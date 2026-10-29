@@ -5272,3 +5272,225 @@ details.sequence[open] {
     font-size: 1.6rem;
   }
 }
+
+/* ---------- puzzles: modes, HUD, timer, results ---------- */
+.pz-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.pz-modes button {
+  font: inherit;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 650;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pz-modes button span {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.pz-modes button.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--surface);
+}
+.pz-start h2 {
+  margin: 4px 0 8px;
+}
+.pz-rules {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-2);
+}
+.pz-rules li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 10px;
+  vertical-align: middle;
+}
+.pz-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pz-top .pz-meta {
+  margin: 0;
+}
+.pz-hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pz-total {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.pz-combo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--raise);
+  border-radius: 4px;
+  padding: 2px 7px;
+  animation: pz-pop 0.3s ease-out;
+}
+.pz-lives {
+  display: inline-flex;
+  gap: 4px;
+}
+.pz-lives span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bad);
+}
+.pz-lives span.on {
+  background: var(--bad);
+}
+.pz-dots {
+  margin-bottom: 10px;
+}
+.pz-timer {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  margin: 0 0 14px;
+  transform-origin: left;
+  animation: pz-drain 20s linear forwards;
+}
+@keyframes pz-drain {
+  0%,
+  25% {
+    transform: scaleX(1);
+    background: var(--accent);
+  }
+  100% {
+    transform: scaleX(0);
+    background: var(--muted);
+  }
+}
+@keyframes pz-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.pz-verdict {
+  font-size: 1.05rem;
+}
+.pz-gain {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--serif);
+  font-weight: 700;
+  color: var(--good);
+  animation: pz-pop 0.35s ease-out;
+}
+.pz-opt.right {
+  animation: pz-pop 0.25s ease-out;
+}
+.pz-foot .pz-next {
+  order: 2;
+}
+.pz-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+.pz-score .pz-big {
+  margin: 0;
+}
+.pz-unit {
+  color: var(--muted);
+  font-size: 1rem;
+}
+.pz-best {
+  align-self: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  padding: 3px 9px;
+  border-radius: 4px;
+  animation: pz-pop 0.4s ease-out;
+}
+.pz-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 12px;
+}
+.pz-marks span {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--good);
+}
+.pz-marks span.no {
+  background: var(--bad);
+}
+.sb-pts {
+  font-family: var(--serif);
+  font-weight: 700;
+}
+.sb-stats dd small {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pz-timer,
+  .pz-gain,
+  .pz-combo,
+  .pz-best,
+  .pz-opt.right {
+    animation: none;
+  }
+}
+@media (max-width: 680px) {
+  .pz-modes button {
+    font-size: 1rem;
+    padding: 10px 12px;
+  }
+  .pz-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pz-foot .pz-next {
+    order: 0;
+    width: 100%;
+  }
+}

@@ -9,7 +9,7 @@ import { preflopRanking } from '../ranges/preflopEquity';
 
 export interface Puzzle {
   id: string;
-  kind: 'open' | 'potodds' | 'showdown' | 'combos' | 'bluff' | 'shove';
+  kind: 'open' | 'potodds' | 'showdown' | 'combos' | 'bluff' | 'shove' | 'outs' | 'nuts';
   topic: string;
   prompt: string;
   hero?: Card[];
@@ -207,6 +207,102 @@ function shovePuzzle(rng: Rng, id: string): Puzzle {
   };
 }
 
+function outsPuzzle(rng: Rng, id: string): Puzzle {
+  // a flop where you have a draw (flush or open-ended) and no made straight or better
+  for (let t = 0; t < 400; t++) {
+    const deck = rng.shuffle(fullDeck());
+    const hero = deck.slice(0, 2);
+    const board = deck.slice(2, 5);
+    const now = categoryOf(evaluate([...hero, ...board]));
+    if (now > HandCategory.Pair) continue; // no two pair or better, so every out is a straight or flush card
+    const unseen = deck.slice(5);
+    const outs = unseen.filter((c) => categoryOf(evaluate([...hero, ...board, c])) >= HandCategory.Straight);
+    const flushOuts = outs.filter((c) => categoryOf(evaluate([...hero, ...board, c])) === HandCategory.Flush || categoryOf(evaluate([...hero, ...board, c])) === HandCategory.StraightFlush).length;
+    const n = outs.length;
+    if (n < 4 || n > 15) continue;
+    const kind = flushOuts >= 9 && n > flushOuts ? 'a flush draw and a straight draw' : flushOuts >= 9 ? 'a flush draw' : n >= 8 ? 'an open-ended (or double gutshot) straight draw' : 'a gutshot straight draw';
+    const wrong = [...new Set([n + 1, n - 1, n + 4, n === 9 ? 8 : 9, n + 2].filter((x) => x !== n && x > 0))].slice(0, 3).map(String);
+    const { options, answer } = shuffleOptions(rng, String(n), wrong);
+    return {
+      id,
+      kind: 'outs',
+      topic: 'Outs',
+      prompt: 'Flop. How many cards on the turn give you a straight or better?',
+      hero,
+      board,
+      options,
+      answer,
+      explain: `You have ${kind}. ${n} of the 47 unseen cards make a straight or better${flushOuts && n > flushOuts ? ` (${flushOuts} flush cards plus ${n - flushOuts} straight cards)` : ''}. With one card to come that is ${n} ÷ 47 ≈ ${pct(n / 47)}; by the river about ${pct(1 - ((47 - n) / 47) * ((46 - n) / 46))}.`,
+      lesson: 'outs',
+    };
+  }
+  return potOddsPuzzle(rng, id);
+}
+
+const NUTS_NAMES: Record<number, string> = {
+  [HandCategory.StraightFlush]: 'Straight flush',
+  [HandCategory.Quads]: 'Four of a kind',
+  [HandCategory.FullHouse]: 'Full house',
+  [HandCategory.Flush]: 'Flush',
+  [HandCategory.Straight]: 'Straight',
+  [HandCategory.Trips]: 'Three of a kind',
+};
+
+function nutsPuzzle(rng: Rng, id: string): Puzzle {
+  const deck = rng.shuffle(fullDeck());
+  const board = deck.slice(0, 5);
+  const rest = deck.slice(5);
+  let best = -1;
+  let bestHole: Card[] = [];
+  for (let a = 0; a < rest.length; a++)
+    for (let b = a + 1; b < rest.length; b++) {
+      const v = evaluate([...board, rest[a], rest[b]]);
+      if (v > best) {
+        best = v;
+        bestHole = [rest[a], rest[b]];
+      }
+    }
+  const cat = categoryOf(best);
+  const correct = NUTS_NAMES[cat] ?? describeScore(best);
+  const pool = Object.values(NUTS_NAMES).filter((x) => x !== correct);
+  const wrong = rng.shuffle(pool).slice(0, 3);
+  const { options, answer } = shuffleOptions(rng, correct, wrong);
+  const paired = new Set(board.map((c) => cardToString(c)[0])).size < 5;
+  return {
+    id,
+    kind: 'nuts',
+    topic: 'The nuts',
+    prompt: 'River. What is the best possible hand on this board (the nuts)?',
+    board,
+    options,
+    answer,
+    explain: `The strongest holding is ${cardToString(bestHole[0])} ${cardToString(bestHole[1])}, making ${lower(describeScore(best))}. ${paired ? 'A paired board makes full houses and quads possible.' : 'With no pair on the board, full houses and quads are impossible.'}`,
+    lesson: 'rules-rankings',
+  };
+}
+
+const ALL_MAKERS = [openPuzzle, potOddsPuzzle, showdownPuzzle, combosPuzzle, bluffPuzzle, shovePuzzle, outsPuzzle, nutsPuzzle];
+
+/** One random puzzle of any kind (used by survival mode). */
+export function randomPuzzle(key: string, index: number): Puzzle {
+  const rng = createRng(hashString(`survival:${key}:${index}`));
+  const make = ALL_MAKERS[Math.floor(rng.next() * ALL_MAKERS.length)];
+  return make(rng, `${key}#${index}`);
+}
+
+// ---------------- scoring ----------------
+
+export const BASE_POINTS = 100;
+export const SPEED_WINDOW = { full: 5000, zero: 20000 };
+
+/** Points for one answer: 100 for a correct answer, up to +50 for speed, times the combo multiplier. */
+export function pointsFor(correct: boolean, ms: number, combo: number): number {
+  if (!correct) return 0;
+  const speed = ms <= SPEED_WINDOW.full ? 1 : ms >= SPEED_WINDOW.zero ? 0 : 1 - (ms - SPEED_WINDOW.full) / (SPEED_WINDOW.zero - SPEED_WINDOW.full);
+  const mult = Math.min(2, 1 + 0.25 * Math.max(0, combo - 1));
+  return Math.round((BASE_POINTS + 50 * speed) * mult);
+}
+
 /** Local date key, e.g. 2026-10-29. */
 export function todayKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -215,19 +311,30 @@ export function todayKey(d = new Date()): string {
 /** Five puzzles for a day (or for any seed, for unranked extra sets). */
 export function puzzleSet(key: string): Puzzle[] {
   const rng = createRng(hashString(`puzzles:${key}`));
-  const last = rng.next() < 0.5 ? bluffPuzzle : shovePuzzle;
-  const makers = [openPuzzle, potOddsPuzzle, showdownPuzzle, combosPuzzle, last];
+  // one preflop, one math, one reading question, then two more of any other kind
+  const math = rng.pick([potOddsPuzzle, bluffPuzzle, combosPuzzle]);
+  const reading = rng.pick([showdownPuzzle, nutsPuzzle, outsPuzzle]);
+  const pre = rng.pick([openPuzzle, shovePuzzle]);
+  const rest = rng.shuffle(ALL_MAKERS.filter((m) => m !== math && m !== reading && m !== pre)).slice(0, 2);
+  const makers = [pre, math, reading, ...rest];
   return makers.map((m, i) => m(rng, `${key}#${i}`));
 }
 
 // ---------------- results (stored in this browser) ----------------
 
 export interface PuzzleRun {
+  id: string;
+  mode: 'daily' | 'survival';
   date: string;
-  score: number;
+  points: number;
+  correct: number;
   total: number;
   ms: number;
   at: number;
+  /** one character per answer: 'o' correct, 'x' wrong */
+  marks: string;
+  /** legacy field from the first version */
+  score?: number;
 }
 
 const KEY = 'felt-school:puzzles';
@@ -235,26 +342,73 @@ const KEY = 'felt-school:puzzles';
 export function loadRuns(): PuzzleRun[] {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((r) => r && typeof r.date === 'string') : [];
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((r) => r && typeof r.date === 'string')
+      .map((r) => ({
+        id: r.id ?? `daily:${r.date}`,
+        mode: r.mode ?? 'daily',
+        date: r.date,
+        points: typeof r.points === 'number' ? r.points : (r.score ?? 0) * BASE_POINTS,
+        correct: typeof r.correct === 'number' ? r.correct : r.score ?? 0,
+        total: r.total ?? 5,
+        ms: r.ms ?? 0,
+        at: r.at ?? 0,
+        marks: r.marks ?? '',
+      }));
   } catch {
     return [];
   }
 }
 
 export function saveRun(run: PuzzleRun): PuzzleRun[] {
-  const runs = loadRuns().filter((r) => r.date !== run.date);
+  const runs = loadRuns().filter((r) => r.id !== run.id);
   runs.push(run);
   try {
     localStorage.setItem(KEY, JSON.stringify(runs.slice(-400)));
   } catch {
-    /* storage unavailable */
+    /* storage unavailable: keep the run for this visit */
   }
   return runs;
 }
 
+/** Text for sharing a result, e.g. "Felt School daily · Oct 29 · 455 pts ✅✅❌✅✅". */
+export function shareText(run: PuzzleRun, label: string): string {
+  const marks = [...run.marks].map((m) => (m === 'o' ? '🟩' : '🟥')).join('');
+  return `Felt School ${run.mode === 'daily' ? 'daily' : 'survival'} · ${label} · ${run.points} pts\n${marks}`;
+}
+
+// in-progress state, so a reload or redraw resumes instead of restarting
+export interface PuzzleProgress {
+  key: string;
+  index: number;
+  picks: (number | null)[];
+  times: number[];
+  points: number[];
+  startedAt: number;
+  lives?: number;
+}
+const PKEY = 'felt-school:puzzle-progress';
+export function loadProgress(key: string): PuzzleProgress | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(`${PKEY}:${key}`) ?? 'null');
+    return v && v.key === key ? v : null;
+  } catch {
+    return null;
+  }
+}
+export function saveProgress(key: string, p: PuzzleProgress | null) {
+  try {
+    if (p) localStorage.setItem(`${PKEY}:${key}`, JSON.stringify(p));
+    else localStorage.removeItem(`${PKEY}:${key}`);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Consecutive days with a completed daily set, ending today or yesterday. */
 export function streak(runs: PuzzleRun[], today = new Date()): number {
-  const days = new Set(runs.map((r) => r.date));
+  const days = new Set(runs.filter((r) => r.mode === 'daily').map((r) => r.date));
   const d = new Date(today);
   if (!days.has(todayKey(d))) d.setDate(d.getDate() - 1);
   let n = 0;

@@ -1,69 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { CardRow } from '../components/Card';
 import { LESSON_INDEX } from '../../content/lessons';
-import { PuzzleRun, loadRuns, puzzleSet, saveRun, streak, todayKey } from '../../puzzles/daily';
+import {
+  Puzzle,
+  PuzzleProgress,
+  PuzzleRun,
+  loadProgress,
+  loadRuns,
+  pointsFor,
+  puzzleSet,
+  randomPuzzle,
+  saveProgress,
+  saveRun,
+  shareText,
+  streak,
+  todayKey,
+} from '../../puzzles/daily';
 
+const LIVES = 3;
 const fmtTime = (ms: number) => {
   const s = Math.max(1, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 const fmtDate = (key: string) => {
   const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
+const untilMidnight = () => {
+  const n = new Date();
+  const m = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1);
+  const h = Math.floor((m.getTime() - n.getTime()) / 3600000);
+  const min = Math.floor(((m.getTime() - n.getTime()) % 3600000) / 60000);
+  return `${h}h ${min}m`;
+};
+
+type Mode = 'daily' | 'survival';
 
 export function HomePage() {
   const { data } = useStore();
   const nav = useNavigate();
   const today = todayKey();
   const [runs, setRuns] = useState<PuzzleRun[]>(loadRuns);
-  const doneToday = runs.find((r) => r.date === today);
-  // extra sets are unranked practice; the daily set counts for the scoreboard
-  const [extra, setExtra] = useState(0);
-  const setKey = extra ? `${today}:extra:${extra}` : today;
-  const puzzles = useMemo(() => puzzleSet(setKey), [setKey]);
-  const [i, setI] = useState(0);
-  const [picks, setPicks] = useState<(number | null)[]>(() => puzzles.map(() => null));
-  const started = useRef(Date.now());
-  const [finished, setFinished] = useState<{ score: number; ms: number } | null>(null);
+  const [mode, setMode] = useState<Mode>('daily');
+  const dailyRun = runs.find((r) => r.id === `daily:${today}`);
 
-  useEffect(() => {
-    setI(0);
-    setPicks(puzzles.map(() => null));
-    setFinished(null);
-    started.current = Date.now();
-  }, [puzzles]);
-
-  const ranked = extra === 0 && !doneToday;
-  const p = puzzles[i];
-  const pick = picks[i];
-  const answered = pick !== null && pick !== undefined;
-  const score = picks.filter((x, k) => x === puzzles[k].answer).length;
-
-  const choose = (k: number) => {
-    if (answered || finished) return;
-    setPicks((old) => old.map((x, j) => (j === i ? k : x)));
-  };
-  const next = () => {
-    if (i < puzzles.length - 1) {
-      setI(i + 1);
-      return;
-    }
-    const ms = Date.now() - started.current;
-    setFinished({ score, ms });
-    if (ranked) setRuns(saveRun({ date: today, score, total: puzzles.length, ms, at: Date.now() }));
-  };
-
-  // scoreboard
-  const best = [...runs].sort((a, b) => b.score - a.score || a.ms - b.ms);
-  const top = best.slice(0, 7);
-  const st = streak(runs);
   const played = data.history.length;
   const scored = data.history.filter((h) => h.score !== null);
   const avg = scored.length ? Math.round(scored.reduce((a, h) => a + (h.score ?? 0), 0) / scored.length) : null;
-  const showDone = !!doneToday && extra === 0 && !finished;
+  const board = [...runs].sort((a, b) => b.points - a.points || a.ms - b.ms).slice(0, 8);
+  const survivalBest = runs.filter((r) => r.mode === 'survival').reduce((m, r) => Math.max(m, r.points), 0);
+  const st = streak(runs);
 
   return (
     <div className="page home">
@@ -80,155 +68,66 @@ export function HomePage() {
 
       <div className="home-grid">
         <section className="puzzles" aria-labelledby="pz-title">
-          <header className="pz-head">
-            <div>
-              <p className="eyebrow">{extra ? 'Extra puzzles · not ranked' : `Daily puzzles · ${fmtDate(today)}`}</p>
-              <h2 id="pz-title">{extra ? 'More puzzles' : 'Today’s puzzles'}</h2>
-            </div>
-            {!showDone && (
-              <ol className="pz-dots" aria-label="Progress">
-                {puzzles.map((q, k) => (
-                  <li key={q.id} className={`${k === i && !finished ? 'cur' : ''} ${picks[k] === null ? '' : picks[k] === q.answer ? 'ok' : 'no'}`} aria-label={`Puzzle ${k + 1}`} />
-                ))}
-              </ol>
-            )}
-          </header>
-
-          {showDone ? (
-            <div className="pz-result">
-              <p className="pz-big">
-                {doneToday!.score}
-                <span>/{doneToday!.total}</span>
-              </p>
-              <p>
-                You finished today’s puzzles in {fmtTime(doneToday!.ms)}. New ones appear tomorrow.
-              </p>
-              <div className="pz-actions">
-                <button className="btn primary" onClick={() => setExtra(1)}>
-                  Play extra puzzles
-                </button>
-                <button className="btn" onClick={() => nav('/practice')}>
-                  Go to practice
-                </button>
-              </div>
-            </div>
-          ) : finished ? (
-            <div className="pz-result">
-              <p className="pz-big">
-                {finished.score}
-                <span>/{puzzles.length}</span>
-              </p>
-              <p>
-                {finished.score === puzzles.length ? 'A perfect set.' : finished.score >= 3 ? 'Good set.' : 'Worth another look at the explanations.'} Time {fmtTime(finished.ms)}.
-                {ranked ? ' Saved to your scoreboard.' : ' Extra sets are not ranked.'}
-              </p>
-              <div className="pz-actions">
-                <button className="btn primary" onClick={() => setExtra((x) => x + 1)}>
-                  Play extra puzzles
-                </button>
-                <button className="btn" onClick={() => nav('/practice')}>
-                  Go to practice
-                </button>
-              </div>
-            </div>
+          <div className="pz-modes" role="tablist" aria-label="Puzzle mode">
+            <button role="tab" aria-selected={mode === 'daily'} className={mode === 'daily' ? 'on' : ''} onClick={() => setMode('daily')}>
+              Daily five
+              <span>{dailyRun ? `${dailyRun.points} pts today` : '5 questions · once a day'}</span>
+            </button>
+            <button role="tab" aria-selected={mode === 'survival'} className={mode === 'survival' ? 'on' : ''} onClick={() => setMode('survival')} data-testid="mode-survival">
+              Survival
+              <span>{survivalBest ? `Best ${survivalBest} pts` : `Keep going until ${LIVES} mistakes`}</span>
+            </button>
+          </div>
+          {mode === 'daily' ? (
+            <PuzzleGame key={`daily:${today}`} mode="daily" setKey={today} existing={dailyRun} runs={runs} onSaved={setRuns} onSwitch={() => setMode('survival')} />
           ) : (
-            <article className="pz-card">
-              <p className="pz-meta">
-                {i + 1} of {puzzles.length} · {p.topic}
-              </p>
-              <p className="pz-prompt">{p.prompt}</p>
-              {(p.hero || p.board) && (
-                <div className="pz-cards">
-                  {p.board && (
-                    <div>
-                      <span className="pz-cl">Board</span>
-                      <CardRow cards={p.board} size="md" fourColor={data.prefs.fourColor} />
-                    </div>
-                  )}
-                  {p.hero && (
-                    <div>
-                      <span className="pz-cl">You</span>
-                      <CardRow cards={p.hero} size="md" fourColor={data.prefs.fourColor} />
-                    </div>
-                  )}
-                  {p.villain && (
-                    <div>
-                      <span className="pz-cl">Opponent</span>
-                      <CardRow cards={p.villain} size="md" fourColor={data.prefs.fourColor} />
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className={`pz-options n${p.options.length}`}>
-                {p.options.map((o, k) => (
-                  <button
-                    key={o}
-                    className={`pz-opt ${answered ? (k === p.answer ? 'right' : k === pick ? 'wrong' : 'dim') : ''}`}
-                    onClick={() => choose(k)}
-                    disabled={answered}
-                    data-testid="pz-option"
-                  >
-                    {o}
-                  </button>
-                ))}
-              </div>
-              {answered && (
-                <div className={`pz-feedback ${pick === p.answer ? 'ok' : 'no'}`} role="status">
-                  <p>
-                    <strong>{pick === p.answer ? 'Correct.' : `Not quite — the answer is ${p.options[p.answer]}.`}</strong> {p.explain}
-                  </p>
-                  <div className="pz-foot">
-                    {LESSON_INDEX[p.lesson] && <Link to={`/learn/${p.lesson}`}>Lesson: {LESSON_INDEX[p.lesson].title}</Link>}
-                    <button className="btn primary" onClick={next} autoFocus>
-                      {i < puzzles.length - 1 ? 'Next puzzle' : 'See result'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </article>
+            <PuzzleGame key="survival" mode="survival" setKey="survival" runs={runs} onSaved={setRuns} onSwitch={() => setMode('daily')} />
           )}
         </section>
 
         <aside className="scoreboard" aria-labelledby="sb-title">
-          <h2 id="sb-title">Your scoreboard</h2>
+          <h2 id="sb-title">Leaderboard</h2>
           <dl className="sb-stats">
             <div>
               <dt>Today</dt>
-              <dd>{doneToday ? `${doneToday.score}/${doneToday.total}` : '—'}</dd>
+              <dd>{dailyRun ? dailyRun.points : '—'}</dd>
             </div>
             <div>
               <dt>Streak</dt>
               <dd>
-                {st} day{st === 1 ? '' : 's'}
+                {st}
+                <small> day{st === 1 ? '' : 's'}</small>
               </dd>
             </div>
             <div>
-              <dt>Best</dt>
-              <dd>{best[0] ? `${best[0].score}/${best[0].total}` : '—'}</dd>
+              <dt>Survival</dt>
+              <dd>{survivalBest || '—'}</dd>
             </div>
           </dl>
-          <h3>Best daily runs</h3>
-          {top.length === 0 ? (
-            <p className="note">Finish today’s puzzles to start your board. Ties are broken by time.</p>
+          <h3>Top runs</h3>
+          {board.length === 0 ? (
+            <p className="note">Finish a puzzle run to get on the board. Ties are broken by time.</p>
           ) : (
             <table className="sb-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Day</th>
-                  <th>Score</th>
-                  <th>Time</th>
+                  <th>Run</th>
+                  <th>Points</th>
+                  <th>Right</th>
                 </tr>
               </thead>
               <tbody>
-                {top.map((r, k) => (
-                  <tr key={r.date} className={r.date === today ? 'me' : ''}>
+                {board.map((r, k) => (
+                  <tr key={r.id} className={Date.now() - r.at < 60000 ? 'me' : ''}>
                     <td>{k + 1}</td>
-                    <td>{fmtDate(r.date)}</td>
                     <td>
-                      {r.score}/{r.total}
+                      {r.mode === 'daily' ? 'Daily' : 'Survival'} <span className="note">{fmtDate(r.date)}</span>
                     </td>
-                    <td>{fmtTime(r.ms)}</td>
+                    <td className="sb-pts">{r.points}</td>
+                    <td>
+                      {r.correct}/{r.total}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -241,12 +140,284 @@ export function HomePage() {
                 {played} hand{played === 1 ? '' : 's'} played{avg !== null ? `, average score ${avg}` : ''}. <Link to="/progress">Details</Link>
               </>
             ) : (
-              <>No hands yet. <Link to="/practice">Play your first hand</Link></>
+              <>
+                No hands yet. <Link to="/practice">Play your first hand</Link>
+              </>
             )}
           </p>
-          <p className="note">Scores are saved in this browser.</p>
+          <p className="note">The leaderboard shows your runs on this device.</p>
         </aside>
       </div>
     </div>
+  );
+}
+
+function PuzzleGame({
+  mode,
+  setKey,
+  existing,
+  runs,
+  onSaved,
+  onSwitch,
+}: {
+  mode: Mode;
+  setKey: string;
+  existing?: PuzzleRun;
+  runs: PuzzleRun[];
+  onSaved: (r: PuzzleRun[]) => void;
+  onSwitch: () => void;
+}) {
+  const { data } = useStore();
+  const nav = useNavigate();
+  const progressKey = `${mode}:${setKey}`;
+  const fresh = (): PuzzleProgress => ({ key: progressKey, index: 0, picks: [], times: [], points: [], startedAt: Date.now(), lives: mode === 'survival' ? LIVES : undefined });
+  const [prog, setProg] = useState<PuzzleProgress | null>(() => (existing ? null : loadProgress(progressKey)));
+  const [survivalSeed, setSurvivalSeed] = useState(() => String(prog?.startedAt ?? Date.now()));
+  const [shownAt, setShownAt] = useState(Date.now());
+  const [result, setResult] = useState<PuzzleRun | null>(existing ?? null);
+  const [copied, setCopied] = useState(false);
+
+  const daily = useMemo(() => (mode === 'daily' ? puzzleSet(setKey) : []), [mode, setKey]);
+  const puzzleAt = (k: number): Puzzle => (mode === 'daily' ? daily[k] : randomPuzzle(survivalSeed, k));
+
+  useEffect(() => saveProgress(progressKey, prog), [progressKey, prog]);
+  useEffect(() => setShownAt(Date.now()), [prog?.index]);
+
+  // start screen for survival, or when nothing is in progress
+  if (!prog && !result) {
+    return (
+      <div className="pz-card pz-start">
+        <p className="pz-meta">{mode === 'daily' ? 'Daily five' : 'Survival'}</p>
+        <h2 id="pz-title">{mode === 'daily' ? 'Five quick poker questions' : 'How long can you last?'}</h2>
+        <p>
+          {mode === 'daily'
+            ? 'One preflop decision, one bit of math, one hand to read and two surprises. Everyone gets the same five today.'
+            : `Questions keep coming until you make ${LIVES} mistakes. Every kind of puzzle can show up.`}
+        </p>
+        <ul className="pz-rules">
+          <li>
+            <strong>100</strong> points for a right answer
+          </li>
+          <li>
+            up to <strong>+50</strong> for answering within 5 seconds
+          </li>
+          <li>
+            a <strong>combo</strong> multiplier for answers in a row (up to ×2)
+          </li>
+        </ul>
+        <button
+          className="btn primary big"
+          data-testid="pz-start"
+          onClick={() => {
+            const p = fresh();
+            setSurvivalSeed(String(p.startedAt));
+            setProg(p);
+          }}
+        >
+          {mode === 'daily' ? 'Start today’s five' : 'Start survival'}
+        </button>
+      </div>
+    );
+  }
+
+  if (result) {
+    const sameMode = runs.filter((r) => r.mode === result.mode).sort((a, b) => b.points - a.points || a.ms - b.ms);
+    const rank = sameMode.findIndex((r) => r.id === result.id) + 1;
+    const isBest = rank === 1 && sameMode.length > 1;
+    const label = result.mode === 'daily' ? fmtDate(result.date) : `${result.correct} right`;
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(shareText(result, label));
+        setCopied(true);
+      } catch {
+        setCopied(false);
+      }
+    };
+    return (
+      <div className="pz-card pz-result" data-testid="pz-result">
+        <p className="pz-meta">{result.mode === 'daily' ? `Daily five · ${fmtDate(result.date)}` : 'Survival · run over'}</p>
+        <div className="pz-score">
+          <span className="pz-big">{result.points}</span>
+          <span className="pz-unit">points</span>
+          {isBest && <span className="pz-best">New best</span>}
+        </div>
+        <p className="pz-marks" aria-label={`${result.correct} of ${result.total} correct`}>
+          {[...result.marks].map((m, k) => (
+            <span key={k} className={m === 'o' ? 'ok' : 'no'} />
+          ))}
+        </p>
+        <p>
+          {result.correct} of {result.total} right in {fmtTime(result.ms)}.{' '}
+          {rank > 0 && `That is your #${rank} ${result.mode === 'daily' ? 'daily' : 'survival'} run.`}{' '}
+          {result.mode === 'daily' && `New puzzles in ${untilMidnight()}.`}
+        </p>
+        <div className="pz-actions">
+          <button className="btn" onClick={copy}>
+            {copied ? 'Copied' : 'Copy result'}
+          </button>
+          {result.mode === 'daily' ? (
+            <button className="btn primary" onClick={onSwitch}>
+              Try survival
+            </button>
+          ) : (
+            <button
+              className="btn primary"
+              onClick={() => {
+                const p = fresh();
+                setSurvivalSeed(String(p.startedAt));
+                setResult(null);
+                setProg(p);
+              }}
+            >
+              Play again
+            </button>
+          )}
+          <button className="btn ghost" onClick={() => nav('/practice')}>
+            Go to practice
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const p = puzzleAt(prog!.index);
+  const pick = prog!.picks[prog!.index];
+  const answered = pick !== null && pick !== undefined;
+  const combo = (() => {
+    let c = 0;
+    for (let k = prog!.index - (answered ? 0 : 1); k >= 0; k--) {
+      if (prog!.picks[k] === puzzleAt(k).answer) c++;
+      else break;
+    }
+    return c;
+  })();
+  const total = prog!.points.reduce((a, b) => a + b, 0);
+  const lives = prog!.lives ?? 0;
+
+  const choose = (k: number) => {
+    if (answered) return;
+    const ms = Date.now() - shownAt;
+    const correct = k === p.answer;
+    const pts = pointsFor(correct, ms, correct ? combo + 1 : 0);
+    setProg((old) => {
+      if (!old) return old;
+      const picks = [...old.picks];
+      picks[old.index] = k;
+      const times = [...old.times];
+      times[old.index] = ms;
+      const points = [...old.points];
+      points[old.index] = pts;
+      return { ...old, picks, times, points, lives: old.lives !== undefined && !correct ? old.lives - 1 : old.lives };
+    });
+  };
+
+  const over = mode === 'daily' ? prog!.index >= daily.length - 1 : lives <= 0;
+  const next = () => {
+    if (!answered) return;
+    if (!over) {
+      setProg((old) => (old ? { ...old, index: old.index + 1 } : old));
+      return;
+    }
+    // finished: save first, then show the result
+    const n = prog!.index + 1;
+    const marks = Array.from({ length: n }, (_, k) => (prog!.picks[k] === puzzleAt(k).answer ? 'o' : 'x')).join('');
+    const run: PuzzleRun = {
+      id: mode === 'daily' ? `daily:${setKey}` : `survival:${prog!.startedAt}`,
+      mode,
+      date: todayKey(),
+      points: total,
+      correct: [...marks].filter((m) => m === 'o').length,
+      total: n,
+      ms: prog!.times.slice(0, n).reduce((a, b) => a + (b ?? 0), 0),
+      at: Date.now(),
+      marks,
+    };
+    onSaved(saveRun(run));
+    setResult(run);
+    setProg(null);
+  };
+
+  const lastPts = answered ? prog!.points[prog!.index] : 0;
+  return (
+    <article className="pz-card" aria-live="polite">
+      <div className="pz-top">
+        <p className="pz-meta">
+          {mode === 'daily' ? `${prog!.index + 1} of ${daily.length}` : `Question ${prog!.index + 1}`} · {p.topic}
+        </p>
+        <div className="pz-hud">
+          {mode === 'survival' && (
+            <span className="pz-lives" aria-label={`${lives} lives left`}>
+              {Array.from({ length: LIVES }, (_, k) => (
+                <span key={k} className={k < lives ? 'on' : ''} />
+              ))}
+            </span>
+          )}
+          {combo >= 2 && <span className="pz-combo">×{Math.min(2, 1 + 0.25 * (combo - 1)).toFixed(2).replace(/0$/, '')} combo</span>}
+          <span className="pz-total">{total} pts</span>
+        </div>
+      </div>
+      {mode === 'daily' && (
+        <ol className="pz-dots" aria-hidden="true">
+          {daily.map((q, k) => (
+            <li key={q.id} className={`${k === prog!.index ? 'cur' : ''} ${prog!.picks[k] === undefined || prog!.picks[k] === null ? '' : prog!.picks[k] === q.answer ? 'ok' : 'no'}`} />
+          ))}
+        </ol>
+      )}
+      {!answered && <div className="pz-timer" key={prog!.index} aria-hidden="true" />}
+      <h2 id="pz-title" className="pz-prompt">
+        {p.prompt}
+      </h2>
+      {(p.hero || p.board) && (
+        <div className="pz-cards">
+          {p.board && (
+            <div>
+              <span className="pz-cl">Board</span>
+              <CardRow cards={p.board} size="md" fourColor={data.prefs.fourColor} />
+            </div>
+          )}
+          {p.hero && (
+            <div>
+              <span className="pz-cl">You</span>
+              <CardRow cards={p.hero} size="md" fourColor={data.prefs.fourColor} />
+            </div>
+          )}
+          {p.villain && (
+            <div>
+              <span className="pz-cl">Opponent</span>
+              <CardRow cards={p.villain} size="md" fourColor={data.prefs.fourColor} />
+            </div>
+          )}
+        </div>
+      )}
+      <div className={`pz-options n${p.options.length}`}>
+        {p.options.map((o, k) => (
+          <button key={o} className={`pz-opt ${answered ? (k === p.answer ? 'right' : k === pick ? 'wrong' : 'dim') : ''}`} onClick={() => choose(k)} disabled={answered} data-testid="pz-option">
+            {o}
+          </button>
+        ))}
+      </div>
+      {answered && (
+        <div className={`pz-feedback ${pick === p.answer ? 'ok' : 'no'}`} role="status">
+          <p className="pz-verdict">
+            {pick === p.answer ? (
+              <>
+                <strong>Correct</strong> <span className="pz-gain">+{lastPts}</span>
+              </>
+            ) : (
+              <>
+                <strong>Not quite</strong> — the answer is {p.options[p.answer]}.{mode === 'survival' && ` ${lives} ${lives === 1 ? 'life' : 'lives'} left.`}
+              </>
+            )}
+          </p>
+          <p>{p.explain}</p>
+          <div className="pz-foot">
+            <button className="btn primary pz-next" onClick={next} data-testid="pz-next">
+              {over ? 'See your score' : 'Next question'}
+            </button>
+            {LESSON_INDEX[p.lesson] && <Link to={`/learn/${p.lesson}`}>Lesson: {LESSON_INDEX[p.lesson].title}</Link>}
+          </div>
+        </div>
+      )}
+    </article>
   );
 }

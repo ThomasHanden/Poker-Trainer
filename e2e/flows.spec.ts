@@ -110,16 +110,32 @@ test('full hands mode deals a complete hand from preflop', async ({ page }) => {
   expect(await page.locator('.board .pcard:not(.empty)').count()).toBe(0);
 });
 
-test('daily puzzles can be completed and show on the scoreboard', async ({ page }) => {
+test('daily puzzles can be completed and show on the leaderboard', async ({ page }) => {
   await page.goto('/#/');
-  await page.evaluate(() => localStorage.removeItem('felt-school:puzzles'));
+  await page.evaluate(() => localStorage.clear());
   await page.reload();
+  await page.getByTestId('pz-start').click();
   for (let k = 0; k < 5; k++) {
     await page.getByTestId('pz-option').first().click();
-    await page.getByRole('button', { name: /Next puzzle|See result/ }).click();
+    await page.getByTestId('pz-next').click();
   }
-  await expect(page.locator('.pz-big')).toBeVisible();
+  await expect(page.getByTestId('pz-result')).toBeVisible();
   await expect(page.locator('.sb-table tbody tr')).toHaveCount(1);
+  // a reload keeps the finished result instead of starting over
+  await page.reload();
+  await expect(page.getByTestId('pz-result')).toBeVisible();
+  // survival ends after three mistakes and is ranked too
+  await page.getByTestId('mode-survival').click();
+  await page.getByTestId('pz-start').click();
+  for (let k = 0; k < 40 && !(await page.getByTestId('pz-result').isVisible()); k++) {
+    const opts = page.getByTestId('pz-option');
+    const n = await opts.count();
+    // pick the last option: often wrong, so the run ends quickly
+    await opts.nth(n - 1).click();
+    await page.getByTestId('pz-next').click();
+  }
+  await expect(page.getByTestId('pz-result')).toBeVisible();
+  await expect(page.locator('.sb-table tbody tr')).toHaveCount(2);
   await page.getByRole('button', { name: 'Go to practice →' }).click();
   await expect(page).toHaveURL(/#\/practice/);
 });
