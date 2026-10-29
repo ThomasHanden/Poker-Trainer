@@ -25,7 +25,9 @@ test('core training flow: scenario → decisions → review → lesson → relat
 
   // 2-3. make legal decisions until the hand ends, then read the review
   await playToEnd(page);
+  await page.locator('.dcard-toggle').first().click();
   await expect(page.getByText('1. What information was available?').first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Opponent types' }).first().click();
   await expect(page.getByText('7. What opponent tendencies could change the recommendation?').first()).toBeVisible();
   await expect(page.locator('.score-box')).toContainText(/instructional score|Insufficient confidence/);
 
@@ -36,7 +38,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
 
   // 5. practise the related concept
   await page.getByTestId('practice-related').click();
-  await expect(page.locator('.banner.info')).toContainText('Targeted practice');
+  await expect(page.locator('.pchip.target')).toContainText('Target:');
   await expect(page.locator('.action-bar, [data-testid=review]').first()).toBeVisible({ timeout: 30_000 });
 
   // 6. save and reopen a custom range

@@ -85,8 +85,6 @@ export function Table({
   const totalPot = potSize(state);
   const streetBets = state.players.reduce((a, p) => a + p.streetCommitted, 0);
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
-  const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - state.players[hero].streetCommitted, state.players[hero].stack)) : 0;
-  const me = state.players[hero];
   // seat geometry: hero at the bottom centre, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
   const box = narrow ? PORTRAIT : LANDSCAPE;
@@ -175,21 +173,43 @@ export function Table({
           );
         })}
       </div>
-      <div className="table-facts" aria-live="polite">
-        {!state.complete && state.toAct === hero && (
-          <span>
-            <Term id="tocall">To call</Term> <strong data-testid="to-call">{fmtBB(toCall, bb)}</strong>
-          </span>
-        )}
-        <span>
-          <Term id="effective">Effective</Term> <strong>{fmtBB(effectiveStack(state, hero), bb)}</strong>
+    </div>
+  );
+}
+
+/** The numbers a decision is made with: pot, amount to call, effective stack and current hand. */
+export function DecisionFacts({ state, hero }: { state: HandState; hero: number }) {
+  const bb = state.config.bb;
+  const me = state.players[hero];
+  const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - me.streetCommitted, me.stack)) : 0;
+  return (
+    <div className="facts" aria-live="polite">
+      <div className="fact">
+        <span className="fact-l">
+          <Term id="pot">Pot</Term>
         </span>
-        {me.hole.length === 2 && state.board.length >= 3 && (
-          <span>
-            You have <strong>{describeHolding(me.hole, state.board)}</strong>
-          </span>
-        )}
+        <span className="fact-v">{fmtBB(potSize(state), bb)}</span>
       </div>
+      <div className="fact">
+        <span className="fact-l">
+          <Term id="tocall">To call</Term>
+        </span>
+        <span className="fact-v" data-testid="to-call">
+          {fmtBB(toCall, bb)}
+        </span>
+      </div>
+      <div className="fact">
+        <span className="fact-l">
+          <Term id="effective">Effective stack</Term>
+        </span>
+        <span className="fact-v">{fmtBB(effectiveStack(state, hero), bb)}</span>
+      </div>
+      {me.hole.length === 2 && state.board.length >= 3 && (
+        <div className="fact wide">
+          <span className="fact-l">You have</span>
+          <span className="fact-v">{describeHolding(me.hole, state.board)}</span>
+        </div>
+      )}
     </div>
   );
 }

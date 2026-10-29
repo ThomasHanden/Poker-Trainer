@@ -5,9 +5,9 @@ import { run } from '../../workers/client';
 import { GenerateResult } from '../../scenarios/generator';
 import { Scenario, PracticeSettings } from '../../scenarios/types';
 import { PlaySession, startSession, heroAct } from '../../scenarios/play';
-import { PlayerAction, legalActions } from '../../engine/rules';
+import { PlayerAction, legalActions, HandState } from '../../engine/rules';
 import { ScenarioEvaluation, LiveHelp, Assistance, DecisionEvaluation } from '../../evaluation/evaluate';
-import { Table, HistoryList, fmtBB } from '../components/Table';
+import { Table, HistoryList, DecisionFacts, fmtBB } from '../components/Table';
 import { ActionBar } from '../components/ActionBar';
 import { SettingsPanel, settingsSummary } from '../components/SettingsPanel';
 import { ReviewView, GradeBadge } from '../components/ReviewView';
@@ -146,6 +146,7 @@ export function PracticePage() {
       update((d) => ({ ...d, history: [...d.history, rec] }));
       setRecordId(rec.id);
       setPhase('done');
+      requestAnimationFrame(() => document.querySelector('.rsum')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (e) {
       setError({ msg: `Evaluation failed: ${(e as Error).message}` });
       setPhase('error');
@@ -218,158 +219,132 @@ export function PracticePage() {
   const record = recordId ? data.history.find((h) => h.id === recordId) : undefined;
   const la = sess && heroTurn ? legalActions(sess.state) : null;
 
+  const targetLabel = targetTemplate ? getTemplate(targetTemplate)?.title ?? targetTemplate : targetConcept ? CONCEPTS[targetConcept]?.name : null;
+  const opponents = sc
+    ? Object.entries(sc.shownProfiles)
+        .filter(([i]) => !sess!.state.players[Number(i)].folded || sess!.state.history.some((h) => h.player === Number(i) && h.type !== 'fold' && !h.type.startsWith('post')))
+        .map(([i, p]) => `${sess!.state.players[Number(i)].position}: ${PROFILES[p].short}`)
+    : [];
+  const retry = () => sc && begin({ templateId: sc.templateId, seed: sc.seed, settingsOverride: sc.settings });
+  const related = () => sc && begin({ templateId: sc.templateId, settingsOverride: sc.settings });
+  const lastAction = sess ? lastActionText(sess.state, sc!.heroIndex) : '';
+
   return (
     <div className="page practice">
-      <div className="practice-top">
-        <h1>Practice</h1>
-        <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
-          {phase === 'loading' ? 'Dealing…' : 'New scenario'}
-        </button>
-      </div>
-      {(targetTemplate || targetConcept) && (
-        <div className="banner info">
-          Targeted practice: {targetTemplate ? getTemplate(targetTemplate)?.title ?? targetTemplate : CONCEPTS[targetConcept!]?.name}.{' '}
-          <button className="linklike" onClick={() => setParams({})}>
-            Clear target
-          </button>
-        </div>
-      )}
-      {showSettings ? (
-        <>
-          <SettingsPanel settings={settings} onChange={setSettings} />
-          {sess && (
-            <button className="linklike collapse-link" onClick={() => setShowSettings(false)}>
-              Hide settings
+      <header className="practice-head">
+        <div className="ph-main">
+          <h1 className="ph-title">{sc ? sc.title : 'Practice'}</h1>
+          <p className="ph-sub">{sc ? sc.setupText : 'Fresh, varied poker spots with an honest review after every hand.'}</p>
+          <div className="ph-chips">
+            {settingsSummary(settings)
+              .split(' · ')
+              .map((c) => (
+                <span key={c} className="pchip">
+                  {c}
+                </span>
+              ))}
+            {opponents.map((o) => (
+              <span key={o} className="pchip muted">
+                {o}
+              </span>
+            ))}
+            {sc?.icm && <span className="pchip muted">Payouts {sc.icm.payouts.join('/')}%</span>}
+            {targetLabel && (
+              <span className="pchip target">
+                Target: {targetLabel}
+                <button aria-label="Clear target" onClick={() => setParams({})}>
+                  ×
+                </button>
+              </span>
+            )}
+            <button className="linklike ph-change" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings}>
+              {showSettings ? 'Close settings' : 'Change settings'}
             </button>
-          )}
-        </>
-      ) : (
-        <div className="settings-bar">
-          <span className="settings-sum">{settingsSummary(settings)}</span>
-          <button className="btn small" onClick={() => setShowSettings(true)} aria-expanded={false}>
-            Change settings
-          </button>
+          </div>
         </div>
-      )}
-      {showKeys && (
-        <div className="keys" role="dialog" aria-label="Keyboard shortcuts">
-          <kbd>F</kbd> fold · <kbd>C</kbd> check/call · <kbd>B</kbd>/<kbd>R</kbd> bet or raise · <kbd>1</kbd>–<kbd>7</kbd> size presets · <kbd>A</kbd> all-in · <kbd>Enter</kbd> confirm · <kbd>H</kbd> hint · <kbd>N</kbd> new scenario · <kbd>?</kbd> close
-        </div>
-      )}
-      {phase === 'idle' && !sess && (
-        <div className="empty">
-          <p>Pick your settings (or keep the defaults) and press <strong>New scenario</strong>.</p>
-        </div>
-      )}
+        <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
+          {phase === 'loading' ? 'Dealing…' : sess ? 'Next hand' : 'New scenario'}
+        </button>
+      </header>
+      {(showSettings || !sess) && <SettingsPanel settings={settings} onChange={setSettings} />}
       {error && (
         <div className="error-box" role="alert">
           <p>{error.msg}</p>
           {error.suggestions && (
             <ul>
-              {error.suggestions.map((s, i) => (
-                <li key={i}>{s}</li>
+              {error.suggestions.map((m, i) => (
+                <li key={i}>{m}</li>
               ))}
             </ul>
           )}
         </div>
       )}
-      {phase === 'loading' && <div className="loading" role="status">Generating a fresh scenario…</div>}
+      {phase === 'loading' && <div className="loading" role="status">Dealing a fresh scenario…</div>}
       {sess && sc && (
-        <div className="practice-grid">
-          <div className="practice-main">
-            <div className="scenario-head">
-              <h2>{sc.title}</h2>
-              <p>{sc.setupText}</p>
-              <p className="note">
-                {sc.state.config.format === 'cash' ? 'Cash game' : 'Tournament'} · {sc.state.players.length === 2 ? 'heads-up' : `${sc.state.players.length}-handed`} · {sc.difficulty} · {guided ? 'guided' : 'assessment'} ·{' '}
-                {Object.entries(sc.shownProfiles)
-                  .filter(([i]) => !sess.state.players[Number(i)].folded || sess.state.history.some((h) => h.player === Number(i) && h.type !== 'fold' && !h.type.startsWith('post')))
-                  .map(([i, p]) => `${sess.state.players[Number(i)].position}: ${PROFILES[p].short}`)
-                  .join(', ')}
-              </p>
-              {sc.icm && <p className="note">Payouts: {sc.icm.description}</p>}
-            </div>
-            <Table state={sess.state} hero={sc.heroIndex} profiles={sc.shownProfiles} fourColor={data.prefs.fourColor} />
-            {heroTurn && <ActionBar state={sess.state} onAct={onAct} disabled={phase !== 'playing'} />}
-            {heroTurn && (
+        <div className="practice-body">
+          <Table state={sess.state} hero={sc.heroIndex} profiles={sc.shownProfiles} fourColor={data.prefs.fourColor} />
+          {heroTurn && (
+            <section className="decision-panel" aria-label="Your decision">
+              <DecisionFacts state={sess.state} hero={sc.heroIndex} />
+              <ActionBar state={sess.state} onAct={onAct} disabled={phase !== 'playing'} />
+              {feedback && (
+                <p className="dp-feedback" role="status">
+                  Last decision: {feedback.actionLabel} <GradeBadge grade={feedback.grade} />
+                </p>
+              )}
+              {guided && (
+                <div className="dp-help">
+                  <div className="assist-buttons">
+                    <span className="dp-help-label">Help</span>
+                    {sc.settings.assists.hints && (
+                      <button className="btn small" onClick={() => requestHelp('hint')}>
+                        Hint
+                      </button>
+                    )}
+                    {sc.settings.assists.potOdds && la && la.toCall > 0 && (
+                      <button className="btn small" onClick={() => requestHelp('potOdds')}>
+                        Pot odds
+                      </button>
+                    )}
+                    {sc.settings.assists.equity && sc.difficulty !== 'expert' && (
+                      <button className="btn small" onClick={() => requestHelp('equity')} disabled={helpLoading}>
+                        {helpLoading ? 'Calculating…' : 'Equity'}
+                      </button>
+                    )}
+                    <span className="note">Using help marks the decision as assisted.</span>
+                  </div>
+                  {assist.hint && <p className="hint">💡 {sess.decisions.length === 0 ? template?.hint : 'Which hands in their range call or fold each option? Compare the price with your equity, and think about later streets.'}</p>}
+                  {assist.potOdds && la && la.toCall > 0 && (
+                    <p className="hint">
+                      <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(la.pot, sc.state.config.bb)} → you need {((100 * la.toCall) / (la.pot + la.toCall)).toFixed(1)}% equity to break even.
+                    </p>
+                  )}
+                  {assist.equity && help?.equity && (
+                    <p className="hint">
+                      <Term id="equity">Equity</Term> vs the modelled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
+                      {help.equity.samples && help.equity.se > 0 ? `, ±${(196 * help.equity.se).toFixed(1)}%` : ''}). {help.rangeSummary}
+                    </p>
+                  )}
+                </div>
+              )}
               <button className="linklike shortcuts-link" onClick={() => setShowKeys((k) => !k)} aria-expanded={showKeys}>
                 Keyboard shortcuts
               </button>
-            )}
-            {!heroTurn && phase === 'evaluating' && <div className="loading" role="status">Hand complete — analysing your decisions…</div>}
-            {feedback && phase === 'playing' && (
-              <div className="feedback" role="status">
-                <strong>Last decision:</strong> {feedback.actionLabel} <GradeBadge grade={feedback.grade} /> — {feedback.recommended}
-              </div>
-            )}
-            {guided && heroTurn && (
-              <div className="assist-panel">
-                <h3>Guided help</h3>
-                <p className="note">Using help marks this decision as assisted in your progress.</p>
-                <div className="assist-buttons">
-                  {sc.settings.assists.hints && (
-                    <button className="btn" onClick={() => requestHelp('hint')}>
-                      Hint <kbd>H</kbd>
-                    </button>
-                  )}
-                  {sc.settings.assists.potOdds && la && la.toCall > 0 && (
-                    <button className="btn" onClick={() => requestHelp('potOdds')}>
-                      Show pot odds
-                    </button>
-                  )}
-                  {sc.settings.assists.equity && sc.difficulty === 'expert' && <span className="note">Equity help is not offered at expert difficulty.</span>}
-                  {sc.settings.assists.equity && sc.difficulty !== 'expert' && (
-                    <button className="btn" onClick={() => requestHelp('equity')} disabled={helpLoading}>
-                      {helpLoading ? 'Calculating…' : 'Equity vs modelled range'}
-                    </button>
-                  )}
-                </div>
-                {assist.hint && (
-                  <p className="hint">
-                    💡 {sess.decisions.length === 0 ? template?.hint : 'Ask: which hands in their range call or fold your options? Compare the price with your equity and think about later streets.'}
-                  </p>
-                )}
-                {assist.potOdds && la && la.toCall > 0 && (
-                  <p>
-                    <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(la.pot, sc.state.config.bb)} → you need {((100 * la.toCall) / (la.pot + la.toCall)).toFixed(1)}% equity to break even (before considering later streets).
-                  </p>
-                )}
-                {assist.equity && help?.equity && (
-                  <p>
-                    <Term id="equity">Equity</Term> vs the modelled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
-                    {help.equity.samples && help.equity.se > 0 ? `, ${help.equity.samples.toLocaleString()} samples, ±${(196 * help.equity.se).toFixed(1)}%` : ''}). {help.rangeSummary}
-                  </p>
-                )}
-              </div>
-            )}
-            {phase === 'done' && evaluation && (
-              <div className="done-bar">
-                <span>
-                  Hand complete.{' '}
-                  {evaluation.score !== null ? (
-                    <>
-                      Instructional score <strong data-testid="score">{evaluation.score}</strong> (confidence {evaluation.confidence}).
-                    </>
-                  ) : (
-                    'Insufficient confidence to score.'
-                  )}
-                </span>
-                <button className="btn primary" onClick={() => begin()}>
-                  New scenario
-                </button>
-                <button className="btn" onClick={() => begin({ templateId: sc.templateId, seed: sc.seed, settingsOverride: sc.settings })}>
-                  Retry this spot
-                </button>
-                <button className="btn" onClick={() => begin({ templateId: sc.templateId, settingsOverride: sc.settings })}>
-                  Related scenario
-                </button>
-              </div>
-            )}
-          </div>
-          <aside className="practice-side">
-            <h3>Action history</h3>
+              {showKeys && (
+                <p className="keys">
+                  <kbd>F</kbd> fold · <kbd>C</kbd> check/call · <kbd>B</kbd>/<kbd>R</kbd> bet or raise · <kbd>1</kbd>–<kbd>7</kbd> sizes · <kbd>A</kbd> all-in · <kbd>Enter</kbd> confirm · <kbd>H</kbd> hint · <kbd>N</kbd> next hand
+                </p>
+              )}
+            </section>
+          )}
+          {phase === 'evaluating' && <div className="loading" role="status">Hand complete — reviewing your decisions…</div>}
+          <details className="hand-so-far">
+            <summary>
+              <span>Hand so far</span>
+              {lastAction && <span className="hsf-last">{lastAction}</span>}
+            </summary>
             <HistoryList state={sess.state} hero={sc.heroIndex} />
-          </aside>
+          </details>
         </div>
       )}
       {phase === 'done' && evaluation && sess && sc && (
@@ -377,12 +352,26 @@ export function PracticePage() {
           scenario={sc}
           finalState={sess.state}
           evaluation={evaluation}
-          onRetry={() => begin({ templateId: sc.templateId, seed: sc.seed, settingsOverride: sc.settings })}
-          onRelated={() => begin({ templateId: sc.templateId, settingsOverride: sc.settings })}
+          onNext={() => begin()}
+          onRetry={retry}
+          onRelated={related}
           bookmarked={record?.bookmarked}
           onBookmark={record ? () => update((d) => ({ ...d, history: d.history.map((h) => (h.id === record.id ? { ...h, bookmarked: !h.bookmarked } : h)) })) : undefined}
         />
       )}
     </div>
   );
+}
+
+/** One-line description of the most recent action, for the collapsed history strip. */
+function lastActionText(st: HandState, hero: number): string {
+  for (let i = st.history.length - 1; i >= 0; i--) {
+    const h = st.history[i];
+    if (h.type.startsWith('post')) continue;
+    const who = h.player === hero ? 'You' : st.players[h.player].position;
+    const verb = h.player === hero ? { fold: 'fold', check: 'check', call: 'call', bet: 'bet', raise: 'raise to' }[h.type as 'fold'] : { fold: 'folds', check: 'checks', call: 'calls', bet: 'bets', raise: 'raises to' }[h.type as 'fold'];
+    const amt = h.type === 'bet' || h.type === 'raise' ? ` ${fmtBB(h.to, st.config.bb)}` : h.type === 'call' ? ` ${fmtBB(h.amount, st.config.bb)}` : '';
+    return `Last: ${who} ${verb}${amt}`;
+  }
+  return '';
 }
