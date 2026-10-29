@@ -77,6 +77,7 @@ test('illegal amounts are rejected in the sizing UI', async ({ page }) => {
 test('unsupported settings are explained, not generated', async ({ page }) => {
   await page.goto('/#/practice');
   await page.locator('label:has-text("Game format") select').selectOption('tournament');
+  await page.locator('details.more > summary').click();
   await page.locator('label:has-text("Starting street") select').selectOption('river');
   await expect(page.locator('.match.bad')).toContainText('Unsupported combination');
   await page.getByTestId('new-scenario').click();

@@ -97,7 +97,7 @@ export function Table({
                 {p.allIn && <span className="tag allin">ALL-IN</span>}
                 {p.folded && <span className="tag">folded</span>}
               </div>
-              {act && !state.complete && <div className={`seat-action a-${act.type}`}>{ACTION_WORD[act.type] ?? act.type}{act.type === 'bet' || act.type === 'raise' ? ` ${fmtBB(act.to, bb)}` : ''}</div>}
+              {act && !state.complete && <div className={`seat-action a-${act.type}`}>{ACTION_WORD[act.type] ?? act.type}{act.allIn ? ' all-in' : ''}</div>}
               {p.streetCommitted > 0 && !state.complete && <div className="bet-chip" aria-label={`committed ${fmtBB(p.streetCommitted, bb)} this street`}>{fmtBB(p.streetCommitted, bb)}</div>}
               {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
             </div>

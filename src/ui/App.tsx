@@ -61,12 +61,6 @@ function Shell() {
               {label}
             </NavLink>
           ))}
-          <NavLink to="/coverage" className="minor" onClick={() => setMenu(false)}>
-            Coverage
-          </NavLink>
-          <NavLink to="/method" className="minor" onClick={() => setMenu(false)}>
-            Method
-          </NavLink>
         </nav>
       </header>
       {storageWarning && (
@@ -92,7 +86,11 @@ function Shell() {
         </ErrorBoundary>
       </main>
       <footer className="footer">
-        Training tool. Recommendations are instructional — heuristics, illustrative charts, exact math and simulations against a stated opponent model — not solver output. <Link to="/method">How evaluation works</Link>.
+        <span>Recommendations are instructional — heuristics, illustrative charts, exact math and simulations against a stated opponent model — not solver output.</span>
+        <span className="footer-links">
+          <Link to="/method">How evaluation works</Link>
+          <Link to="/coverage">Coverage map</Link>
+        </span>
       </footer>
     </>
   );

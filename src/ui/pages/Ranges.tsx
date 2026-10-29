@@ -144,8 +144,8 @@ function Presets() {
       <div className="side">
         <ChartInfo chart={chart} play={play} dead={dead.cards} />
         <label>
-          Known cards (card removal), e.g. <code>As Kd</code>
-          <input value={deadText} onChange={(e) => setDeadText(e.target.value)} aria-invalid={!!dead.error} />
+          Known cards (card removal)
+          <input value={deadText} onChange={(e) => setDeadText(e.target.value)} placeholder="e.g. As Kd" aria-invalid={!!dead.error} />
         </label>
         {dead.error && <p className="error">{dead.error}</p>}
         {sel ? (

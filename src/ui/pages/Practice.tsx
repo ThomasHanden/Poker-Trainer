@@ -9,7 +9,7 @@ import { PlayerAction, legalActions } from '../../engine/rules';
 import { ScenarioEvaluation, LiveHelp, Assistance, DecisionEvaluation } from '../../evaluation/evaluate';
 import { Table, HistoryList, fmtBB } from '../components/Table';
 import { ActionBar } from '../components/ActionBar';
-import { SettingsPanel } from '../components/SettingsPanel';
+import { SettingsPanel, settingsSummary } from '../components/SettingsPanel';
 import { ReviewView, GradeBadge } from '../components/ReviewView';
 import { getTemplate } from '../../scenarios/templates';
 import { HandRecord, newId } from '../../persistence/storage';
@@ -220,17 +220,9 @@ export function PracticePage() {
     <div className="page practice">
       <div className="practice-top">
         <h1>Practice</h1>
-        <div className="top-actions">
-          <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
-            {phase === 'loading' ? 'Dealing…' : 'New scenario'} <kbd>N</kbd>
-          </button>
-          <button className="btn" aria-expanded={showSettings} onClick={() => setShowSettings((s) => !s)}>
-            {showSettings ? 'Hide settings' : 'Settings'}
-          </button>
-          <button className="btn ghost" onClick={() => setShowKeys((s) => !s)} aria-expanded={showKeys}>
-            Shortcuts <kbd>?</kbd>
-          </button>
-        </div>
+        <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
+          {phase === 'loading' ? 'Dealing…' : 'New scenario'}
+        </button>
       </div>
       {(targetTemplate || targetConcept) && (
         <div className="banner info">
@@ -240,15 +232,31 @@ export function PracticePage() {
           </button>
         </div>
       )}
-      {showKeys && (
-        <div className="keys" role="dialog" aria-label="Keyboard shortcuts">
-          <strong>Keyboard:</strong> <kbd>F</kbd> fold · <kbd>C</kbd>/<kbd>K</kbd> check or call · <kbd>B</kbd>/<kbd>R</kbd> open sizing · <kbd>1</kbd>–<kbd>7</kbd> pot-size presets (25–150%) · <kbd>A</kbd> all-in amount · <kbd>Enter</kbd> confirm amount · <kbd>H</kbd> hint (guided) · <kbd>N</kbd> new scenario · <kbd>?</kbd> toggle this help
+      {showSettings ? (
+        <>
+          <SettingsPanel settings={settings} onChange={setSettings} />
+          {sess && (
+            <button className="linklike collapse-link" onClick={() => setShowSettings(false)}>
+              Hide settings
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="settings-bar">
+          <span className="settings-sum">{settingsSummary(settings)}</span>
+          <button className="btn small" onClick={() => setShowSettings(true)} aria-expanded={false}>
+            Change settings
+          </button>
         </div>
       )}
-      {showSettings && <SettingsPanel settings={settings} onChange={setSettings} />}
+      {showKeys && (
+        <div className="keys" role="dialog" aria-label="Keyboard shortcuts">
+          <kbd>F</kbd> fold · <kbd>C</kbd> check/call · <kbd>B</kbd>/<kbd>R</kbd> bet or raise · <kbd>1</kbd>–<kbd>7</kbd> size presets · <kbd>A</kbd> all-in · <kbd>Enter</kbd> confirm · <kbd>H</kbd> hint · <kbd>N</kbd> new scenario · <kbd>?</kbd> close
+        </div>
+      )}
       {phase === 'idle' && !sess && (
         <div className="empty">
-          <p>Choose settings (or keep the defaults) and press <strong>New scenario</strong>. Every scenario is freshly generated from a validated template; you can change difficulty or targets at any time.</p>
+          <p>Pick your settings (or keep the defaults) and press <strong>New scenario</strong>.</p>
         </div>
       )}
       {error && (
@@ -284,6 +292,11 @@ export function PracticePage() {
             </div>
             <Table state={sess.state} hero={sc.heroIndex} profiles={sc.shownProfiles} fourColor={data.prefs.fourColor} />
             {heroTurn && <ActionBar state={sess.state} onAct={onAct} disabled={phase !== 'playing'} />}
+            {heroTurn && (
+              <button className="linklike shortcuts-link" onClick={() => setShowKeys((k) => !k)} aria-expanded={showKeys}>
+                Keyboard shortcuts
+              </button>
+            )}
             {!heroTurn && phase === 'evaluating' && <div className="loading" role="status">Hand complete — analysing your decisions…</div>}
             {feedback && phase === 'playing' && (
               <div className="feedback" role="status">
