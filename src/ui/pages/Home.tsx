@@ -86,7 +86,7 @@ export function HomePage() {
         </section>
 
         <aside className="scoreboard" aria-labelledby="sb-title">
-          <h2 id="sb-title">Your stats</h2>
+          <h2 id="sb-title">Personal bests</h2>
           <dl className="sb-stats">
             <div>
               <dt>Today</dt>
