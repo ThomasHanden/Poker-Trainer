@@ -314,6 +314,34 @@ export function PracticePage() {
           </div>
         </div>
         <div className="ph-side">
+          <div className="seg mode-switch" role="radiogroup" aria-label="Practice type">
+            {(
+              [
+                ['spots', 'Single spots'],
+                ['full', 'Full hands'],
+              ] as const
+            ).map(([m, label]) => {
+              const on = (settings.street === 'full') === (m === 'full');
+              return (
+                <button
+                  key={m}
+                  role="radio"
+                  aria-checked={on}
+                  className={on ? 'on' : ''}
+                  data-testid={`mode-${m}`}
+                  onClick={() => {
+                    if (on) return;
+                    const next: PracticeSettings = { ...settings, street: m === 'full' ? 'full' : 'any', concepts: m === 'full' ? [] : settings.concepts };
+                    setSettings(next);
+                    if (targetTemplate || targetConcept) setParams({});
+                    begin({ settingsOverride: next, templateId: m === 'full' ? 'full-hand' : undefined });
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
             {phase === 'loading' ? 'Dealing…' : sess ? 'Next hand' : 'Start practicing'}
           </button>

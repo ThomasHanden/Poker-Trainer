@@ -67,7 +67,7 @@ export const TOURNAMENT: Lesson[] = [
       title: 'The math of one shove',
       steps: [
         'SB 10bb (BB ante): pot before action 2.5bb. Shoving 9.5bb more.',
-        'If the BB calls 35% and you have 40% equity when called: EV = 0.65 × 2.5 + 0.35 × (0.40 × 20 − 9.5) = 1.625 − 0.525 = +1.1bb vs folding.',
+        'If the BB calls 35% and you have 40% equity when called, the pot after a call is 10 + 10 + 1 (ante) = 21bb: EV = 0.65 × 2.5 + 0.35 × (0.40 × 21 − 9.5) = 1.625 − 0.385 ≈ +1.24bb vs folding.',
       ],
     },
     mistakes: ['Shoving too tight because “I might get called”.', 'Calling shoves too tight as the big blind, ignoring the price.'],

@@ -61,10 +61,15 @@ export function LearnPage() {
                     <summary>
                       <strong>{s.title}</strong> — {s.blurb} <span className="note">({n}/{s.lessons.length} done)</span>
                     </summary>
-                    <ol>
-                      {s.lessons.map((id) => (
+                    <ol className="link-list numbered">
+                      {s.lessons.map((id, i) => (
                         <li key={id}>
-                          <Link to={`/learn/${id}`}>{LESSON_INDEX[id].title}</Link> {done(id) ? '✓' : ''}
+                          <Link to={`/learn/${id}`} className={done(id) ? 'done' : ''}>
+                            <span className="ll-num" aria-hidden="true">{done(id) ? '✓' : i + 1}</span>
+                            <span className="ll-title">{LESSON_INDEX[id].title}</span>
+                            {done(id) && <span className="sr-only"> (completed)</span>}
+                            <span className="ll-chev" aria-hidden="true">›</span>
+                          </Link>
                         </li>
                       ))}
                     </ol>
@@ -345,10 +350,16 @@ export function LessonPage() {
       </section>
       <section>
         <h2>Related lessons</h2>
-        <ul>
+        <ul className="link-list">
           {l.related.map((r) => (
             <li key={r}>
-              <Link to={`/learn/${r}`}>{LESSON_INDEX[r].title}</Link>
+              <Link to={`/learn/${r}`}>
+                <span className="ll-title">
+                  {LESSON_INDEX[r].title}
+                  <span className="ll-sub">{LESSON_INDEX[r].summary}</span>
+                </span>
+                <span className="ll-chev" aria-hidden="true">›</span>
+              </Link>
             </li>
           ))}
         </ul>

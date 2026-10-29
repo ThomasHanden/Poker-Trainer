@@ -127,7 +127,7 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
         steps: [
           'You are in the small blind with K♦ 7♣, 8bb effective, folded to you.',
           'The computed chart in the Ranges tab (SB shove, 8bb) includes K7o: shove.',
-          'If you were the big blind facing an 8bb shove, the computed calling chart folds K7o: the call needs real equity against the shoving range, and you have no fold equity.',
+          'If you were the big blind facing an 8bb shove, the computed calling chart also calls K7o — the price is good — but its calling range (about 45% of hands) is much narrower than the 63% shoving range, because the caller has no fold equity.',
         ],
       },
     ],

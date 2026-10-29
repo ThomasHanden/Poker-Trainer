@@ -68,7 +68,7 @@ export const FOUNDATIONS: Lesson[] = [
     example: {
       title: 'The same hand, two seats',
       steps: [
-        'You hold K♥ J♣. From under the gun at a 6-max table, five players are left to act and you will usually be out of position against anyone who calls. The baseline chart opens KJo only when it is near the top of the range — it is close.',
+        'You hold K♥ J♣. From under the gun at a 6-max table, five players are left to act and you will usually be out of position against anyone who calls. The baseline chart does open KJo from UTG, but only just: it sits near the bottom of the early-position range.',
         'From the button, only the blinds remain, and you will act last on every later street. KJo is a comfortable open.',
         'Postflop on K♦ 8♠ 3♣ heads-up, in position you can bet when checked to and check behind on dangerous turns. Out of position you must commit first without knowing what your opponent will do.',
       ],

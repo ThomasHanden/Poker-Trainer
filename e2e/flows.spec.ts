@@ -99,3 +99,13 @@ test('main pages have no horizontal overflow', async ({ page }) => {
     expect(sw, path).toBeLessThanOrEqual(cw + 1);
   }
 });
+
+test('full hands mode deals a complete hand from preflop', async ({ page }) => {
+  await page.goto('/#/practice');
+  await page.getByTestId('mode-full').click();
+  await expect(page.locator('.action-bar')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.ph-title')).toContainText('Full hand');
+  await expect(page.getByTestId('mode-full')).toHaveAttribute('aria-checked', 'true');
+  // the board is empty at the first decision
+  expect(await page.locator('.board .pcard:not(.empty)').count()).toBe(0);
+});

@@ -209,7 +209,7 @@ export function evaluateDecision(sc: Scenario, rec: DecisionRecord, opts: EvalOp
   const ctx = buildDecisionContext(sc, rec.state, rec.isKey);
   let g: Guidance;
   try {
-    g = rec.isKey && template ? template.guide(ctx) : genericGuidance(ctx);
+    g = rec.isKey && template && !template.genericGuide ? template.guide(ctx) : genericGuidance(ctx);
   } catch (e) {
     g = { ratings: {}, reasons: [`Guidance unavailable: ${(e as Error).message}`], confidence: 'low', source: 'heuristic' };
   }
@@ -340,7 +340,7 @@ export function evaluateDecision(sc: Scenario, rec: DecisionRecord, opts: EvalOp
     : undefined;
 
   // concepts & categories
-  const concepts: ConceptId[] = rec.isKey && template ? template.concepts : genericConcepts(ctx, key);
+  const concepts: ConceptId[] = rec.isKey && template && !template.genericGuide ? template.concepts : genericConcepts(ctx, key);
   const mistakeCategories: string[] = [];
   if (grade === 'inaccuracy' || grade === 'mistake' || grade === 'blunder') mistakeCategories.push(...concepts);
   if (sizing?.verdict === 'off') mistakeCategories.push('bet-sizing');

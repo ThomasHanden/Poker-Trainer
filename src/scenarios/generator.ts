@@ -259,8 +259,7 @@ export function matchingTemplates(settings: PracticeSettings, templates: Scenari
     [
       'street',
       (t) =>
-        settings.street === 'any' ||
-        (settings.street === 'full' ? t.street === 'preflop' && t.facing !== 'shove' : t.street === settings.street),
+        settings.street === 'full' ? t.id === 'full-hand' : settings.street === 'any' || t.street === settings.street,
     ],
     ['players', (t) => settings.players === 'any' || (settings.players === 'multiway') === t.multiway],
     ['pot type', (t) => settings.potType === 'any' || t.potType === settings.potType],
@@ -330,6 +329,15 @@ export function generateScenario(settings: PracticeSettings, opts: GenerateOptio
       pickProfile: pickProfileFactory(settings, childRng(seed, 'profile'), settings.difficulty),
     };
     try {
+      if (t.custom) {
+        const sc = t.custom(settings, seed);
+        if (!sc) {
+          lastErr = 'The hand ended before your turn.';
+          continue;
+        }
+        if (recentF.has(sc.fingerprint) && attempt < 25 && !opts.seed) continue;
+        return { scenario: sc };
+      }
       const script = t.build(ctx);
       if (!script) {
         lastErr = `Template ${t.id} could not satisfy the settings.`;
@@ -357,8 +365,10 @@ export function rebuildScenario(id: string, settings: PracticeSettings): Generat
   const t = TEMPLATES.find((x) => x.id === templateId);
   if (!t) return { error: 'Unknown template' };
   const seed = Number(seedStr);
-  const rng = createRng(seed);
-  void rng;
+  if (t.custom) {
+    const sc = t.custom(settings, seed);
+    return sc ? { scenario: sc } : { error: 'Could not rebuild this hand' };
+  }
   const ctx: BuildContext = {
     rng: childRng(seed, 'build'),
     difficulty: settings.difficulty,

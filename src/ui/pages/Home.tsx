@@ -25,6 +25,9 @@ export function HomePage() {
           <button className="btn primary big" onClick={() => nav('/practice?start=1')}>
             Start practicing →
           </button>
+          <button className="btn big" onClick={() => { update((s) => ({ ...s, settings: { ...s.settings, street: 'full', concepts: [] } })); nav('/practice?template=full-hand'); }}>
+            Play a full hand
+          </button>
         </div>
         {played > 0 && (
           <p className="note">

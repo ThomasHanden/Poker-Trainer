@@ -11,7 +11,7 @@ export const PREFLOP: Lesson[] = [
     plain: [
       'Starting-hand strength is not one fixed list. A hand’s value depends on how strong the hands it will face are, and whether it will play in or out of position.',
       'From early seats, you need hands that do well against the strong ranges that call or re-raise you: big pairs, strong broadway hands, suited aces, and the best suited connectors. As you move toward the button, more hands become profitable because fewer opponents remain and you will usually have position.',
-      'This app’s baseline 6-max charts open roughly 18% from UTG, 22% from HJ, 29% from CO and 45% from the button at 100bb. Full-ring early seats are tighter still. These are illustrative baselines, not solver output.',
+      'This app’s baseline 6-max charts open roughly 18% from UTG, 23% from HJ, 29% from CO and 44% from the button at 100bb. Full-ring early seats are tighter still. These are illustrative baselines, not solver output.',
     ],
     why: ['Most money in small-stakes games is lost by playing too many hands from bad positions.', 'Starting with a sensible range makes every later decision easier.'],
     example: {
@@ -176,7 +176,7 @@ export const PREFLOP: Lesson[] = [
       steps: [
         'BTN opens 2.5bb. You hold 7♥ 5♥ in the BB. Price: 1.5 / 5.5 = 27%. Its equity vs a button range is around 35–40%, and it makes straights and flushes: call.',
         'You hold J♣ 3♦. Similar raw equity, but it rarely makes anything strong and is often dominated: the baseline folds it.',
-        'Against a UTG open, 7♥5♥ is a closer decision and many offsuit broadways become folds because UTG’s range dominates them.',
+        'Against a UTG open, the chart still defends 7♥5♥, but many offsuit broadways become folds (QTo always, KJo more often than not) because UTG’s range dominates them.',
       ],
     },
     mistakes: ['Folding too often because “I’m out of position”.', 'Calling every hand because “I’m getting a price”.', 'Never 3-betting from the BB, which lets openers steal freely.'],

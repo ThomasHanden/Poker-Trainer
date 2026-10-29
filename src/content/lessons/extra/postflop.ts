@@ -103,7 +103,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
         heading: 'SPR as a commitment guide',
         body: [
           'A low SPR (about 1–3) means a couple of normal bets put everyone all-in. Top pair is usually strong enough to commit, and draws should often get it in too. A medium SPR (about 4–8) means you should be selective: one pair is good, but facing heavy action you may be behind. A high SPR (10+) means one pair rarely wants to play for stacks, while sets and straights can.',
-          'Single-raised pots at 100bb usually start the flop with an SPR of about 10–15. 3-bet pots are about 3–5 and 4-bet pots about 1–2. So the same top pair can be an easy stack-off in a 4-bet pot and a pot-control hand in a single-raised pot.',
+          'Single-raised pots at 100bb usually start the flop with an SPR of about 15–20 (5.5bb pot, 97.5bb behind ≈ 18). 3-bet pots are about 3–5 and 4-bet pots about 1–2. So the same top pair can be an easy stack-off in a 4-bet pot and a pot-control hand in a single-raised pot.',
         ],
       },
       {

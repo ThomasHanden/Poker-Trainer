@@ -9,7 +9,7 @@ export const PREFLOP_D: Record<string, LessonDrills> = {
       'Offsuit hands with weak kickers are the first to cut from early seats.',
     ],
     problems: [
-      { q: 'Rank these from most to least suited for a UTG open in 6-max: A9o, 76s, AQs, KJo.', a: 'AQs (strong and rarely dominated), 76s (plays well and makes strong hands), KJo (often dominated by AK, KQ, AJ), A9o (dominated by every better ace). The baseline opens AQs and some 76s, mixes KJo and folds A9o.' },
+      { q: 'Rank these from most to least suited for a UTG open in 6-max: A9o, 76s, AQs, KJo.', a: 'AQs (strong and rarely dominated), 76s (plays well and makes strong hands), KJo (often dominated by AK, KQ, AJ), A9o (dominated by every better ace). The baseline opens AQs and KJo, opens 76s half the time, and folds A9o.' },
       { q: 'Why does the chance of facing a strong hand grow with the number of players behind you?', a: 'Each player has a small chance of a strong hand. The chance that at least one does is 1 − (chance none do), which grows quickly: with a 5% chance each, about 10% with two players and about 23% with five.' },
     ],
   },

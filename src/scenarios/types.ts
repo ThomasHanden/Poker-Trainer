@@ -184,6 +184,10 @@ export interface Guidance {
 export interface ScenarioTemplate extends TemplateMeta {
   build(ctx: BuildContext): ScenarioScript | null;
   guide(ctx: DecisionContext): Guidance;
+  /** builds the whole scenario itself instead of a script (e.g. full hands from the deal) */
+  custom?: (settings: PracticeSettings, seed: number) => Scenario | null;
+  /** grade every decision, including the first, with the generic guidance */
+  genericGuide?: boolean;
 }
 
 export interface Scenario {

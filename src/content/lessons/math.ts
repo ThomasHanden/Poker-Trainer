@@ -172,7 +172,7 @@ export const MATH: Lesson[] = [
       title: 'Short-stack shove',
       steps: [
         'You have 10bb in the small blind (blinds 0.5/1, 1bb BB ante → 2.5bb in the middle). You shove.',
-        'If the big blind folds 60% and you have 35% equity when called: EV ≈ 0.6 × 2.5 + 0.4 × (0.35 × 20 − 9.5) = 1.5 + 0.4 × (−2.5) = +0.5bb vs folding.',
+        'If the big blind folds 60% and you have 35% equity when called, the pot after a call is 10 + 10 + 1 (ante) = 21bb: EV ≈ 0.6 × 2.5 + 0.4 × (0.35 × 21 − 9.5) = 1.5 + 0.4 × (−2.15) ≈ +0.64bb vs folding.',
       ],
     },
     mistakes: ['Bluffing into players who never fold.', 'Ignoring that bigger bets usually create more fold equity but risk more.'],
@@ -228,7 +228,7 @@ export const MATH: Lesson[] = [
       title: 'Counting value vs bluffs',
       steps: [
         'River board K♠ 8♦ 3♣ 2♥ 5♠. Opponent’s value: sets (KK 3 combos, 88 3, 33 3), AK (12). Total 21.',
-        'Their bluffs: missed QJ/QT/JT spade draws, say 6 suited combos plus some other air.',
+        'Their bluffs: missed spade draws such as Q♠J♠, Q♠T♠ and J♠T♠ (3 combos) plus other missed draws and air.',
         'Your hand’s blockers change these numbers (holding a king removes KK and AK combos).',
       ],
     },

@@ -222,8 +222,8 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
         title: 'Small blind vs button: linear',
         steps: [
           'The button opens and you are in the small blind. Calling is unattractive (out of position, big blind behind).',
-          'A linear 3-bet range might include TT+, AT+, KQ, KJs, QJs and some suited connectors.',
-          'Hands like A9o and KTo mostly fold rather than call.',
+          'The app’s baseline 3-bets 88+, suited aces (A9s+ and A5s–A2s), AJo+ (ATo half the time), KQo, suited broadways and some suited connectors.',
+          'Hands like A9o and KTo fold rather than call; only a few small pairs and suited aces are ever flatted.',
         ],
       },
     ],

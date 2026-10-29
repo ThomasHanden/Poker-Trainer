@@ -57,7 +57,8 @@ function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; on
   const isFact = (w: string) => /^(You must call|Your equity against)/.test(w);
   const reason = d.why.find((w) => !isFact(w)) ?? d.why[0];
   const short = reason ? firstSentence(reason) : verdict(d);
-  const facts = d.math.filter((m) => m.value.length <= 22).slice(0, 3);
+  // preflop, SPR and multiway equity against players who have not acted are more confusing than useful
+  const facts = d.math.filter((m) => m.value.length <= 22 && (d.street !== 'preflop' || /price|break-even|pot odds/i.test(m.label))).slice(0, 3);
   return (
     <article className={`dcard ${d.isKey ? 'key' : ''}`} id={id}>
       <header className="dcard-head">
@@ -92,7 +93,11 @@ function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; on
         <button className="btn small dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? 'Hide in-depth explanation' : 'See in-depth explanation'}
         </button>
-        <button className="linklike" onClick={onShow}>
+        <button className="btn small ghost table-link" onClick={onShow}>
+          <svg aria-hidden="true" width="18" height="12" viewBox="0 0 18 12">
+            <rect x="1" y="1" width="16" height="10" rx="5" fill="currentColor" opacity="0.18" />
+            <rect x="1" y="1" width="16" height="10" rx="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          </svg>
           See it on the table
         </button>
       </div>
