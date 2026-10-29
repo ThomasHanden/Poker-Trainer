@@ -370,7 +370,26 @@ export function PracticePage() {
           </button>
         </div>
       )}
-      {(showSettings || !sess) && <SettingsPanel settings={settings} onChange={setSettings} />}
+      {showSettings && (
+        <div className="settings-wrap">
+          <SettingsPanel settings={settings} onChange={setSettings} />
+          <div className="settings-done">
+            <button className="btn" onClick={() => setShowSettings(false)}>
+              Done
+            </button>
+            {!sess && (
+              <button className="btn primary" onClick={() => begin()} disabled={phase === 'loading'}>
+                Deal a hand with these settings
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {!showSettings && !sess && phase !== 'loading' && (
+        <div className="practice-empty">
+          <p>Press <strong>Start practicing</strong> to deal your first hand.</p>
+        </div>
+      )}
       {error && (
         <div className="error-box" role="alert">
           <p>{error.msg}</p>

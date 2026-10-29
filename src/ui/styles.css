@@ -5494,3 +5494,15 @@ details.sequence[open] {
     width: 100%;
   }
 }
+.settings-done {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin: 10px 0 18px;
+}
+.practice-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-2);
+}
