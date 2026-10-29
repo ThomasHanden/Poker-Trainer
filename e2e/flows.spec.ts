@@ -34,7 +34,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
   await expect(page.getByText('1. What information was available?').first()).toBeVisible();
   await page.getByRole('tab', { name: 'Opponent types' }).first().click();
   await expect(page.getByText('7. What opponent tendencies could change the recommendation?').first()).toBeVisible();
-  await expect(page.locator('.score-box')).toContainText(/instructional score|Insufficient confidence/);
+  await expect(page.locator('.score-box')).toContainText(/score out of 100|Insufficient confidence/);
 
   // 4. open a linked lesson
   await page.locator('.lesson-links a').first().click();

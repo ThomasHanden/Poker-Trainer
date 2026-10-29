@@ -116,7 +116,7 @@ function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; on
               Sizing ({d.sizing.chosen}): {d.sizing.verdict === 'acceptable' ? 'acceptable' : 'outside the recommended range'}. {d.sizing.note}
             </p>
           )}
-          {d.conflict && <p className="dcard-conflict">⚖ {d.conflict}</p>}
+          {d.conflict && <p className="dcard-conflict">{d.conflict}</p>}
           <div className="tabs small" role="tablist">
             {(
               [
@@ -272,7 +272,7 @@ export function ReviewView({
                 <span className="score" data-testid="score">
                   {evaluation.score}
                 </span>
-                <span className="score-label">instructional score</span>
+                <span className="score-label">score out of 100</span>
               </>
             ) : (
               <span className="score-label">Insufficient confidence to score</span>
@@ -334,7 +334,7 @@ export function ReviewView({
           )}
           {onBookmark && (
             <button className="btn ghost" aria-pressed={bookmarked} onClick={onBookmark}>
-              {bookmarked ? '★ Saved' : '☆ Save'}
+              {bookmarked ? 'Saved' : 'Save hand'}
             </button>
           )}
         </div>

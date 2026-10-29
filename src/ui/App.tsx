@@ -82,7 +82,8 @@ function Shell() {
         </ErrorBoundary>
       </main>
       <footer className="footer">
-        <span>Scores are instructional assessments — not solver output. Your progress is stored only in this browser.</span>
+        <span className="foot-brand">Felt School</span>
+        <span>Scores are teaching estimates, not solver output. Your progress is saved in this browser only.</span>
       </footer>
     </>
   );

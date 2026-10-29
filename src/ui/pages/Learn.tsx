@@ -18,10 +18,11 @@ export function LearnPage() {
   const searching = q.trim().length > 0 || level !== 'any';
   return (
     <div className="page learn">
-      <h1>Learn</h1>
-      <p className="lead">
-        {LESSONS.length} lessons, all open — no unlocks. Each has a plain-language explanation, why it matters, an example, common mistakes, the math, assumptions, a knowledge check and a link to related practice.
-      </p>
+      <header className="page-head">
+        <p className="eyebrow">Library · {LESSONS.length} lessons</p>
+        <h1>Learn the theory</h1>
+        <p className="lead">Short lessons on one idea each, with worked examples, practice problems and a quiz. Start with a study track or pick any topic.</p>
+      </header>
       <div className="filters">
         <label className="grow">
           Search
@@ -52,14 +53,19 @@ export function LearnPage() {
       ) : (
         <>
           <section>
-            <h2>Suggested study sequences (optional)</h2>
+            <h2>Study tracks</h2>
+            <p className="note">Optional reading orders. Every lesson is open, so you can also pick any topic below.</p>
             <div className="sequences">
               {SEQUENCES.map((s) => {
                 const n = s.lessons.filter(done).length;
                 return (
                   <details key={s.id} className="sequence">
                     <summary>
-                      <strong>{s.title}</strong> — {s.blurb} <span className="note">({n}/{s.lessons.length} done)</span>
+                      <span className="seq-title">{s.title}</span>
+                      <span className="seq-blurb">{s.blurb}</span>
+                      <span className="seq-count">
+                        {n} of {s.lessons.length}
+                      </span>
                     </summary>
                     <ol className="link-list numbered">
                       {s.lessons.map((id, i) => (
@@ -333,7 +339,7 @@ export function LessonPage() {
       <section className="practice-link">
         <h2>Practice it</h2>
         <Link className="btn primary big" to={practiceHref} data-testid="practice-related">
-          ▶ {l.practice.label}
+          {l.practice.label}
         </Link>
         {l.practice.templates && l.practice.templates.length > 1 && (
           <p className="note">

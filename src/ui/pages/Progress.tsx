@@ -73,10 +73,14 @@ export function ProgressPage() {
 
   return (
     <div className="page progress">
-      <h1>Progress</h1>
+      <header className="page-head">
+        <p className="eyebrow">Your results</p>
+        <h1>Progress</h1>
+        <p className="lead">How your decisions are scoring, where you are strong, and what to work on next.</p>
+      </header>
       {hist.length === 0 ? (
         <div className="empty">
-          <p>No completed scenarios yet. <Link to="/practice">Start practicing</Link> — your strengths, weaknesses and trends will appear here.</p>
+          <p>No hands played yet. <Link to="/practice">Play a few hands</Link> and your scores will show up here.</p>
         </div>
       ) : (
         <>

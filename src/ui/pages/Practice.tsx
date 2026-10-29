@@ -417,7 +417,7 @@ export function PracticePage() {
                     )}
                     <span className="note">Using help marks the decision as assisted.</span>
                   </div>
-                  {assist.hint && <p className="hint">💡 {sess.decisions.length === 0 ? template?.hint : 'Which hands in their range call or fold each option? Compare the price with your equity, and think about later streets.'}</p>}
+                  {assist.hint && <p className="hint">{sess.decisions.length === 0 ? template?.hint : 'Which hands in their range call or fold each option? Compare the price with your equity, and think about later streets.'}</p>}
                   {assist.potOdds && la && la.toCall > 0 && (
                     <p className="hint">
                       <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(la.pot, sc.state.config.bb)} → you need {((100 * la.toCall) / (la.pot + la.toCall)).toFixed(1)}% equity to break even.

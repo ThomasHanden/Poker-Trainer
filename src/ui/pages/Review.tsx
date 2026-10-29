@@ -21,8 +21,11 @@ export function ReviewListPage() {
   }, [data.history, filter, tpl]);
   return (
     <div className="page">
-      <h1>Review</h1>
-      <p className="lead">Every completed scenario is saved locally. Reviews are rebuilt exactly from the scenario seed and your actions.</p>
+      <header className="page-head">
+        <p className="eyebrow">Your hands</p>
+        <h1>Review</h1>
+        <p className="lead">Every hand you finish is saved here. Open one to replay it and read the review again.</p>
+      </header>
       <div className="filters">
         <label>
           Show

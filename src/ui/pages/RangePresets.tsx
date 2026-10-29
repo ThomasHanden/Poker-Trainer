@@ -108,6 +108,7 @@ export function Presets() {
   return (
     <div>
       <div className="picker">
+        <span className="picker-label">Situation</span>
         <div className="seg picker-cats" role="tablist" aria-label="Situation">
           {CATEGORIES.map((c) => (
             <button key={c.id} role="tab" aria-selected={c.id === catId} className={c.id === catId ? 'on' : ''} onClick={() => setCatId(c.id)}>
@@ -116,6 +117,7 @@ export function Presets() {
           ))}
         </div>
         <p className="picker-blurb">{cat.blurb}</p>
+        <span className="picker-label">{cat.id === 'open' ? 'Table and seat' : 'Spot'}</span>
         <div className="picker-row">
           {subs.length > 1 && (
             <div className="seg small" role="radiogroup" aria-label="Variant">

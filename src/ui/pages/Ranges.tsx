@@ -32,7 +32,11 @@ export function RangesPage() {
   const setTab = (t: Tab) => setParams({ tab: t });
   return (
     <div className="page ranges">
-      <h1>Ranges</h1>
+      <header className="page-head">
+        <p className="eyebrow">Tools</p>
+        <h1>Ranges</h1>
+        <p className="lead">See which hands to play from each seat, build your own ranges, and check equities.</p>
+      </header>
       <div className="tabs" role="tablist">
         {(
           [
@@ -599,7 +603,7 @@ function EquityCalc() {
             <span>You win</span>
             <span>Opponent wins</span>
           </div>
-          {lesson && <p className="eq-lesson">💡 {lesson}</p>}
+          {lesson && <p className="eq-lesson">{lesson}</p>}
           {board.trim().split(/\s+/).filter(Boolean).length < 5 && (
             <>
               <h4>Can you call a bet?</h4>
