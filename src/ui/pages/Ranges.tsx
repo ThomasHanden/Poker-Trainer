@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { RangeMatrix, MatrixLegend, CellView } from '../components/RangeMatrix';
-import { allChartsIncludingComputed, Chart, chartFreq, chartPlayRange } from '../../ranges/presets';
-import { ALL_CLASSES, HandClass, Range, emptyRange, parseRange, formatRange, rangeCombos, rangePercent, compareRanges, blockedFraction, describeClass, comboCount } from '../../ranges/hands';
+import { allChartsIncludingComputed, chartPlayRange } from '../../ranges/presets';
+import { ALL_CLASSES, HandClass, Range, emptyRange, parseRange, formatRange, rangeCombos, rangePercent, compareRanges, blockedFraction } from '../../ranges/hands';
 import { parseCards, Card } from '../../engine/cards';
-import { explainPreflopHand } from '../../scenarios/templates/helpers';
+import { HAND_GROUPS, groupClasses } from '../../ranges/groups';
+import { preflopRanking } from '../../ranges/preflopEquity';
+import { Presets, GroupBreakdown } from './RangePresets';
 import { useStore } from '../store';
 import { newId, SavedRange } from '../../persistence/storage';
 import { run } from '../../workers/client';
@@ -61,157 +63,6 @@ export function RangesPage() {
   );
 }
 
-// ---------------- Presets ----------------
-
-function Presets() {
-  const charts = useMemo(() => allChartsIncludingComputed(), []);
-  const [group, setGroup] = useState<string>('open');
-  const [pos, setPos] = useState('any');
-  const [stack, setStack] = useState('any');
-  const filtered = charts.filter((c) => (group === 'any' || c.group === group) && (pos === 'any' || c.position === pos) && (stack === 'any' || String(c.stackBB) === stack));
-  const [id, setId] = useState(filtered[0]?.id ?? charts[0].id);
-  const chart = charts.find((c) => c.id === id) ?? filtered[0] ?? charts[0];
-  useEffect(() => {
-    if (filtered.length && !filtered.some((c) => c.id === id)) setId(filtered[0].id);
-  }, [filtered, id]);
-  const [deadText, setDeadText] = useState('');
-  const dead = parseDead(deadText);
-  const [sel, setSel] = useState<HandClass | null>(null);
-  const [nums, setNums] = useState(false);
-  const play = chartPlayRange(chart);
-  const groups = [...new Set(charts.map((c) => c.group))];
-  const positions = [...new Set(charts.map((c) => c.position))];
-  const stacks = [...new Set(charts.map((c) => String(c.stackBB)))].sort((a, b) => Number(a) - Number(b));
-  return (
-    <div className="ranges-grid">
-      <div>
-        <div className="filters">
-          <label>
-            Type
-            <select value={group} onChange={(e) => setGroup(e.target.value)}>
-              <option value="any">Any</option>
-              {groups.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Position
-            <select value={pos} onChange={(e) => setPos(e.target.value)}>
-              <option value="any">Any</option>
-              {positions.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Stack (bb)
-            <select value={stack} onChange={(e) => setStack(e.target.value)}>
-              <option value="any">Any</option>
-              {stacks.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-          <label className="grow">
-            Chart
-            <select value={chart.id} onChange={(e) => setId(e.target.value)}>
-              {filtered.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <RangeMatrix
-          ariaLabel={`${chart.name} chart`}
-          cells={(h) => {
-            const f = chartFreq(chart, h);
-            return { raise: f.raise, call: f.call, blocked: dead.cards.length ? blockedFraction(h, dead.cards) : undefined };
-          }}
-          onSelect={setSel}
-          selected={sel}
-          showNumbers={nums}
-        />
-        <MatrixLegend kind="chart" />
-        <label className="inline">
-          <input type="checkbox" checked={nums} onChange={(e) => setNums(e.target.checked)} /> Show frequencies as numbers
-        </label>
-      </div>
-      <div className="side">
-        <ChartInfo chart={chart} play={play} dead={dead.cards} />
-        <label>
-          Known cards (card removal)
-          <input value={deadText} onChange={(e) => setDeadText(e.target.value)} placeholder="e.g. As Kd" aria-invalid={!!dead.error} />
-        </label>
-        {dead.error && <p className="error">{dead.error}</p>}
-        {sel ? (
-          <div className="why-box">
-            <h3>
-              Why {sel} ({describeClass(sel)})?
-            </h3>
-            <ul>
-              {explainPreflopHand(sel, chartFreq(chart, sel), chart).map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-            <p className="note">
-              {comboCount(sel)} combos{dead.cards.length ? `, ${Math.round(comboCount(sel) * (1 - blockedFraction(sel, dead.cards)))} after card removal` : ''}.
-            </p>
-          </div>
-        ) : (
-          <p className="note">Select a hand to see why it is (or is not) in the range.</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ChartInfo({ chart, play, dead }: { chart: Chart; play: Range; dead: Card[] }) {
-  const rc = rangeCombos(chart.raise, dead);
-  const cc = rangeCombos(chart.call, dead);
-  return (
-    <div className="chart-info">
-      <h3>{chart.name}</h3>
-      <p>
-        <span className={`badge ${chart.confidence}`}>{chart.confidence === 'computed' ? 'Computed (stated model)' : 'Illustrative baseline'}</span>
-      </p>
-      <p>
-        <strong>Prior action:</strong> {chart.priorAction}
-        <br />
-        <strong>Sizing:</strong> {chart.sizing}
-        <br />
-        <strong>Format:</strong> {chart.format}, {chart.tableSize === 2 ? 'heads-up' : `${chart.tableSize}-max`}, {chart.stackBB}bb
-      </p>
-      <p>
-        {chart.raiseLabel}: {rc.toFixed(0)} combos ({((100 * rc) / 1326).toFixed(1)}%)
-        {cc > 0 && (
-          <>
-            {' '}
-            · {chart.callLabel ?? 'Call'}: {cc.toFixed(0)} combos ({((100 * cc) / 1326).toFixed(1)}%)
-          </>
-        )}{' '}
-        · Plays {rangePercent(play, dead).toFixed(1)}% of {dead.length ? 'remaining' : 'all'} hands
-      </p>
-      <details>
-        <summary>Assumptions</summary>
-        <ul>
-          {chart.assumptions.map((a, i) => (
-            <li key={i}>{a}</li>
-          ))}
-        </ul>
-      </details>
-      <details>
-        <summary>Export ({chart.raiseLabel.toLowerCase()} range)</summary>
-        <textarea readOnly value={formatRange(chart.raise)} rows={4} aria-label="Exported range text" />
-      </details>
-    </div>
-  );
-}
-
 // ---------------- Editor ----------------
 
 function Editor() {
@@ -255,6 +106,20 @@ function Editor() {
     }
   };
   const combos = rangeCombos(range, dead.cards);
+  const [topPct, setTopPct] = useState(20);
+  const topRange = () => {
+    // fill the best hands (by this app's playability ordering) until the target share of combos is reached
+    const r = emptyRange();
+    let n = 0;
+    for (const h of preflopRanking()) {
+      if (n >= (topPct / 100) * 1326) break;
+      r[h] = 1;
+      n += h.length === 2 ? 6 : h[2] === 's' ? 4 : 12;
+    }
+    setRange(r);
+    setMsg(`Filled the top ${topPct}% of hands.`);
+  };
+  const addGroup = (id: string) => setRange((r) => ({ ...r, ...Object.fromEntries(groupClasses(id).map((h) => [h, brush])) }));
   return (
     <div className="ranges-grid">
       <div>
@@ -279,12 +144,33 @@ function Editor() {
             ))}
           </select>
         </div>
+        <div className="quick-tools">
+          <div className="qt-row">
+            <span className="qt-label">Quick fill</span>
+            <input type="range" min={1} max={100} value={topPct} onChange={(e) => setTopPct(Number(e.target.value))} aria-label="Top percent of hands" />
+            <span className="qt-val">Top {topPct}%</span>
+            <button className="btn small" onClick={topRange}>
+              Fill
+            </button>
+          </div>
+          <div className="qt-row">
+            <span className="qt-label">Add family</span>
+            {HAND_GROUPS.map((g) => (
+              <button key={g.id} className="chip" onClick={() => addGroup(g.id)} title={g.hint}>
+                {g.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <RangeMatrix ariaLabel="Editable range" cells={(h) => ({ weight: range[h] ?? 0, blocked: dead.cards.length ? blockedFraction(h, dead.cards) : undefined })} onPaint={paint} showNumbers />
         <MatrixLegend kind="weight" />
         <p className="stats" data-testid="range-stats">
           {combos.toFixed(1)} combos · {rangePercent(range, dead.cards).toFixed(1)}% of {dead.cards.length ? 'remaining' : 'all'} hands
         </p>
-        <p className="note">Click or drag to paint with the selected weight. Clicking a cell that already has the brush weight clears it. Keyboard: Tab to a cell and press Enter.</p>
+        <p className="note">Click or drag to paint with the selected weight. Clicking a cell that already has the brush weight clears it. Keyboard: Tab to a cell and press Enter. “Add family” uses the selected brush weight.</p>
+        <p className="range-text" aria-label="Current range as text">
+          <code>{formatRange(range) || '(empty)'}</code>
+        </p>
       </div>
       <div className="side">
         <label>
@@ -323,6 +209,7 @@ function Editor() {
             Export current
           </button>
         </div>
+        <GroupBreakdown range={range} title="Hand families in this range" />
         <h3>Saved ranges</h3>
         {data.ranges.length === 0 ? (
           <p className="note">No saved ranges yet.</p>
@@ -385,6 +272,7 @@ function Compare() {
   const ra = opts.find((o) => o.id === a)?.range ?? emptyRange();
   const rb = opts.find((o) => o.id === b)?.range ?? emptyRange();
   const cmp = compareRanges(ra, rb);
+  const chips = (hs: string[]) => (hs.length ? <span className="hand-chips">{hs.map((h) => <span key={h} className="hchip">{h}</span>)}</span> : <span className="note">none</span>);
   return (
     <div className="ranges-grid">
       <div>
@@ -399,6 +287,9 @@ function Compare() {
               ))}
             </select>
           </label>
+          <button className="btn small swap" onClick={() => { setA(b); setB(a); }} aria-label="Swap A and B">
+            ⇄
+          </button>
           <label className="grow">
             Range B
             <select value={b} onChange={(e) => setB(e.target.value)}>
@@ -423,22 +314,27 @@ function Compare() {
         <MatrixLegend kind="compare" />
       </div>
       <div className="side">
-        <h3>Comparison</h3>
-        <p>
-          A: {cmp.combosA.toFixed(0)} combos ({((100 * cmp.combosA) / 1326).toFixed(1)}%) · B: {cmp.combosB.toFixed(0)} combos ({((100 * cmp.combosB) / 1326).toFixed(1)}%)
-        </p>
-        <p>
-          Overlap: {cmp.overlapCombos.toFixed(0)} combos · similarity {(cmp.similarity * 100).toFixed(0)}% (weighted overlap ÷ union)
-        </p>
-        <p>
-          <strong>Only in A:</strong> {cmp.onlyA.join(', ') || 'none'}
-        </p>
-        <p>
-          <strong>Only in B:</strong> {cmp.onlyB.join(', ') || 'none'}
-        </p>
-        <p>
-          <strong>Different weights:</strong> {cmp.differentWeight.join(', ') || 'none'}
-        </p>
+        <div className="cmp-stats">
+          <div>
+            <span className="sw a" /> A <strong>{((100 * cmp.combosA) / 1326).toFixed(1)}%</strong>
+            <span className="note"> {cmp.combosA.toFixed(0)} combos</span>
+          </div>
+          <div>
+            <span className="sw b" /> B <strong>{((100 * cmp.combosB) / 1326).toFixed(1)}%</strong>
+            <span className="note"> {cmp.combosB.toFixed(0)} combos</span>
+          </div>
+          <div>
+            Similarity <strong>{(cmp.similarity * 100).toFixed(0)}%</strong>
+            <span className="note"> {cmp.overlapCombos.toFixed(0)} shared combos</span>
+          </div>
+        </div>
+        <h4>Only in A</h4>
+        {chips(cmp.onlyA)}
+        <h4>Only in B</h4>
+        {chips(cmp.onlyB)}
+        <h4>Different weights</h4>
+        {chips(cmp.differentWeight)}
+        <GroupBreakdown range={ra} compare={rb} title="By hand family (A top, B below)" />
         <p className="note">
           Tip: save your own attempt in <Link to="/ranges?tab=editor">Build & save</Link>, then compare it with a reference chart here.
         </p>
@@ -594,6 +490,24 @@ function ChoiceDrillView({ d }: { d: ChoiceDrill }) {
 
 // ---------------- Equity calculator ----------------
 
+const EXAMPLES: { label: string; hero: string; board: string; range: string; lesson: string }[] = [
+  { label: 'AKs vs QQ', hero: 'Ah Kh', board: '', range: 'QQ', lesson: 'The classic “coin flip”: a pair is a small favourite over two overcards.' },
+  { label: 'AK vs AQ', hero: 'As Kd', board: '', range: 'AQo', lesson: 'Domination: sharing an ace with a better kicker leaves the weaker hand about 3 outs to beat you.' },
+  { label: 'JTs vs AA', hero: 'Jc Tc', board: '', range: 'AA', lesson: 'Even a strong suited connector is a big underdog to aces — but far from dead.' },
+  { label: 'Flush draw on the flop', hero: 'Ah 5h', board: 'Kh 9h 2c', range: 'KQ,KJ,KT,K9,99', lesson: 'Nut flush draw plus an ace overcard: about 12 outs with two cards to come — the rule of 4 says roughly 45%. The exact figure is a little lower because not every out wins (an ace can still lose to two pair or a set).' },
+  { label: 'Top pair vs a c-bet range', hero: 'Kd Qc', board: 'Ks 7d 2c', range: '22+,A2s+,K9s+,QTs+,JTs,ATo+,KJo+', lesson: 'Strong one-pair hands are well ahead of a wide range, but not of a tight one.' },
+  { label: 'Overpair vs a turn raise', hero: 'Qs Qd', board: 'Jh Th 4c 2s', range: 'JJ,TT,44,JTs,KhQh,AhKh,QhJh', lesson: 'Against a narrow, strong range even an overpair can be in bad shape.' },
+];
+
+const PRICES: [string, number][] = [
+  ['¼ pot', 0.25],
+  ['⅓ pot', 1 / 3],
+  ['½ pot', 0.5],
+  ['⅔ pot', 2 / 3],
+  ['Pot', 1],
+  ['2× pot', 2],
+];
+
 function EquityCalc() {
   const opts = useRangeOptions();
   const [hero, setHero] = useState('Ah Kh');
@@ -603,17 +517,18 @@ function EquityCalc() {
   const [res, setRes] = useState<EquityResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const calc = async () => {
+  const [lesson, setLesson] = useState<string | null>(null);
+  const calc = async (h0 = hero, b0 = board, c0 = custom) => {
     setErr(null);
     setRes(null);
     try {
-      const h = parseCards(hero);
+      const h = parseCards(h0);
       if (h.length !== 2) throw new Error('Enter exactly two hole cards.');
-      const b = board.trim() ? parseCards(board) : [];
+      const b = b0.trim() ? parseCards(b0) : [];
       if (b.length > 5 || b.length === 1 || b.length === 2) throw new Error('A board has 0, 3, 4 or 5 cards.');
       const all = [...h, ...b];
       if (new Set(all).size !== all.length) throw new Error('Duplicate card.');
-      const text = custom.trim() ? custom : formatRange(opts.find((o) => o.id === rid)!.range);
+      const text = c0.trim() ? c0 : formatRange(opts.find((o) => o.id === rid)!.range);
       parseRange(text);
       setBusy(true);
       setRes(await run<EquityResult>({ kind: 'equity', hero: h, ranges: [text], board: b, samples: 40000 }));
@@ -622,12 +537,27 @@ function EquityCalc() {
     }
     setBusy(false);
   };
+  const example = (x: (typeof EXAMPLES)[number]) => {
+    setHero(x.hero);
+    setBoard(x.board);
+    setCustom(x.range);
+    setLesson(x.lesson);
+    calc(x.hero, x.board, x.range);
+  };
   return (
     <div className="equity-calc">
+      <div className="eq-examples">
+        <span className="qt-label">Try a classic</span>
+        {EXAMPLES.map((x) => (
+          <button key={x.label} className="chip" onClick={() => example(x)} disabled={busy}>
+            {x.label}
+          </button>
+        ))}
+      </div>
       <div className="grid2">
         <label>
           Your hand
-          <input value={hero} onChange={(e) => setHero(e.target.value)} />
+          <input value={hero} onChange={(e) => setHero(e.target.value)} placeholder="e.g. Ah Kh" />
         </label>
         <label>
           Board (optional)
@@ -635,7 +565,7 @@ function EquityCalc() {
         </label>
         <label>
           Opponent range
-          <select value={rid} onChange={(e) => setRid(e.target.value)}>
+          <select value={rid} onChange={(e) => { setRid(e.target.value); setCustom(''); }}>
             {opts.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
@@ -644,24 +574,65 @@ function EquityCalc() {
           </select>
         </label>
         <label>
-          …or custom range text
-          <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g. TT+,AQs+,AKo" />
+          …or type a range / exact hand
+          <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g. TT+,AQs+,AKo or QsQd" />
         </label>
       </div>
-      <button className="btn primary" onClick={calc} disabled={busy}>
+      <p className="note">Cards are rank + suit: A K Q J T 9…2 and s h d c. Example: “Ah Kh” is the ace and king of hearts.</p>
+      <button className="btn primary" onClick={() => calc()} disabled={busy}>
         {busy ? 'Calculating…' : 'Calculate equity'}
       </button>
       {err && <p className="error">{err}</p>}
       {res && (
         <div className="eq-result" role="status">
-          <p>
-            Equity: <strong>{(res.equity * 100).toFixed(2)}%</strong> (win {(res.win * 100).toFixed(1)}%, tie {(res.tie * 100).toFixed(1)}%)
-          </p>
+          <div className="eq-head">
+            <span className="eq-big">{(res.equity * 100).toFixed(1)}%</span>
+            <span>
+              your equity <span className="note">(win {(res.win * 100).toFixed(1)}%, tie {(res.tie * 100).toFixed(1)}%)</span>
+            </span>
+          </div>
+          <div className="eq-bar" aria-hidden="true">
+            <span className="eq-win" style={{ width: `${res.win * 100}%` }} />
+            <span className="eq-tie" style={{ width: `${res.tie * 100}%` }} />
+          </div>
+          <div className="eq-bar-legend note">
+            <span>You win</span>
+            <span>Opponent wins</span>
+          </div>
+          {lesson && <p className="eq-lesson">💡 {lesson}</p>}
+          {board.trim().split(/\s+/).filter(Boolean).length < 5 && (
+            <>
+              <h4>Can you call a bet?</h4>
+              <p className="note">If the opponent bets and you call, you need at least this much equity to break even (ignoring future betting). Your equity: {(res.equity * 100).toFixed(1)}%.</p>
+              <table className="price-table">
+                <thead>
+                  <tr>
+                    <th>Bet size</th>
+                    <th>Equity needed</th>
+                    <th>Call?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRICES.map(([label, f]) => {
+                    const need = f / (1 + 2 * f);
+                    const ok = res.equity >= need;
+                    return (
+                      <tr key={label}>
+                        <td>{label}</td>
+                        <td>{(need * 100).toFixed(1)}%</td>
+                        <td className={ok ? 'ok' : 'no'}>{ok ? '✓ profitable on price alone' : '✗ needs more (implied odds or fold equity)'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
+          )}
           <p className="note">
             {res.method === 'exact'
               ? `Exact enumeration over ${res.samples.toLocaleString()} (opponent combo, runout) pairs.`
               : `Monte Carlo simulation: ${res.samples.toLocaleString()} samples, standard error ±${(res.stdError * 100).toFixed(2)}% (95% interval ±${(196 * res.stdError).toFixed(2)}%).`}{' '}
-            Card removal applied. Ties count as half.
+            Card removal applied. Ties count as half. Equity is the share of the pot you would win if all cards were dealt with no more betting — it is not the same as how profitable a hand is to play.
           </p>
         </div>
       )}

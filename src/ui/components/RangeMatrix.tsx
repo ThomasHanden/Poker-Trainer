@@ -5,7 +5,9 @@ export interface CellView {
   raise?: number; // 0..1
   call?: number;
   weight?: number; // for single-colour ranges
-  tone?: 'a' | 'b' | 'both' | 'value' | 'bluff' | 'ref' | 'miss' | 'extra' | 'none';
+  tone?: 'a' | 'b' | 'both' | 'value' | 'bluff' | 'ref' | 'miss' | 'extra' | 'new' | 'dropped' | 'none';
+  /** fade the cell (used to highlight a hand family or a difference) */
+  dim?: boolean;
   blocked?: number; // fraction of combos blocked by dead cards
   disabled?: boolean;
   label?: string;
@@ -89,7 +91,7 @@ export function RangeMatrix({
                   role="gridcell"
                   key={h}
                   data-hand={h}
-                  className={`cell ${r === c ? 'pair' : r < c ? 'suited' : 'offsuit'} ${v.tone ? `t-${v.tone}` : ''} ${selected === h ? 'sel' : ''} ${v.disabled ? 'dis' : ''}`}
+                  className={`cell ${r === c ? 'pair' : r < c ? 'suited' : 'offsuit'} ${v.tone ? `t-${v.tone}` : ''} ${selected === h ? 'sel' : ''} ${v.disabled ? 'dis' : ''} ${v.dim ? 'dimmed' : ''}`}
                   style={{ backgroundImage: background(v) || undefined, opacity: v.blocked ? Math.max(0.25, 1 - v.blocked) : undefined }}
                   aria-label={`${h}: ${desc}${v.blocked ? `, ${pct(v.blocked)} of combos blocked` : ''}, ${comboCount(h)} combos`}
                   aria-pressed={v.weight !== undefined ? v.weight > 0 : undefined}
@@ -126,27 +128,34 @@ export function RangeMatrix({
 }
 
 export function MatrixLegend({ kind }: { kind: 'chart' | 'weight' | 'compare' | 'drill' }) {
-  if (kind === 'chart')
-    return (
-      <div className="legend" aria-label="Legend">
-        <span className="sw raise" /> Raise/3-bet/shove <span className="sw call" /> Call <span className="sw fold" /> Fold · split cells are mixed (numbers: R = raise %, C = call %)
-      </div>
-    );
-  if (kind === 'weight')
-    return (
-      <div className="legend">
-        <span className="sw fill" /> Included (fill height = weight)
-      </div>
-    );
-  if (kind === 'compare')
-    return (
-      <div className="legend">
-        <span className="sw a" /> Only A <span className="sw b" /> Only B <span className="sw both" /> Both (pattern) · labels show A/B weights
-      </div>
-    );
+  const items: [string, string][] =
+    kind === 'chart'
+      ? [
+          ['raise', 'Raise / 3-bet / shove'],
+          ['call', 'Call'],
+          ['fold', 'Fold'],
+        ]
+      : kind === 'weight'
+        ? [['fill', 'Included (fill height = weight)']]
+        : kind === 'compare'
+          ? [
+              ['a', 'Only A'],
+              ['b', 'Only B'],
+              ['both', 'Both'],
+            ]
+          : [
+              ['value', 'Value'],
+              ['bluff', 'Bluff'],
+              ['fill', 'Selected'],
+            ];
   return (
-    <div className="legend">
-      <span className="sw value" /> Value <span className="sw bluff" /> Bluff <span className="sw fill" /> Selected
+    <div className="legend" aria-label="Legend">
+      {items.map(([sw, label]) => (
+        <span key={sw} className="li">
+          <span className={`sw ${sw}`} /> {label}
+        </span>
+      ))}
+      {kind === 'chart' && <span className="li note">Split cells are mixed strategies.</span>}
     </div>
   );
 }
