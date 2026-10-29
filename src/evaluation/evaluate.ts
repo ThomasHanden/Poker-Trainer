@@ -396,7 +396,7 @@ function genericConcepts(ctx: DecisionContext, key: ActionKey): ConceptId[] {
   if (ctx.toCall > 0) return ctx.facing === 'raise' ? ['facing-raise', 'pot-odds'] : ['pot-odds', ...(ctx.street === 'river' ? (['bluff-catch'] as ConceptId[]) : [])];
   const eq = ctx.equity?.equity ?? 0.5;
   if (key === 'bet') return eq >= 0.55 ? ['value-bet', 'bet-sizing'] : ctx.draws && ctx.draws.drawEquity > 0.2 ? ['semi-bluff'] : ['bluff'];
-  return eq >= 0.55 ? ['value-bet', 'checking-range'] : ['equity-realization'];
+  return eq >= 0.55 ? ['value-bet'] : ['equity-realization'];
 }
 
 function describeIntent(ctx: DecisionContext, a: PlayerAction, key: ActionKey): string {

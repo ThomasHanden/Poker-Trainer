@@ -1,0 +1,288 @@
+import { useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { LESSONS, LESSON_INDEX, SECTIONS, SEQUENCES, lessonsInSection } from '../../content/lessons';
+import { SOURCES } from '../../content/sources';
+import { useStore } from '../store';
+import { TEMPLATES } from '../../scenarios/templates';
+import { CONCEPTS } from '../../content/concepts';
+
+export function LearnPage() {
+  const { data } = useStore();
+  const [q, setQ] = useState('');
+  const [level, setLevel] = useState<'any' | 'beginner' | 'intermediate' | 'advanced'>('any');
+  const results = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return LESSONS.filter((l) => (level === 'any' || l.level === level) && (!t || [l.title, l.summary, ...l.plain, ...l.mistakes].join(' ').toLowerCase().includes(t)));
+  }, [q, level]);
+  const done = (id: string) => data.lessons[id]?.completed;
+  const searching = q.trim().length > 0 || level !== 'any';
+  return (
+    <div className="page learn">
+      <h1>Learn</h1>
+      <p className="lead">
+        {LESSONS.length} lessons, all open — no unlocks. Each has a plain-language explanation, why it matters, an example, common mistakes, the math, assumptions, a knowledge check and a link to related practice.
+      </p>
+      <div className="filters">
+        <label className="grow">
+          Search
+          <input type="search" placeholder="e.g. pot odds, ICM, blockers" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <label>
+          Level
+          <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
+            <option value="any">Any</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </label>
+      </div>
+      {searching ? (
+        <section>
+          <h2>
+            {results.length} result{results.length === 1 ? '' : 's'}
+          </h2>
+          {results.length === 0 && <p className="empty">No lessons match. Try a broader term.</p>}
+          <ul className="lesson-grid">
+            {results.map((l) => (
+              <LessonCard key={l.id} id={l.id} done={!!done(l.id)} />
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <>
+          <section>
+            <h2>Suggested study sequences (optional)</h2>
+            <div className="sequences">
+              {SEQUENCES.map((s) => {
+                const n = s.lessons.filter(done).length;
+                return (
+                  <details key={s.id} className="sequence">
+                    <summary>
+                      <strong>{s.title}</strong> — {s.blurb} <span className="note">({n}/{s.lessons.length} done)</span>
+                    </summary>
+                    <ol>
+                      {s.lessons.map((id) => (
+                        <li key={id}>
+                          <Link to={`/learn/${id}`}>{LESSON_INDEX[id].title}</Link> {done(id) ? '✓' : ''}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                );
+              })}
+            </div>
+          </section>
+          {SECTIONS.map((s) => (
+            <section key={s.id}>
+              <h2>{s.title}</h2>
+              <p className="note">{s.blurb}</p>
+              <ul className="lesson-grid">
+                {lessonsInSection(s.id).map((l) => (
+                  <LessonCard key={l.id} id={l.id} done={!!done(l.id)} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function LessonCard({ id, done }: { id: string; done: boolean }) {
+  const l = LESSON_INDEX[id];
+  return (
+    <li className="lesson-card">
+      <Link to={`/learn/${id}`}>
+        <strong>{l.title}</strong>
+        <span>{l.summary}</span>
+        <span className="meta">
+          {l.level}
+          {l.format !== 'both' ? ` · ${l.format}` : ''}
+          {done ? ' · ✓ completed' : ''}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+export function LessonPage() {
+  const { id } = useParams();
+  const l = id ? LESSON_INDEX[id] : undefined;
+  const { data, update } = useStore();
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [checked, setChecked] = useState(false);
+  if (!l)
+    return (
+      <div className="page">
+        <p>Lesson not found. <Link to="/learn">Back to the library</Link></p>
+      </div>
+    );
+  const prog = data.lessons[l.id];
+  const correct = l.quiz.filter((q, i) => answers[i] === q.answer).length;
+  const check = () => {
+    setChecked(true);
+    update((d) => {
+      const old = d.lessons[l.id];
+      const best = !old?.quizBest || correct / l.quiz.length > old.quizBest.correct / old.quizBest.total ? { correct, total: l.quiz.length, at: Date.now() } : old.quizBest;
+      return { ...d, lessons: { ...d.lessons, [l.id]: { ...old, completed: old?.completed || correct === l.quiz.length, quizBest: best, visitedAt: Date.now() } } };
+    });
+  };
+  const practiceHref = l.practice.templates?.length ? `/practice?template=${l.practice.templates[0]}` : l.practice.concepts?.length ? `/practice?concept=${l.practice.concepts[0]}` : '/practice?start=1';
+  const section = SECTIONS.find((s) => s.id === l.section)!;
+  return (
+    <article className="page lesson">
+      <p>
+        <Link to="/learn">← Library</Link> · {section.title}
+      </p>
+      <h1>{l.title}</h1>
+      <p className="lead">{l.summary}</p>
+      <p className="note">
+        Level: {l.level} · Applies to: {l.format === 'both' ? 'cash games and tournaments' : l.format === 'cash' ? 'cash games' : 'tournaments'}
+        {prog?.completed ? ' · ✓ completed' : ''}
+      </p>
+      <section>
+        <h2>The idea</h2>
+        {l.plain.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </section>
+      <section>
+        <h2>Why it matters</h2>
+        <ul>
+          {l.why.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      </section>
+      <section className="example">
+        <h2>Example: {l.example.title}</h2>
+        <ol>
+          {l.example.steps.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ol>
+      </section>
+      <section>
+        <h2>Common mistakes</h2>
+        <ul>
+          {l.mistakes.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      </section>
+      {l.math && (
+        <section className="mathbox">
+          <h2>The math</h2>
+          {l.math.formulas && (
+            <ul className="formulas">
+              {l.math.formulas.map((f, i) => (
+                <li key={i}>
+                  <code>{f}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+          {l.math.notes.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </section>
+      )}
+      <section>
+        <h2>Assumptions and exceptions</h2>
+        <ul>
+          {l.assumptions.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      </section>
+      <section className="quiz">
+        <h2>Knowledge check</h2>
+        {l.quiz.map((q, i) => (
+          <fieldset key={i} className="quiz-q">
+            <legend>
+              {i + 1}. {q.q}
+            </legend>
+            {q.options.map((o, j) => {
+              const state = checked ? (j === q.answer ? 'right' : answers[i] === j ? 'wrong' : '') : '';
+              return (
+                <label key={j} className={`opt ${state}`}>
+                  <input type="radio" name={`q${i}`} checked={answers[i] === j} onChange={() => setAnswers((a) => ({ ...a, [i]: j }))} disabled={checked} /> {o}
+                </label>
+              );
+            })}
+            {checked && <p className={answers[i] === q.answer ? 'right' : 'wrong'}>{answers[i] === q.answer ? 'Correct. ' : 'Not quite. '}{q.explain}</p>}
+          </fieldset>
+        ))}
+        {!checked ? (
+          <button className="btn primary" onClick={check} disabled={Object.keys(answers).length < l.quiz.length}>
+            Check answers
+          </button>
+        ) : (
+          <p>
+            You got {correct} of {l.quiz.length}.{' '}
+            <button
+              className="btn"
+              onClick={() => {
+                setChecked(false);
+                setAnswers({});
+              }}
+            >
+              Try again
+            </button>
+          </p>
+        )}
+        {!prog?.completed && (
+          <button className="btn ghost" onClick={() => update((d) => ({ ...d, lessons: { ...d.lessons, [l.id]: { ...d.lessons[l.id], completed: true, visitedAt: Date.now() } } }))}>
+            Mark as completed
+          </button>
+        )}
+      </section>
+      <section className="practice-link">
+        <h2>Practice it</h2>
+        <Link className="btn primary big" to={practiceHref} data-testid="practice-related">
+          ▶ {l.practice.label}
+        </Link>
+        {l.practice.templates && l.practice.templates.length > 1 && (
+          <p className="note">
+            Also:{' '}
+            {l.practice.templates.slice(1).map((t, i) => (
+              <span key={t}>
+                {i > 0 && ' · '}
+                <Link to={`/practice?template=${t}`}>{TEMPLATES.find((x) => x.id === t)?.title}</Link>
+              </span>
+            ))}
+          </p>
+        )}
+        {l.practice.concepts && l.practice.concepts.length > 0 && <p className="note">Concepts: {l.practice.concepts.map((c) => CONCEPTS[c].name).join(', ')}</p>}
+      </section>
+      <section>
+        <h2>Related lessons</h2>
+        <ul>
+          {l.related.map((r) => (
+            <li key={r}>
+              <Link to={`/learn/${r}`}>{LESSON_INDEX[r].title}</Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="sources">
+        <h2>Sources</h2>
+        <ul>
+          {l.sources.map((s) => {
+            const src = SOURCES[s];
+            return (
+              <li key={s}>
+                {src.url ? <a href={src.url} target="_blank" rel="noreferrer">{src.title}</a> : src.title}
+                {src.author ? ` — ${src.author}` : ''}
+                {src.year ? ` (${src.year})` : ''}. <span className="note">{src.usedFor}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="note">Explanations are original. Sources are cited for the concepts they are known for.</p>
+      </section>
+    </article>
+  );
+}
