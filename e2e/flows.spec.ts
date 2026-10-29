@@ -25,6 +25,11 @@ test('core training flow: scenario → decisions → review → lesson → relat
 
   // 2-3. make legal decisions until the hand ends, then read the review
   await playToEnd(page);
+  await expect(page.locator('.replay .felt')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to start' }).click();
+  await expect(page.locator('.replay-caption')).toContainText('Blinds posted');
+  await page.getByTestId('replay-next').click();
+  await expect(page.locator('.replay-count')).toContainText(/^1\//);
   await page.locator('.dcard-toggle').first().click();
   await expect(page.getByText('1. What information was available?').first()).toBeVisible();
   await page.getByRole('tab', { name: 'Opponent types' }).first().click();

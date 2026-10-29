@@ -213,3 +213,22 @@ describe('settings filtering', () => {
     }
   });
 });
+
+describe('visual replay timeline', () => {
+  it('reconstructs every template hand action by action', async () => {
+    const { buildTimeline } = await import('../src/engine/timeline');
+    for (const t of TEMPLATES) {
+      for (let seed = 1; seed <= 3; seed++) {
+        const sc = generateScenario(settingsFor(t.difficulties[t.difficulties.length - 1]), { templateId: t.id, seed: 900 + seed }).scenario!;
+        const u = createRng(seed * 7919);
+        let sess = startSession(sc);
+        let guard = 0;
+        while (!sess.state.complete && guard++ < 20) sess = heroAct(sess, randomLegal(sess.state, () => u.next()), { hint: false, potOdds: false, equity: false, feedback: false });
+        const tl = buildTimeline(sess.state);
+        expect(tl, `${t.id}#${seed}`).not.toBeNull();
+        expect(tl!.length).toBe(1 + sess.state.history.filter((h) => !h.type.startsWith('post')).length);
+        expect(tl![tl!.length - 1].state.result?.net).toEqual(sess.state.result?.net);
+      }
+    }
+  });
+});

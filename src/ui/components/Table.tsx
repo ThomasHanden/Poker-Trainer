@@ -10,6 +10,24 @@ export const fmtBB = (chips: number, bb: number) => {
   return `${Number.isInteger(v) ? v : v.toFixed(v < 10 ? 2 : 1).replace(/\.?0+$/, '')}bb`;
 };
 
+/** Short description of one action, e.g. "raises to 2.5bb" (or "raise to 2.5bb" for the hero). */
+export function actionText(h: ActionRecord, bb: number, isHero = false): string {
+  const t: Record<string, string> = {
+    'post-sb': `posts small blind ${fmtBB(h.amount, bb)}`,
+    'post-bb': `posts big blind ${fmtBB(h.amount, bb)}`,
+    'post-ante': `posts ante ${fmtBB(h.amount, bb)}`,
+    fold: 'folds',
+    check: 'checks',
+    call: `calls ${fmtBB(h.amount, bb)}`,
+    bet: `bets ${fmtBB(h.to, bb)}`,
+    raise: `raises to ${fmtBB(h.to, bb)}`,
+  };
+  let txt = t[h.type] ?? h.type;
+  if (isHero) txt = txt.replace(/^(\w+?)s\b/, '$1');
+  if (h.allIn) txt += ' (all-in)';
+  return txt;
+}
+
 function lastStreetAction(s: HandState, player: number): ActionRecord | undefined {
   for (let i = s.history.length - 1; i >= 0; i--) {
     const h = s.history[i];
@@ -72,12 +90,15 @@ export function Table({
   profiles,
   fourColor,
   revealAll = false,
+  spotlight,
 }: {
   state: HandState;
   hero: number;
   profiles: Record<number, ProfileId>;
   fourColor: boolean;
   revealAll?: boolean;
+  /** replay: the seat that just acted, highlighted with a label of its action */
+  spotlight?: { seat: number; label: string };
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -128,7 +149,7 @@ export function Table({
         {state.players.map((p, i) => {
           const g = geo(i);
           const act = lastStreetAction(state, i);
-          const isTurn = state.toAct === i && !state.complete;
+          const isTurn = spotlight ? spotlight.seat === i : state.toAct === i && !state.complete;
           const show = p.isHero || showdown.has(i) || revealAll;
           const prof = profiles[i];
           const cards =
@@ -154,7 +175,11 @@ export function Table({
                   <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
                 </div>
                 {!g.low && cards}
-                {act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>}
+                {spotlight ? (
+                  spotlight.seat === i && <div className="seat-action spot">{spotlight.label}</div>
+                ) : (
+                  act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
+                )}
                 {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
               </div>
               {p.streetCommitted > 0 && !state.complete && (

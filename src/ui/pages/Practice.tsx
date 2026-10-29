@@ -280,7 +280,7 @@ export function PracticePage() {
         </div>
       )}
       {phase === 'loading' && <div className="loading" role="status">Dealing a fresh scenario…</div>}
-      {sess && sc && (
+      {sess && sc && !(phase === 'done' && evaluation) && (
         <div className="practice-body">
           <Table state={sess.state} hero={sc.heroIndex} profiles={sc.shownProfiles} fourColor={data.prefs.fourColor} />
           {heroTurn && (

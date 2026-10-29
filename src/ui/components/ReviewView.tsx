@@ -8,6 +8,8 @@ import { CardRow } from './Card';
 import { fmtBB } from './Table';
 import { LESSON_INDEX } from '../../content/lessons';
 import { PROFILES } from '../../opponents/profiles';
+import { HandReplay } from './HandReplay';
+import { useStore } from '../store';
 
 export const gradeClass = (g: Grade) => `grade g-${g}`;
 const ICON: Record<Grade, string> = { best: '✓', good: '✓', inaccuracy: '!', mistake: '✗', blunder: '✗', unscored: '?' };
@@ -39,7 +41,7 @@ function verdict(d: DecisionEvaluation): string {
 
 type Tab = 'situation' | 'ranges' | 'options' | 'opponents' | 'sources';
 
-function DecisionCard({ d, id }: { d: DecisionEvaluation; id: string }) {
+function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; onShow: () => void }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('situation');
   const reasons = d.why.slice(0, 3);
@@ -63,9 +65,14 @@ function DecisionCard({ d, id }: { d: DecisionEvaluation; id: string }) {
         ))}
       </ul>
       {d.conflict && <p className="dcard-conflict">⚖ {d.conflict}</p>}
-      <button className="linklike dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        {open ? 'Hide full analysis' : 'Full analysis'}
-      </button>
+      <div className="dcard-links">
+        <button className="linklike dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? 'Hide full analysis' : 'Full analysis'}
+        </button>
+        <button className="linklike" onClick={onShow}>
+          See it on the table
+        </button>
+      </div>
       {open && (
         <div className="dcard-full">
           <div className="tabs small" role="tablist">
@@ -205,6 +212,8 @@ export function ReviewView({
 }) {
   const t = getTemplate(scenario.templateId);
   const [reveal, setReveal] = useState(false);
+  const [jumpTo, setJumpTo] = useState<{ decision: number; nonce: number }>();
+  const { data } = useStore();
   const hero = scenario.heroIndex;
   const bb = finalState.config.bb;
   const res = finalState.result;
@@ -289,9 +298,11 @@ export function ReviewView({
         </div>
       </section>
 
+      <HandReplay finalState={finalState} hero={hero} profiles={scenario.shownProfiles} fourColor={data.prefs.fourColor} decisions={evaluation.decisions} jumpTo={jumpTo} />
+
       <section className="rdecisions">
         {evaluation.decisions.map((d, i) => (
-          <DecisionCard key={i} d={d} id={`dec-${i}`} />
+          <DecisionCard key={i} d={d} id={`dec-${i}`} onShow={() => setJumpTo({ decision: i, nonce: Date.now() })} />
         ))}
       </section>
 
