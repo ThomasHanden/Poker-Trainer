@@ -5624,3 +5624,155 @@ label .select-btn {
     animation: none;
   }
 }
+
+/* ---------- softer form controls (dropdowns, inputs, segmented buttons) ---------- */
+:root {
+  --ctl-radius: 10px;
+  --ctl-border: color-mix(in srgb, var(--border-strong) 70%, var(--border));
+  --ctl-shadow: 0 1px 2px rgba(28, 26, 22, 0.05);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+textarea,
+.select-btn {
+  border-radius: var(--ctl-radius);
+  border-color: var(--ctl-border);
+  box-shadow: var(--ctl-shadow);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.select-btn {
+  height: 44px;
+  padding: 0 14px;
+}
+input:not([type='checkbox']):not([type='radio']):not([type='range']):focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.select-btn {
+  font-weight: 500;
+  background: var(--surface);
+}
+.select-btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 60%, var(--bg));
+}
+.select-btn:focus-visible,
+.select-btn.open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--surface);
+}
+.select-chev {
+  width: 22px;
+  height: 22px;
+  padding: 5px;
+  margin-right: -6px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-2);
+  transition: transform 0.25s var(--ease), background 0.2s;
+}
+.select-btn.open .select-chev {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.select-pop {
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 2px rgba(28, 26, 22, 0.06),
+    0 12px 32px -6px rgba(28, 26, 22, 0.18);
+  transform-origin: top center;
+  animation: select-pop-in 0.18s var(--ease);
+}
+.select-pop.up {
+  transform-origin: bottom center;
+  animation: select-pop-in-up 0.18s var(--ease);
+}
+@keyframes select-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+@keyframes select-pop-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% + 6px)) scale(0.98);
+  }
+}
+.select-opt {
+  padding: 10px 12px;
+  border-radius: 9px;
+  transition: background 0.12s var(--ease), color 0.12s;
+}
+.select-opt + .select-opt,
+li + li .select-opt {
+  margin-top: 1px;
+}
+.select-opt.active {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-2));
+}
+.select-opt.sel {
+  font-weight: 500;
+  color: var(--text);
+}
+.select-opt svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.select-opt.sel svg {
+  width: 16px;
+  height: 16px;
+}
+/* field labels: quieter and closer to their control */
+label {
+  gap: 7px;
+}
+.field-label,
+label > span:first-child:not(.select-value) {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+/* segmented buttons: rounded track with a raised selected pill */
+.seg {
+  border-radius: 12px;
+  padding: 3px;
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+.seg button {
+  border-radius: 9px;
+  transition: background 0.2s var(--ease), color 0.2s, box-shadow 0.2s var(--ease);
+}
+.seg button.on {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(28, 26, 22, 0.08), 0 0 0 1px var(--border);
+}
+/* settings panel: more air, softer card */
+.settings {
+  border-radius: 16px;
+  border-color: var(--border);
+  padding: 20px 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .select-pop,
+  .select-pop.up {
+    animation: none;
+  }
+}
+@media (max-width: 680px) {
+  /* four-option button groups become an even 2 × 2 grid instead of wrapping one item */
+  .seg:has(> button:nth-child(4):last-child) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+  }
+  .seg:has(> button:nth-child(4):last-child) button {
+    min-width: 0;
+  }
+}
