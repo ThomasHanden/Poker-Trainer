@@ -62,7 +62,7 @@ export const FOUNDATIONS: Lesson[] = [
       'Because of this, ranges widen as you move toward the button. From early position, many players act after you and the chance someone has a strong hand is high; from the button, only the blinds remain and you will have position postflop.',
     ],
     why: [
-      'The same hand is worth more in position because you realise more of its equity — you lose less when behind and win more when ahead.',
+      'The same hand is worth more in position because you realize more of its equity — you lose less when behind and win more when ahead.',
       'Position explains many baseline strategies: wider button opens, mostly 3-bet-or-fold from the small blind, and why the big blind defends wide only because of its price.',
     ],
     example: {
@@ -75,7 +75,7 @@ export const FOUNDATIONS: Lesson[] = [
     },
     mistakes: [
       'Playing the same range from every seat.',
-      'Calling raises out of position with hands that need position to realise their equity (weak offsuit broadways, small suited hands).',
+      'Calling raises out of position with hands that need position to realize their equity (weak offsuit broadways, small suited hands).',
       'Forgetting that the blinds have a positional disadvantage for the whole hand.',
     ],
     assumptions: ['Advantages assume standard stack depths. When stacks are very short (push/fold), position matters much less because there is little postflop play.'],
@@ -169,12 +169,12 @@ export const FOUNDATIONS: Lesson[] = [
     format: 'both',
     plain: [
       'Equity is the fraction of the pot you would win on average if all remaining cards were dealt with no more betting (ties count half). It is a property of the cards and ranges.',
-      'Expected value (EV) is the average profit of a decision, including all future betting: how often opponents fold, how much they pay you when you are ahead, how much you lose when behind, and how often you can realise your equity at all.',
+      'Expected value (EV) is the average profit of a decision, including all future betting: how often opponents fold, how much they pay you when you are ahead, how much you lose when behind, and how often you can realize your equity at all.',
       'High equity does not automatically mean “raise”, and low equity does not automatically mean “fold”. A flush draw with 35% equity can be a profitable call — or a profitable raise — depending on price and fold equity. A hand with 55% equity can be a poor bet if only better hands call.',
     ],
     why: [
       'Most good decisions are EV comparisons between actions (fold, call, raise; check or bet; which size).',
-      'Equity is the main input to EV, but position, stack depth and opponents change how much of it you realise.',
+      'Equity is the main input to EV, but position, stack depth and opponents change how much of it you realize.',
     ],
     example: {
       title: 'Turning equity into EV',
@@ -255,7 +255,7 @@ export const FOUNDATIONS: Lesson[] = [
     assumptions: ['Ranges are estimates. The app’s ranges are exact for its simulated opponents but only approximate for real players.'],
     quiz: [
       { q: 'A range is best described as…', options: ['The best hand a player could have', 'The set of hands a player could have, with likelihoods', 'The pot size'], answer: 1, explain: 'Ranges include every plausible holding, ideally weighted.' },
-      { q: 'Why think about your own range?', options: ['To avoid making your actions transparent', 'To memorise charts', 'It is not useful'], answer: 0, explain: 'If you only bet strong hands, observant opponents fold to your bets.' },
+      { q: 'Why think about your own range?', options: ['To avoid making your actions transparent', 'To memorize charts', 'It is not useful'], answer: 0, explain: 'If you only bet strong hands, observant opponents fold to your bets.' },
     ],
     practice: { label: 'Facing a c-bet (read the range breakdown)', templates: ['fl-defend-cbet'], concepts: ['pot-odds'] },
     related: ['constructing-ranges', 'narrowing-ranges', 'equity-vs-range'],

@@ -41,7 +41,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
   await expect(page.locator('article.lesson h1')).toBeVisible();
   await expect(page.getByText('Knowledge check')).toBeVisible();
 
-  // 5. practise the related concept
+  // 5. practice the related concept
   await page.getByTestId('practice-related').click();
   await expect(page.locator('.pchip.target')).toContainText('Target:');
   await expect(page.locator('.action-bar, [data-testid=review]').first()).toBeVisible({ timeout: 30_000 });

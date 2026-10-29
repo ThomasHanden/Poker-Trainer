@@ -46,7 +46,7 @@ export const CONCEPTS: Record<ConceptId, { name: string; lesson: string }> = {
   'facing-open': { name: 'Facing an open', lesson: 'calling-vs-raising' },
   'three-bet': { name: '3-betting', lesson: 'three-four-betting' },
   'four-bet': { name: '4-betting', lesson: 'three-four-betting' },
-  'blind-defense': { name: 'Blind defence', lesson: 'blind-defense' },
+  'blind-defense': { name: 'Blind defense', lesson: 'blind-defense' },
   'blind-vs-blind': { name: 'Blind vs blind', lesson: 'blind-defense' },
   squeeze: { name: 'Squeezing', lesson: 'squeezes' },
   isolation: { name: 'Isolation raises', lesson: 'isolation-limped' },
@@ -76,8 +76,8 @@ export const CONCEPTS: Record<ConceptId, { name: string; lesson: string }> = {
   'bet-sizing': { name: 'Bet sizing', lesson: 'what-a-bet-does' },
   multiway: { name: 'Multiway pots', lesson: 'multiway' },
   spr: { name: 'Stack-to-pot ratio', lesson: 'position-spr' },
-  mdf: { name: 'Minimum defence frequency', lesson: 'mdf' },
-  'equity-realization': { name: 'Equity realisation', lesson: 'equity-denial-realization' },
+  mdf: { name: 'Minimum defense frequency', lesson: 'mdf' },
+  'equity-realization': { name: 'Equity realization', lesson: 'equity-denial-realization' },
   exploit: { name: 'Exploiting tendencies', lesson: 'exploitative-adjustments' },
 };
 

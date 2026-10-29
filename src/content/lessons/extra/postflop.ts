@@ -12,7 +12,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'A checklist for any flop',
         body: [
-          'High card: an ace- or king-high board usually favours the preflop raiser, who has more strong aces and kings. Low, connected boards (such as 7-6-5) favour the caller, especially the big blind, who has more small suited and connected hands.',
+          'High card: an ace- or king-high board usually favors the preflop raiser, who has more strong aces and kings. Low, connected boards (such as 7-6-5) favor the caller, especially the big blind, who has more small suited and connected hands.',
           'Connectedness: count the straight draws. Three cards within a five-card window allow made straights; two connected cards allow open-enders. Suits: a two-tone flop allows flush draws; a monotone flop makes flushes possible already. Pairing: a paired board reduces the number of strong hands and makes trips and full houses the nuts.',
         ],
       },
@@ -186,7 +186,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       ['Equity denial', 'Making hands with some equity fold so they cannot draw out.'],
       ['Free card', 'A card seen without paying, because everyone checked.'],
       ['Protection', 'Betting partly to deny equity to hands that could outdraw you.'],
-      ['Realisation', 'The share of a hand’s equity it actually wins.'],
+      ['Realization', 'The share of a hand’s equity it actually wins.'],
     ],
     deeper: [
       {
@@ -197,10 +197,10 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
         ],
       },
       {
-        heading: 'How realisation decides calls',
+        heading: 'How realization decides calls',
         body: [
-          'A hand that realises its equity well can continue with less raw equity. In position, with a draw to the nuts, you can call more. Out of position, with a weak pair that will face bets on many turns, you need more.',
-          'The app’s rollouts take this into account: they simulate the rest of the hand, so a call that looks fine on raw equity can show a lower EV once realisation is included.',
+          'A hand that realizes its equity well can continue with less raw equity. In position, with a draw to the nuts, you can call more. Out of position, with a weak pair that will face bets on many turns, you need more.',
+          'The app’s rollouts take this into account: they simulate the rest of the hand, so a call that looks fine on raw equity can show a lower EV once realization is included.',
         ],
       },
     ],
@@ -222,7 +222,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'On which board does an overpair most need protection?', options: ['K♠ 7♦ 2♣', 'J♥ T♥ 8♣', 'A♠ A♦ 3♣'], answer: 1, explain: 'Wet and connected: many hands have strong draws.' },
-      { q: 'Which hand realises its equity better?', options: ['A nut flush draw in position', 'Bottom pair out of position'], answer: 0, explain: 'It can continue easily and wins big when it hits.' },
+      { q: 'Which hand realizes its equity better?', options: ['A nut flush draw in position', 'Bottom pair out of position'], answer: 0, explain: 'It can continue easily and wins big when it hits.' },
     ],
   },
 
@@ -238,7 +238,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
         heading: 'Frequency and size go together',
         body: [
           'On boards where your range is much stronger, a high frequency with a small size (about a third of the pot) is efficient. Most of your hands benefit, and the opponent must defend with weak holdings.',
-          'On boards where the ranges are close, bet less often and use a larger size (about two-thirds to pot). Your bets will be a stronger, more polarised group, and you check the middle of your range.',
+          'On boards where the ranges are close, bet less often and use a larger size (about two-thirds to pot). Your bets will be a stronger, more polarized group, and you check the middle of your range.',
         ],
       },
       {
@@ -250,8 +250,8 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       },
     ],
     apply: [
-      'Ask whose range the board favours.',
-      'Favourable board → c-bet often and small.',
+      'Ask whose range the board favors.',
+      'Favorable board → c-bet often and small.',
       'Neutral or bad board → c-bet less, size up, and check the middle of your range.',
       'Keep some strong hands in your checks.',
       'Multiway → c-bet much less and mostly for value.',
@@ -267,7 +267,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'On a board that strongly favours your range, the usual c-bet plan is…', options: ['High frequency, small size', 'Low frequency, large size', 'Never bet'], answer: 0, explain: 'Most hands benefit and the opponent’s range is weak.' },
+      { q: 'On a board that strongly favors your range, the usual c-bet plan is…', options: ['High frequency, small size', 'Low frequency, large size', 'Never bet'], answer: 0, explain: 'Most hands benefit and the opponent’s range is weak.' },
       { q: 'Why keep some strong hands in your checking range?', options: ['So opponents cannot bet every time you check', 'Because strong hands never want to bet', 'It is required'], answer: 0, explain: 'Otherwise your checks are an easy target.' },
     ],
   },
@@ -283,7 +283,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'Why the delay works',
         body: [
-          'When you check back the flop, you keep the pot small, realise your equity and give the opponent a chance to bet. When they check again on the turn, their range is weaker: many players would bet the turn with their good hands and draws.',
+          'When you check back the flop, you keep the pot small, realize your equity and give the opponent a chance to bet. When they check again on the turn, their range is weaker: many players would bet the turn with their good hands and draws.',
           'Your checked-back range contains many medium hands and some strong ones you slow-played. Betting the turn after two checks often gets folds from weak hands and value from worse pairs.',
         ],
       },
@@ -296,7 +296,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       },
     ],
     apply: [
-      'Check back flops that do not favour your range or where your hand wants pot control.',
+      'Check back flops that do not favor your range or where your hand wants pot control.',
       'On the turn after a check-check, bet when the card helps your range or gives you equity.',
       'Use the opponent’s turn check as evidence that their range is weaker.',
       'Keep some strong hands in your flop checks so the delayed line is credible.',
@@ -336,19 +336,19 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
         heading: 'Common mistakes with leads',
         body: [
           'Many players donk-bet small with medium hands “to see where they are”. This lets the aggressor raise with strong hands and bluffs and fold the rest, and it takes weak hands out of the checking range.',
-          'A lead should come from a range that is strong on that card, and the size should suit what you want: small to probe weak ranges, larger when the card favours you heavily.',
+          'A lead should come from a range that is strong on that card, and the size should suit what you want: small to probe weak ranges, larger when the card favors you heavily.',
         ],
       },
     ],
     apply: [
-      'Lead when the new card clearly favours your range.',
+      'Lead when the new card clearly favors your range.',
       'Probe the turn after a check-back, with a range of value hands and good draws.',
       'Avoid small “blocking” leads with medium hands unless you have a specific read.',
-      'Keep checking most of your range when the card favours the aggressor.',
+      'Keep checking most of your range when the card favors the aggressor.',
     ],
     examples: [
       {
-        title: 'A turn that favours the caller',
+        title: 'A turn that favors the caller',
         steps: [
           'Button opens, big blind calls. Flop K♠ 8♦ 6♣: button bets small, big blind calls.',
           'Turn 7♥. The big blind has many 9-5s, 5-4, T-9, 8-7, 7-6 and 8-6 that made straights or two pair. The button has fewer of these.',
@@ -358,7 +358,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'After the button checks back the flop, a turn bet by the big blind is called…', options: ['A probe bet', 'A 3-bet', 'A c-bet'], answer: 0, explain: 'Betting into a player who declined to bet.' },
-      { q: 'A good reason to donk-bet the turn is…', options: ['The turn card favours your range', 'You want to find out where you stand', 'You always lead with pairs'], answer: 0, explain: 'Leads work best from ranges that improved.' },
+      { q: 'A good reason to donk-bet the turn is…', options: ['The turn card favors your range', 'You want to find out where you stand', 'You always lead with pairs'], answer: 0, explain: 'Leads work best from ranges that improved.' },
     ],
   },
 
@@ -568,7 +568,7 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
     apply: [
       'Bluff much less often multiway, and only with real equity.',
       'Value bet stronger hands; slow down with one pair.',
-      'Favour nut draws over weak draws.',
+      'Favor nut draws over weak draws.',
       'Respect bets and raises into several players.',
     ],
     examples: [

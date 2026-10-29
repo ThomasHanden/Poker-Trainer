@@ -71,7 +71,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'Choosing your size',
         body: [
-          'Smaller opens are cheaper steals and lose less when you have to fold to a 3-bet. Larger opens charge the blinds more to call and make the pot bigger with your strong hands. The right size depends on the game: online cash games favour 2–2.5bb, live games often 3bb or more because players call more, and ante tournaments about 2–2.2bb.',
+          'Smaller opens are cheaper steals and lose less when you have to fold to a 3-bet. Larger opens charge the blinds more to call and make the pot bigger with your strong hands. The right size depends on the game: online cash games favor 2–2.5bb, live games often 3bb or more because players call more, and ante tournaments about 2–2.2bb.',
           'Adjust for specific opponents. Against blinds who call too much, open larger and tighter. Against blinds who 3-bet a lot, open smaller so their 3-bets win less.',
         ],
       },
@@ -191,7 +191,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
   'linear-polarized': {
     terms: [
       ['Linear (merged) range', 'A range made of the best hands down to a cutoff point.'],
-      ['Polarised range', 'A range of very strong hands plus bluffs, with the middle removed.'],
+      ['Polarized range', 'A range of very strong hands plus bluffs, with the middle removed.'],
       ['Condensed range', 'A range made mostly of medium-strength hands, often the result of calling.'],
       ['Blocker', 'A card in your hand that makes certain opponent hands less likely.'],
     ],
@@ -199,20 +199,20 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'Why ranges take these shapes',
         body: [
-          'If calling is a good option for your middle-strength hands, there is no need to 3-bet them, so your 3-bets become the hands that most want a big pot (value) plus hands that cannot call but benefit from fold equity (bluffs). That is a polarised range.',
+          'If calling is a good option for your middle-strength hands, there is no need to 3-bet them, so your 3-bets become the hands that most want a big pot (value) plus hands that cannot call but benefit from fold equity (bluffs). That is a polarized range.',
           'If calling is not a good option, because you are out of position or there are players behind, then your middle hands either fold or raise. Raising the best of them for thin value gives a linear range.',
         ],
       },
       {
         heading: 'How the opponent changes the answer',
         body: [
-          'Against opponents who call 3-bets with too many weaker hands, linear ranges earn more because AJ, KQ and TT are ahead of what calls. Against opponents who fold a lot, polarised ranges earn more because the bluffs win the pot often and the value hands still get action from the strongest part of their range.',
-          'In practice most strategies are a blend: a mostly linear 3-bet from the small blind, and a more polarised 3-bet from the button or big blind.',
+          'Against opponents who call 3-bets with too many weaker hands, linear ranges earn more because AJ, KQ and TT are ahead of what calls. Against opponents who fold a lot, polarized ranges earn more because the bluffs win the pot often and the value hands still get action from the strongest part of their range.',
+          'In practice most strategies are a blend: a mostly linear 3-bet from the small blind, and a more polarized 3-bet from the button or big blind.',
         ],
       },
     ],
     apply: [
-      'If you can call profitably (in position, closing the action), polarise your 3-bets.',
+      'If you can call profitably (in position, closing the action), polarize your 3-bets.',
       'If you cannot call (small blind, squeeze risk), use a more linear 3-bet.',
       'Against stations, make the range more linear; against folders, add more bluffs.',
       'Choose bluffs with blockers and playability, not random weak hands.',
@@ -229,7 +229,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'Which seat most often uses a linear 3-bet range?', options: ['Small blind vs button', 'Button vs cutoff', 'Big blind vs button'], answer: 0, explain: 'Calling from the small blind is poor, so medium hands raise or fold.' },
-      { q: 'A polarised range contains…', options: ['Only medium hands', 'Strong hands and bluffs', 'Only bluffs'], answer: 1, explain: 'The middle is removed.' },
+      { q: 'A polarized range contains…', options: ['Only medium hands', 'Strong hands and bluffs', 'Only bluffs'], answer: 1, explain: 'The middle is removed.' },
     ],
   },
 
@@ -237,15 +237,15 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
     terms: [
       ['Defend', 'Continue (call or 3-bet) from the blinds against a steal.'],
       ['Price', 'How much equity you need to call, given the pot and the bet.'],
-      ['Realisation factor', 'The share of raw equity a hand actually wins on average once later betting is accounted for.'],
+      ['Realization factor', 'The share of raw equity a hand actually wins on average once later betting is accounted for.'],
       ['Blind vs blind', 'Pots where it folds to the small blind, who plays against the big blind.'],
     ],
     deeper: [
       {
-        heading: 'Raw equity versus realised equity',
+        heading: 'Raw equity versus realized equity',
         body: [
-          'The price tells you the raw equity needed if the hand went straight to showdown. Out of position you will not get there for free: you will face bets on the flop and turn and sometimes have to fold the best hand. Common estimates put out-of-position realisation at around 70–85% of raw equity for decent hands, and lower for weak offsuit hands.',
-          'So if you need 27% to call and a hand has 33% raw equity but only realises 75% of it, it effectively has about 25%. That is just short. Suited and connected hands realise more and pass the test; weak offsuit hands often fail it.',
+          'The price tells you the raw equity needed if the hand went straight to showdown. Out of position you will not get there for free: you will face bets on the flop and turn and sometimes have to fold the best hand. Common estimates put out-of-position realization at around 70–85% of raw equity for decent hands, and lower for weak offsuit hands.',
+          'So if you need 27% to call and a hand has 33% raw equity but only realizes 75% of it, it effectively has about 25%. That is just short. Suited and connected hands realize more and pass the test; weak offsuit hands often fail it.',
         ],
       },
       {
@@ -432,7 +432,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'Practical adjustments',
         body: [
-          'At high-rake levels (common in low-stakes online and live games), tighten the bottom of your calling ranges, especially big-blind defence and cold calls. Raise or fold more often.',
+          'At high-rake levels (common in low-stakes online and live games), tighten the bottom of your calling ranges, especially big-blind defense and cold calls. Raise or fold more often.',
           'As stakes rise and rake falls as a share of the pot, strategies can widen again. Solver outputs computed without rake are often too loose for high-rake games.',
         ],
       },
@@ -477,7 +477,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
       {
         heading: 'Raw equity is not the deciding factor',
         body: [
-          'Against a random hand, K8o has about 56% equity and 65s about 43%. Yet in many positions 65s is the better hand to play, because it realises more of its equity and loses less when it is behind. Equity tables measure all-in strength, not how a hand plays over several streets.',
+          'Against a random hand, K8o has about 56% equity and 65s about 43%. Yet in many positions 65s is the better hand to play, because it realizes more of its equity and loses less when it is behind. Equity tables measure all-in strength, not how a hand plays over several streets.',
           'Playability matters most when stacks are deep and you will see several streets. When you are all-in preflop, only raw equity matters.',
         ],
       },

@@ -1,4 +1,4 @@
-// Families of starting hands, used to summarise how much of each family a range plays.
+// Families of starting hands, used to summarize how much of each family a range plays.
 
 import { ALL_CLASSES, HandClass, MATRIX_RANKS, Range, comboCount, isPair, isSuited } from './hands';
 

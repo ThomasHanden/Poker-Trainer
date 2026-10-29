@@ -28,7 +28,7 @@ npm run gen:equity -- 4000     # regenerate the preflop equity table (≈5 min)
 | Area | Highlights |
 |---|---|
 | **Practice** | 37 validated scenario templates (13 cash preflop, 5 tournament/short-stack, 9 flop, 5 turn, 5 river). Settings: difficulty (beginner→expert), cash/tournament, heads-up/6-max/full ring, stack band, hero position, starting street or complete hand, heads-up/multiway, pot type, opponent profile, concepts, guided vs assessment. Unsupported combinations are explained instead of generated. Fresh scenarios avoid recent fingerprints and templates. |
-| **Table** | Hole/board cards (optional four-colour deck), button, positions, stacks, effective stack, blinds/antes, pot and per-street bets, amount to call, action history. Fold/check/call/bet/raise/all-in only when legal; pot-% presets (25–150%), min, all-in and custom “raise to” with live “raise by” and validation (min-raise, stack limit, short all-in). Keyboard shortcuts (`?`). |
+| **Table** | Hole/board cards (optional four-color deck), button, positions, stacks, effective stack, blinds/antes, pot and per-street bets, amount to call, action history. Fold/check/call/bet/raise/all-in only when legal; pot-% presets (25–150%), min, all-in and custom “raise to” with live “raise by” and validation (min-raise, stack limit, short all-in). Keyboard shortcuts (`?`). |
 | **Opponents** | One probabilistic policy (6 profiles) that sees only public info + its own cards; hidden cards are sampled from the range implied by the scripted action (Bayesian, with card removal). Expert mode hides profiles. |
 | **Review** | Score (or “insufficient confidence”), street-by-street replay, each decision answering 7 questions (info, plausible ranges with computed composition, position/texture/SPR, intent with fold/call breakdown, alternatives with ratings + simulated EV ± error, why, how tendencies change it — including re-simulation vs other profiles), sizing verdicts, sources & confidence, takeaway, correct plays, mistakes, lesson links, retry/related, bookmark. |
 | **Learn** | 81 lessons in 9 sections covering the full requested curriculum, each with explanation, why it matters, worked example, mistakes, math, assumptions, knowledge check and practice link. Search, levels, optional study sequences, completion tracking. |
@@ -56,6 +56,6 @@ Docs: [RULES](docs/RULES.md) · [EVALUATION & limitations](docs/EVALUATION.md) �
 
 ## Honesty statement
 
-- No solver is integrated; nothing is labelled solver-approved. Preflop charts are **illustrative baselines** written for this app. The heads-up push/fold chart is **computed** in a stated simplified model.
-- Exact results (pot odds, all-in EV given stated ranges, ICM for stated stacks/payouts, turn/river equity vs modelled ranges) are labelled *exact*; Monte Carlo results show sample counts and error bars; multi-street EVs are *model estimates*.
+- No solver is integrated; nothing is labeled solver-approved. Preflop charts are **illustrative baselines** written for this app. The heads-up push/fold chart is **computed** in a stated simplified model.
+- Exact results (pot odds, all-in EV given stated ranges, ICM for stated stacks/payouts, turn/river equity vs modeled ranges) are labeled *exact*; Monte Carlo results show sample counts and error bars; multi-street EVs are *model estimates*.
 - Scores are instructional assessments and never depend on the hand’s outcome.

@@ -111,7 +111,7 @@ export const RANGES_X: Record<string, LessonExtra> = {
         heading: 'Avoiding over-narrowing',
         body: [
           'A common mistake is to narrow too fast: “they called, so they must have a draw”. In reality calls include pairs, draws and some strong hands. Keep categories, with rough weights, rather than one hand.',
-          'Another mistake is ignoring the size. A small bet and a big bet narrow differently: small bets come from wide ranges, big bets from polarised ones.',
+          'Another mistake is ignoring the size. A small bet and a big bet narrow differently: small bets come from wide ranges, big bets from polarized ones.',
         ],
       },
     ],
@@ -246,13 +246,13 @@ export const RANGES_X: Record<string, LessonExtra> = {
       {
         heading: 'Equity distribution, not just average',
         body: [
-          'Two ranges can have similar average equity but different distributions. One might have many medium hands; the other many strong and many weak ones. The second range can bet bigger and more polarised. The first wants smaller bets or checks.',
-          'The range-practice drill “Who does the board favour?” trains exactly this.',
+          'Two ranges can have similar average equity but different distributions. One might have many medium hands; the other many strong and many weak ones. The second range can bet bigger and more polarized. The first wants smaller bets or checks.',
+          'The range-practice drill “Who does the board favor?” trains exactly this.',
         ],
       },
     ],
     apply: [
-      'Before looking at your hand, decide whose range the board favours.',
+      'Before looking at your hand, decide whose range the board favors.',
       'High boards: usually the raiser. Low connected boards: usually the caller.',
       'Check whether the advantage is in the top (nut advantage) or the middle.',
       'Use this to choose your betting frequency and size.',
@@ -262,14 +262,14 @@ export const RANGES_X: Record<string, LessonExtra> = {
         title: 'Three flops, one matchup',
         steps: [
           'UTG opens, the big blind calls.',
-          'A♠ K♦ 4♣: strongly favours UTG — many AK, AQ, AA, KK.',
-          '8♥ 7♥ 5♣: favours the big blind, which has more 96, 64, 87, 75 and small sets.',
+          'A♠ K♦ 4♣: strongly favors UTG — many AK, AQ, AA, KK.',
+          '8♥ 7♥ 5♣: favors the big blind, which has more 96, 64, 87, 75 and small sets.',
           'Q♣ 8♦ 3♠: closer, but UTG still has more overpairs and strong queens.',
         ],
       },
     ],
     quiz: [
-      { q: 'Which flop most favours a big-blind defending range against a UTG open?', options: ['A♠ K♦ 4♣', '7♥ 6♥ 5♣', 'K♠ Q♦ 2♣'], answer: 1, explain: 'Low and connected: the BB has more of these hands.' },
+      { q: 'Which flop most favors a big-blind defending range against a UTG open?', options: ['A♠ K♦ 4♣', '7♥ 6♥ 5♣', 'K♠ Q♦ 2♣'], answer: 1, explain: 'Low and connected: the BB has more of these hands.' },
       { q: 'Should you decide whose board it is before or after looking at your hand?', options: ['Before', 'After'], answer: 0, explain: 'It is a range question first.' },
     ],
   },
@@ -324,7 +324,7 @@ export const RANGES_X: Record<string, LessonExtra> = {
       ['Mixed strategy', 'Playing the same hand in different ways at set frequencies.'],
       ['Indifference', 'When two actions have equal EV for a hand.'],
       ['Pure strategy', 'Always taking the same action with a hand.'],
-      ['Randomiser', 'A way to pick actions at frequencies, such as the second hand of a watch.'],
+      ['Randomizer', 'A way to pick actions at frequencies, such as the second hand of a watch.'],
     ],
     deeper: [
       {
@@ -337,7 +337,7 @@ export const RANGES_X: Record<string, LessonExtra> = {
       {
         heading: 'Mixing in practice',
         body: [
-          'You do not need exact frequencies. Use simple rules: “I bet this hand half the time”, and use a randomiser (the second hand of a clock, the colour of a card) to choose. Or mix by similar hands: bet the hands with a backdoor flush draw and check the others.',
+          'You do not need exact frequencies. Use simple rules: “I bet this hand half the time”, and use a randomizer (the second hand of a clock, the color of a card) to choose. Or mix by similar hands: bet the hands with a backdoor flush draw and check the others.',
           'Against weak opponents, pure exploitative strategies are often better than mixing. Mixing matters most against strong opponents who adapt.',
         ],
       },
@@ -345,7 +345,7 @@ export const RANGES_X: Record<string, LessonExtra> = {
     apply: [
       'Notice spots where two actions are close in EV.',
       'Mix by hand features (e.g. backdoor draws bet, the rest check).',
-      'Or use a simple randomiser for frequencies.',
+      'Or use a simple randomizer for frequencies.',
       'Against weaker players, prefer the exploitative pure action.',
     ],
     examples: [

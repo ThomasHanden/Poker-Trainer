@@ -50,7 +50,7 @@ export const SEQUENCES: { id: string; title: string; blurb: string; lessons: str
   {
     id: 'advanced-ranges',
     title: 'Advanced ranges & sizing',
-    blurb: 'Range construction, blockers, polarisation and overbets.',
+    blurb: 'Range construction, blockers, polarization and overbets.',
     lessons: ['constructing-ranges', 'weighted-combos', 'narrowing-ranges', 'capped-uncapped', 'blockers', 'value-bluff-composition', 'mixed-strategies', 'polarized-merged', 'geometric-sizing', 'overbets-underbets', 'gto-baseline', 'exploitative-adjustments'],
   },
 ];

@@ -60,7 +60,7 @@ const sbShove: ScenarioTemplate = {
   multiway: false,
   facing: 'unopened',
   difficulties: ['beginner', 'intermediate', 'advanced', 'expert'],
-  evaluation: { method: 'computed-equilibrium', assumptions: [...TOURNEY_ASSUMPTIONS, 'Shove-or-fold model: limping and small raises are not modelled (they are valid in real play).'] },
+  evaluation: { method: 'computed-equilibrium', assumptions: [...TOURNEY_ASSUMPTIONS, 'Shove-or-fold model: limping and small raises are not modeled (they are valid in real play).'] },
   setupText: 'Tournament, short-stacked, folded to you in the small blind.',
   hint: 'At this depth a normal raise commits a big part of your stack. Compare how often the big blind folds with your equity when called.',
   build(ctx) {
@@ -163,13 +163,13 @@ const bbCallShove: ScenarioTemplate = {
       ratings,
       reasons: [
         `Calling costs ${bbStr(ctx.toCall, ctx.bb)} to win a pot of ${bbStr(ctx.pot, ctx.bb)}, so you need ${pctStr(req, 1)} equity. All-in calls end the betting, so this pot-odds comparison is the whole decision in chip EV.`,
-        `Against the modelled shoving range you have ${pctStr(eq, 1)} equity, so calling is worth ${evCall >= 0 ? '+' : ''}${bbStr(evCall, ctx.bb)} compared with folding.`,
+        `Against the modeled shoving range you have ${pctStr(eq, 1)} equity, so calling is worth ${evCall >= 0 ? '+' : ''}${bbStr(evCall, ctx.bb)} compared with folding.`,
         `For reference, the computed heads-up equilibrium calls this hand ${pctStr(eqm, 0)} of the time at ${st}bb (that assumes an equilibrium shover).`,
         'Think in ranges: the shover will not always have a monster. A wide shoving range means many medium hands are profitable calls.',
       ],
       math: [
         { label: 'Break-even equity', value: `${bbStr(ctx.toCall, ctx.bb)} / (${bbStr(ctx.pot, ctx.bb)} + ${bbStr(ctx.toCall, ctx.bb)}) = ${pctStr(req, 1)}`, kind: 'exact' },
-        { label: 'Equity vs modelled shoving range', value: pctStr(eq, 1), kind: 'table' },
+        { label: 'Equity vs modeled shoving range', value: pctStr(eq, 1), kind: 'table' },
         { label: 'EV(call) − EV(fold)', value: `${bbStr(evCall, ctx.bb)}`, kind: 'exact' },
       ],
       plausibleRanges: rangeText(ctx),
@@ -236,12 +236,12 @@ const reshove: ScenarioTemplate = {
       const callEq = ctx.equity?.equity ?? NaN;
       math.push(
         { label: 'Opener folds to a shove (model)', value: pctStr(r.fold, 0), kind: 'model' },
-        { label: 'Your equity when called (vs the modelled calling range)', value: pctStr(eqCalled, 1), kind: 'table' },
+        { label: 'Your equity when called (vs the modeled calling range)', value: pctStr(eqCalled, 1), kind: 'table' },
         { label: 'EV(shove) − EV(fold)', value: `${ev >= 0 ? '+' : ''}${bbStr(ev, ctx.bb)}`, kind: 'exact' },
         { label: 'Price to just call', value: `${pctStr(ctx.requiredEquity, 1)} needed; equity vs full opening range ${pctStr(callEq, 1)}`, kind: 'table' },
       );
       reasons.push(
-        `A shove risks ${bbStr(heroIn, ctx.bb)} to win the ${bbStr(ctx.pot, ctx.bb)} already in the pot. The modelled opener folds ${pctStr(r.fold, 0)} of its opening range, and when it calls you have about ${pctStr(eqCalled, 0)} equity, for an EV of ${bbStr(ev, ctx.bb)} versus folding.`,
+        `A shove risks ${bbStr(heroIn, ctx.bb)} to win the ${bbStr(ctx.pot, ctx.bb)} already in the pot. The modeled opener folds ${pctStr(r.fold, 0)} of its opening range, and when it calls you have about ${pctStr(eqCalled, 0)} equity, for an EV of ${bbStr(ev, ctx.bb)} versus folding.`,
         'Re-shoving uses the opener’s wide range against it: hands that are too weak to call a raise profitably can still be profitable shoves, because fold equity does most of the work.',
         `Flat-calling with ${ctx.effectiveBB.toFixed(0)}bb leaves an awkward stack-to-pot ratio out of position; at short depths, shove-or-fold is usually simpler and stronger, though strong hands can call to trap.`,
       );
@@ -418,12 +418,12 @@ function icmGuide(kind: 'call' | 'shove') {
         { label: 'Chip-EV break-even equity', value: pctStr(reqChip, 1), kind: 'exact' },
         { label: 'ICM break-even equity', value: pctStr(reqIcm, 1), kind: 'exact' },
         { label: 'Risk premium', value: pctStr(reqIcm - reqChip, 1), kind: 'exact' },
-        { label: 'Equity vs modelled shoving range', value: pctStr(eq, 1), kind: 'table' },
+        { label: 'Equity vs modeled shoving range', value: pctStr(eq, 1), kind: 'table' },
         { label: 'Prize equity: fold / call', value: `${eFold.toFixed(2)}% / ${eCall.toFixed(2)}% of the prize pool`, kind: 'exact' },
       );
       reasons.push(
         `In chips you would need ${pctStr(reqChip, 1)} equity, but in prize equity (ICM) you need ${pctStr(reqIcm, 1)}. The extra ${pctStr(reqIcm - reqChip, 1)} is the risk premium: busting costs you your guaranteed share of the payouts, while doubling up adds less prize equity than the chips suggest.`,
-        `Your equity against the modelled shoving range is ${pctStr(eq, 1)}, so calling is ${eCall > eFold ? 'better' : 'worse'} than folding by ${Math.abs(eCall - eFold).toFixed(2)}% of the prize pool.`,
+        `Your equity against the modeled shoving range is ${pctStr(eq, 1)}, so calling is ${eCall > eFold ? 'better' : 'worse'} than folding by ${Math.abs(eCall - eFold).toFixed(2)}% of the prize pool.`,
         'Shorter stacks at the table matter: while they are at risk of busting first, folding has extra value for you.',
       );
       const d = eCall - eFold;

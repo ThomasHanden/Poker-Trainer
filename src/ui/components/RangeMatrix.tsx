@@ -4,7 +4,7 @@ import { classAt, HandClass, comboCount } from '../../ranges/hands';
 export interface CellView {
   raise?: number; // 0..1
   call?: number;
-  weight?: number; // for single-colour ranges
+  weight?: number; // for single-color ranges
   tone?: 'a' | 'b' | 'both' | 'value' | 'bluff' | 'ref' | 'miss' | 'extra' | 'new' | 'dropped' | 'none';
   /** fade the cell (used to highlight a hand family or a difference) */
   dim?: boolean;

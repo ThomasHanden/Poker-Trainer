@@ -72,7 +72,7 @@ export const TOURNAMENT: Lesson[] = [
     },
     mistakes: ['Shoving too tight because “I might get called”.', 'Calling shoves too tight as the big blind, ignoring the price.'],
     math: { formulas: ['EV(shove) = P(fold)·pot + P(call)·(equity·final pot − risk)'], notes: ['The computed chart in this app uses fictitious play on a 169-class equity table (Monte Carlo); see its stated assumptions.'] },
-    assumptions: ['Chip EV, equal stacks, only shove/fold for the small blind and call/fold for the big blind. Limping strategies exist and are not modelled.'],
+    assumptions: ['Chip EV, equal stacks, only shove/fold for the small blind and call/fold for the big blind. Limping strategies exist and are not modeled.'],
     quiz: [{ q: 'At 10bb from the small blind vs the big blind, the equilibrium shove range is…', options: ['Very tight (top 10%)', 'Wide (more than half of hands)'], answer: 1, explain: 'Fold equity plus dead money make many hands profitable.' }],
     practice: { label: 'Push/fold drills', templates: ['tr-sb-shove', 'tr-bb-call-shove'], concepts: ['push-fold'] },
     related: ['short-stack', 'fold-equity', 'chip-ev-vs-icm'],

@@ -347,10 +347,10 @@ function Compare() {
 
 const DRILLS: { kind: DrillKind; title: string; blurb: string }[] = [
   { kind: 'open', title: 'Select hands to open', blurb: 'Build an opening range from a position and compare it with the reference.' },
-  { kind: 'continue', title: 'Continue vs a river bet', blurb: 'Pick the bluff-catchers that should call; answers are exact river equities vs the modelled betting range.' },
+  { kind: 'continue', title: 'Continue vs a river bet', blurb: 'Pick the bluff-catchers that should call; answers are exact river equities vs the modeled betting range.' },
   { kind: 'value-bluff', title: 'Value bets and bluffs', blurb: 'Sort river hands into value bets, bluffs and checks.' },
   { kind: 'blockers', title: 'Useful blockers', blurb: 'Choose the holding that removes the most of the opponent’s strongest hands.' },
-  { kind: 'board-advantage', title: 'Who does the board favour?', blurb: 'Predict which preflop range benefits from a flop.' },
+  { kind: 'board-advantage', title: 'Who does the board favor?', blurb: 'Predict which preflop range benefits from a flop.' },
 ];
 
 function Drills() {
@@ -491,7 +491,7 @@ function ChoiceDrillView({ d }: { d: ChoiceDrill }) {
 // ---------------- Equity calculator ----------------
 
 const EXAMPLES: { label: string; hero: string; board: string; range: string; lesson: string }[] = [
-  { label: 'AKs vs QQ', hero: 'Ah Kh', board: '', range: 'QQ', lesson: 'The classic “coin flip”: a pair is a small favourite over two overcards.' },
+  { label: 'AKs vs QQ', hero: 'Ah Kh', board: '', range: 'QQ', lesson: 'The classic “coin flip”: a pair is a small favorite over two overcards.' },
   { label: 'AK vs AQ', hero: 'As Kd', board: '', range: 'AQo', lesson: 'Domination: sharing an ace with a better kicker leaves the weaker hand about 3 outs to beat you.' },
   { label: 'JTs vs AA', hero: 'Jc Tc', board: '', range: 'AA', lesson: 'Even a strong suited connector is a big underdog to aces — but far from dead.' },
   { label: 'Flush draw on the flop', hero: 'Ah 5h', board: 'Kh 9h 2c', range: 'KQ,KJ,KT,K9,99', lesson: 'Nut flush draw plus an ace overcard: about 12 outs with two cards to come — the rule of 4 says roughly 45%. The exact figure is a little lower because not every out wins (an ace can still lose to two pair or a set).' },

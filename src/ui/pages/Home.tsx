@@ -23,7 +23,7 @@ export function HomePage() {
             ))}
           </div>
           <button className="btn primary big" onClick={() => nav('/practice?start=1')}>
-            Start practising →
+            Start practicing →
           </button>
         </div>
         {played > 0 && (

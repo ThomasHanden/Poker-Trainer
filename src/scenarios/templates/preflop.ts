@@ -25,10 +25,10 @@ const xRaise = (preferred: [number, number], acceptable: [number, number], note:
 function withPreflopFacts(ctx: DecisionContext, g: Guidance, chart: Chart): Guidance {
   const math: NonNullable<Guidance['math']> = [];
   if (ctx.toCall > 0) {
-    math.push({ label: 'Price to call', value: `${bbStr(ctx.toCall, ctx.bb)} into ${bbStr(ctx.pot, ctx.bb)} → need ${pctStr(ctx.requiredEquity, 1)} equity (before position/realisation)`, kind: 'exact' });
+    math.push({ label: 'Price to call', value: `${bbStr(ctx.toCall, ctx.bb)} into ${bbStr(ctx.pot, ctx.bb)} → need ${pctStr(ctx.requiredEquity, 1)} equity (before position/realization)`, kind: 'exact' });
   }
   if (ctx.equity && Number.isFinite(ctx.equity.equity)) {
-    math.push({ label: 'All-in equity vs modelled range', value: `${pctStr(ctx.equity.equity, 1)} (precomputed table, approx. ±1%)`, kind: 'table' });
+    math.push({ label: 'All-in equity vs modeled range', value: `${pctStr(ctx.equity.equity, 1)} (precomputed table, approx. ±1%)`, kind: 'table' });
   }
   return {
     ...g,
@@ -120,7 +120,7 @@ const sbFirstIn: ScenarioTemplate = {
   version: 1,
   title: 'Blind vs blind: small blind first in',
   summary: 'Folded to you in the small blind. Raise, limp or fold against the big blind.',
-  objectives: ['Understand why the SB can play wide but is out of position.', 'Recognise raising and limping as two valid strategies.'],
+  objectives: ['Understand why the SB can play wide but is out of position.', 'Recognize raising and limping as two valid strategies.'],
   street: 'preflop',
   category: 'Blind vs blind',
   concepts: ['blind-vs-blind', 'preflop-open', 'position'],
@@ -145,7 +145,7 @@ const sbFirstIn: ScenarioTemplate = {
   guide(ctx) {
     const chart = getChart('cash6-open-SB')!;
     const g = chartGuidance(ctx, chart, [
-      'Only the big blind can call, so wide raising is profitable, but you will act first on every street, which costs equity realisation.',
+      'Only the big blind can call, so wide raising is profitable, but you will act first on every street, which costs equity realization.',
     ]);
     const rank = preflopRanking().indexOf(ctx.heroClass);
     const f = chartFreq(chart, ctx.heroClass);
@@ -154,7 +154,7 @@ const sbFirstIn: ScenarioTemplate = {
       g.reasons.push('Strong hands prefer raising: they want to build the pot and deny the big blind a cheap flop.');
     } else if (f.raise > 0.05 || rank < 110) {
       g.ratings.call = 'mixed';
-      g.reasons.push('Limping is a reasonable alternative for medium hands: it keeps the pot small out of position and lets you realise equity cheaply. Against an aggressive big blind who raises limps a lot, limping loses appeal.');
+      g.reasons.push('Limping is a reasonable alternative for medium hands: it keeps the pot small out of position and lets you realize equity cheaply. Against an aggressive big blind who raises limps a lot, limping loses appeal.');
     } else {
       g.ratings.call = 'discouraged';
     }
@@ -227,7 +227,7 @@ function defendTemplate(cfg: {
 
 const bbVsSteal = defendTemplate({
   id: 'pf-bb-vs-steal',
-  title: 'Big blind defence vs a late-position open',
+  title: 'Big blind defense vs a late-position open',
   summary: 'BTN or CO opens 2.5bb; you are in the big blind.',
   hero: 'BB',
   openers: ['BTN', 'CO'],
@@ -237,7 +237,7 @@ const bbVsSteal = defendTemplate({
   sizing: xRaise([3.6, 4.6], [3, 5.6], 'Out of position, 3-bet to about 4x the open (≈10–11.5bb vs 2.5bb).'),
   hint: 'You already have 1bb in the pot and close the action. Compare the price you are getting with how well your hand plays out of position.',
   extra: (ctx) => [
-    `Calling costs ${bbStr(ctx.toCall, ctx.bb)} to win ${bbStr(ctx.pot, ctx.bb)} (${pctStr(ctx.requiredEquity, 0)} needed). Late-position opens are wide, so many hands have enough raw equity — but out of position you will not realise all of it, which is why the weakest offsuit hands still fold.`,
+    `Calling costs ${bbStr(ctx.toCall, ctx.bb)} to win ${bbStr(ctx.pot, ctx.bb)} (${pctStr(ctx.requiredEquity, 0)} needed). Late-position opens are wide, so many hands have enough raw equity — but out of position you will not realize all of it, which is why the weakest offsuit hands still fold.`,
   ],
 });
 
@@ -270,7 +270,7 @@ const btnVsCo = defendTemplate({
   sizing: xRaise([2.8, 3.5], [2.5, 4.2], 'In position, 3-bet to about 3x the open (≈7.5–8.5bb).'),
   hint: 'You will have position if you call, but two players behind you can still squeeze.',
   extra: () => [
-    'Calling in position realises equity well, but both blinds can squeeze behind you. A 3-bet wins the pot immediately often and isolates the opener, while calling keeps the opener’s weaker hands in.',
+    'Calling in position realizes equity well, but both blinds can squeeze behind you. A 3-bet wins the pot immediately often and isolates the opener, while calling keeps the opener’s weaker hands in.',
   ],
 });
 
@@ -312,7 +312,7 @@ const squeeze: ScenarioTemplate = {
   version: 1,
   title: 'Squeeze from the big blind',
   summary: 'CO opens, BTN calls; you are in the big blind.',
-  objectives: ['Recognise the capped range of a flat-caller.', 'Size squeezes larger because two players can continue.'],
+  objectives: ['Recognize the capped range of a flat-caller.', 'Size squeezes larger because two players can continue.'],
   street: 'preflop',
   category: 'Squeeze',
   concepts: ['squeeze', 'three-bet', 'multiway'],
@@ -420,7 +420,7 @@ const vs3betIP = vs3betTemplate({
   chartId: 'cash6-BTN-open-vs-BB-3bet',
   sizing: xRaise([2.1, 2.6], [1.9, 3], 'In position, 4-bet to about 2.2–2.5x the 3-bet.'),
   hint: 'You will have position for the rest of the hand. The big blind 3-bets fairly wide against button opens.',
-  extra: ['In position, calling realises equity well, so suited and connected hands can call. Your strongest hands and a few blocker bluffs 4-bet.'],
+  extra: ['In position, calling realizes equity well, so suited and connected hands can call. Your strongest hands and a few blocker bluffs 4-bet.'],
 });
 
 const vs3betOOP = vs3betTemplate({
@@ -432,7 +432,7 @@ const vs3betOOP = vs3betTemplate({
   chartId: 'cash6-UTG-open-vs-BTN-3bet',
   sizing: xRaise([2.5, 3.2], [2.2, 3.6], 'Out of position, 4-bet larger: about 2.7–3x the 3-bet.'),
   hint: 'You will be out of position in a bloated pot. Which hands can continue profitably?',
-  extra: ['Out of position you realise less equity in a 3-bet pot, so continue with fewer marginal hands than when in position. The button’s range is stronger than a blind-vs-button 3-bet range.'],
+  extra: ['Out of position you realize less equity in a 3-bet pot, so continue with fewer marginal hands than when in position. The button’s range is stronger than a blind-vs-button 3-bet range.'],
 });
 
 const vs4bet: ScenarioTemplate = {
@@ -506,7 +506,7 @@ const isoLimper: ScenarioTemplate = {
   multiway: false,
   facing: 'limp',
   difficulties: ['beginner', 'intermediate', 'advanced', 'expert'],
-  evaluation: { method: 'chart', assumptions: [...PREFLOP_ASSUMPTIONS, 'The limper is modelled as a calling station.'] },
+  evaluation: { method: 'chart', assumptions: [...PREFLOP_ASSUMPTIONS, 'The limper is modeled as a calling station.'] },
   setupText: 'A recreational player limps in. Isolate, over-limp, or fold?',
   hint: 'The limper’s range is wide and weak, and you would have position. What do you gain by raising instead of limping behind?',
   build(ctx) {
@@ -539,7 +539,7 @@ const deepVs3bet: ScenarioTemplate = {
   version: 1,
   title: 'Deep-stacked: facing a 3-bet at 200bb',
   summary: 'You open the button with 200bb stacks and the big blind 3-bets.',
-  objectives: ['See how implied odds favour suited/connected hands and pairs when deep.', 'See how reverse implied odds hurt offsuit broadway hands.'],
+  objectives: ['See how implied odds favor suited/connected hands and pairs when deep.', 'See how reverse implied odds hurt offsuit broadway hands.'],
   street: 'preflop',
   category: 'Stack depth',
   concepts: ['stack-depth', 'implied-odds', 'three-bet', 'domination'],

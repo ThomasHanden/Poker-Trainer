@@ -2,7 +2,7 @@
 //
 // Scores are INSTRUCTIONAL ASSESSMENTS, not exact measures of optimal play. Each decision is
 // rated by (a) the template's strategic guidance (heuristic/chart/equilibrium/exact math) and
-// (b) where feasible, a simulation of EV against the modelled opponent. Results are labelled with
+// (b) where feasible, a simulation of EV against the modeled opponent. Results are labeled with
 // their sources and confidence. Outcomes (who won the pot) are never used.
 
 import { HandState, PlayerAction, legalActions, potFractionTo, ActionRecord, Street } from '../engine/rules';
@@ -125,7 +125,7 @@ export function actionLabel(a: PlayerAction, s: HandState): string {
 function genericGuidance(ctx: DecisionContext): Guidance {
   if (ctx.street === 'preflop') {
     if (ctx.facing === 'allin') return { ...facingBetGuidance(ctx, { allowImplied: false }), source: 'exact-math', confidence: 'medium' };
-    // baseline chart behaviour for this situation = the policy's "unknown" profile with the hero's cards
+    // baseline chart behavior for this situation = the policy's "unknown" profile with the hero's cards
     const view = publicView(ctx.state, ctx.hero);
     view.state.players[ctx.hero].hole = ctx.hole;
     const opts = policyDistribution(view, PROFILES.unknown);
@@ -330,7 +330,7 @@ export function evaluateDecision(sc: Scenario, rec: DecisionRecord, opts: EvalOp
   if (g.sizing && (preferredKeys.includes('bet') || preferredKeys.includes('raise') || mixedKeys.includes('bet') || mixedKeys.includes('raise'))) recParts.push(`sizing: ${g.sizing.note}`);
   if (best && modelConfident) recParts.push(`best in simulation vs this opponent model: ${best.label.toLowerCase()}`);
   const modelSummary = rollouts.length
-    ? `Simulated EV vs the modelled opponent (relative to your stack at this decision; hand played out by the opponent model and a baseline policy for your later decisions): ` +
+    ? `Simulated EV vs the modeled opponent (relative to your stack at this decision; hand played out by the opponent model and a baseline policy for your later decisions): ` +
       rollouts
         .slice()
         .sort((a, b) => b.ev - a.ev)
@@ -404,17 +404,17 @@ function describeIntent(ctx: DecisionContext, a: PlayerAction, key: ActionKey): 
   const draw = ctx.draws && ctx.street !== 'river' ? ctx.draws.drawEquity : 0;
   switch (key) {
     case 'fold':
-      return `Folding forfeits the ${bbStr(ctx.pot, ctx.bb)} pot to avoid putting in more. It is right when your equity — plus what you can win later — does not justify the price${Number.isFinite(eq) ? ` (your equity vs the modelled range: ${pctStr(eq)}; needed: ${pctStr(ctx.requiredEquity)})` : ''}.`;
+      return `Folding forfeits the ${bbStr(ctx.pot, ctx.bb)} pot to avoid putting in more. It is right when your equity — plus what you can win later — does not justify the price${Number.isFinite(eq) ? ` (your equity vs the modeled range: ${pctStr(eq)}; needed: ${pctStr(ctx.requiredEquity)})` : ''}.`;
     case 'check':
       return Number.isFinite(eq) && eq >= 0.6
         ? 'Checking a strong hand aims to keep weaker hands and bluffs in, protect your checking range, or control the pot — at the cost of value now and of giving free cards.'
-        : 'Checking keeps the pot small and realises your equity for free; with a weak hand it gives up on winning the pot immediately.';
+        : 'Checking keeps the pot small and realizes your equity for free; with a weak hand it gives up on winning the pot immediately.';
     case 'call':
       return draw >= 0.15
-        ? 'Calling with a draw aims to realise your draw equity (and implied odds) without risking a raise war.'
+        ? 'Calling with a draw aims to realize your draw equity (and implied odds) without risking a raise war.'
         : ctx.street === 'river'
           ? 'Calling on the river is a bluff-catch: you win only if the bettor is bluffing (or value-betting worse).'
-          : 'Calling keeps your opponent’s bluffs and weaker bets in while you realise your equity.';
+          : 'Calling keeps your opponent’s bluffs and weaker bets in while you realize your equity.';
     case 'bet':
     case 'raise': {
       const to = a.type === 'allin' ? ctx.la.maxTo : a.to!;

@@ -31,7 +31,7 @@ export function rangeAdvantage(heroRange: Range, villainCombos: WeightedCombo[],
   const villainTopPlus = villainStrong + get(vb, 'top');
   const who = heroTopPlus > villainTopPlus + 0.05 ? 'you have the range advantage' : villainTopPlus > heroTopPlus + 0.05 ? 'your opponent has the range advantage' : 'neither range is clearly ahead';
   const nut = heroStrong > villainStrong + 0.03 ? 'and the nut advantage' : villainStrong > heroStrong + 0.03 ? 'while your opponent has more very strong hands (nut advantage)' : '';
-  const text = `${heroLabel} hits top pair or better ${pctStr(heroTopPlus)} of the time on this board (two pair or better: ${pctStr(heroStrong)}); the opponent’s modelled range does so ${pctStr(villainTopPlus)} (two pair or better: ${pctStr(villainStrong)}). So ${who}${nut ? ' ' + nut : ''}.`;
+  const text = `${heroLabel} hits top pair or better ${pctStr(heroTopPlus)} of the time on this board (two pair or better: ${pctStr(heroStrong)}); the opponent’s modeled range does so ${pctStr(villainTopPlus)} (two pair or better: ${pctStr(villainStrong)}). So ${who}${nut ? ' ' + nut : ''}.`;
   return { heroStrong, villainStrong, heroTopPlus, villainTopPlus, text };
 }
 
@@ -70,7 +70,7 @@ export function blockersFacingBet(ctx: DecisionContext): BlockerResult | null {
   }
   const vr = valueAll ? valueBlocked / valueAll : 0;
   const br = bluffAll ? bluffBlocked / bluffAll : 0;
-  const verdict = vr > br + 0.03 ? 'Your cards block more of their value than their bluffs — a point in favour of calling.' : br > vr + 0.03 ? 'Your cards block more of their bluffs than their value hands — a point against calling.' : 'Your cards have little net blocker effect here.';
+  const verdict = vr > br + 0.03 ? 'Your cards block more of their value than their bluffs — a point in favor of calling.' : br > vr + 0.03 ? 'Your cards block more of their bluffs than their value hands — a point against calling.' : 'Your cards have little net blocker effect here.';
   return { text: `Before removing your cards, ${pctStr(vr)} of their value combos and ${pctStr(br)} of their bluff combos contain one of your hole cards. ${verdict}`, valueRemoved: vr, bluffRemoved: br };
 }
 

@@ -11,9 +11,9 @@ export const bbStr = (chips: number, bb: number) => `${+(chips / bb).toFixed(2)}
 
 export function equityLine(ctx: DecisionContext): string {
   const e = ctx.equity;
-  if (!e || !Number.isFinite(e.equity)) return 'Equity against the modelled range is unavailable.';
+  if (!e || !Number.isFinite(e.equity)) return 'Equity against the modeled range is unavailable.';
   const how = e.method === 'exact' ? 'exact enumeration' : e.samples ? `simulation, ${e.samples.toLocaleString()} samples, ±${pctStr(1.96 * e.stdError, 1)}` : e.source;
-  return `Your equity against the modelled range is ${pctStr(e.equity, 1)} (${how}).`;
+  return `Your equity against the modeled range is ${pctStr(e.equity, 1)} (${how}).`;
 }
 
 export function equityMath(ctx: DecisionContext): Guidance['math'] {
@@ -24,7 +24,7 @@ export function equityMath(ctx: DecisionContext): Guidance['math'] {
   const e = ctx.equity;
   if (e && Number.isFinite(e.equity)) {
     out.push({
-      label: 'Equity vs modelled range',
+      label: 'Equity vs modeled range',
       value: `${pctStr(e.equity, 1)}${e.method === 'simulation' && e.samples ? ` ± ${pctStr(1.96 * e.stdError, 1)} (95%)` : ''}`,
       kind: e.method === 'exact' ? 'exact' : e.samples ? 'simulation' : 'table',
     });
@@ -40,16 +40,16 @@ export function rangeText(ctx: DecisionContext): string {
       const parts = b
         .filter((x) => x.share >= 0.03)
         .map((x) => `${x.label} ${pctStr(x.share)}${x.examples.length ? ` (e.g. ${x.examples.slice(0, 3).join(', ')})` : ''}`);
-      return `${v.position} (${PROFILES[v.profile].short}), weighting each hand by how likely the modelled player is to have taken these actions with it: ${parts.join('; ')}.`;
+      return `${v.position} (${PROFILES[v.profile].short}), weighting each hand by how likely the modeled player is to have taken these actions with it: ${parts.join('; ')}.`;
     })
     .join(' ');
 }
 
 export function positionText(ctx: DecisionContext): string {
-  if (ctx.board.length === 0) return ctx.inPosition ? 'You will act last after the flop (in position).' : 'You will act first after the flop (out of position), which makes it harder to realise your equity.';
+  if (ctx.board.length === 0) return ctx.inPosition ? 'You will act last after the flop (in position).' : 'You will act first after the flop (out of position), which makes it harder to realize your equity.';
   return ctx.inPosition
-    ? 'You are in position: you see your opponent act before every decision, which lets you realise more equity and control the pot size.'
-    : 'You are out of position: you act first on every street, so you realise less of your equity and face more difficult decisions on later streets.';
+    ? 'You are in position: you see your opponent act before every decision, which lets you realize more equity and control the pot size.'
+    : 'You are out of position: you act first on every street, so you realize less of your equity and face more difficult decisions on later streets.';
 }
 
 export function textureText(ctx: DecisionContext): string {
@@ -58,7 +58,7 @@ export function textureText(ctx: DecisionContext): string {
   const notes: string[] = [`Board: ${t.label}.`];
   if (t.wetness >= 0.45) notes.push('Many draws are possible, so hand strengths change a lot on later streets: equity denial and protection matter more, and the preflop raiser’s overpairs/top pairs are more vulnerable.');
   else if (t.wetness <= 0.25) notes.push('Few draws are possible, so the current best hand usually stays best. Equity denial matters less, and small bets work well.');
-  if (t.paired) notes.push('A paired board reduces the number of strong combinations (trips are rare), which usually favours the player with more overpairs and high cards.');
+  if (t.paired) notes.push('A paired board reduces the number of strong combinations (trips are rare), which usually favors the player with more overpairs and high cards.');
   if (t.monotone) notes.push('With three cards of one suit, any single card of that suit is a big deal: made flushes and the nut-flush draw dominate.');
   return notes.join(' ');
 }
@@ -107,7 +107,7 @@ export function facingBetGuidance(ctx: DecisionContext, opts: { allowImplied?: b
     if (strong) {
       ratings.raise = 'preferred';
       if (ratings.call === 'preferred') ratings.call = 'mixed';
-      reasons.push('Your hand is strong enough to raise for value: many worse hands in the modelled range can continue, and raising builds the pot while you are ahead.');
+      reasons.push('Your hand is strong enough to raise for value: many worse hands in the modeled range can continue, and raising builds the pot while you are ahead.');
     } else if (draw && ctx.draws!.drawEquity >= 0.3 && ctx.facing === 'bet') {
       ratings.raise = 'mixed';
       reasons.push('A strong draw can raise as a semi-bluff: you win immediately when they fold and still have plenty of equity when called.');
@@ -148,7 +148,7 @@ export function sizingForTexture(ctx: DecisionContext, kind: 'range' | 'polar' |
       ? { preferred: [0.2, 0.4], acceptable: [0.15, 0.6], note: 'On a dry board where you have the range advantage, a small bet (about 25–40% pot) gets folds from hands with little equity and keeps worse hands in.' }
       : { preferred: [0.45, 0.8], acceptable: [0.3, 1.0], note: 'On a wetter board, bets are usually larger (about half to three-quarters pot) to charge draws and protect vulnerable hands.' };
   }
-  if (kind === 'polar') return { preferred: [0.66, 1.3], acceptable: [0.5, 2.0], note: 'A polarised range (very strong hands and bluffs) can use a large size: the strong hands want to build the pot, and the bluffs need maximum fold equity.' };
+  if (kind === 'polar') return { preferred: [0.66, 1.3], acceptable: [0.5, 2.0], note: 'A polarized range (very strong hands and bluffs) can use a large size: the strong hands want to build the pot, and the bluffs need maximum fold equity.' };
   return { preferred: [0.33, 0.8], acceptable: [0.25, 1.1], note: 'Value bet a size that worse hands can still call.' };
 }
 
@@ -172,7 +172,7 @@ export function betMechanics(ctx: DecisionContext, fractions: number[]): string[
     const r = betResponse(ctx, { type: ctx.la.canBet ? 'bet' : 'raise', to });
     if (!r) continue;
     out.push(
-      `Betting ${Math.round(f * 100)}% pot: the modelled opponent folds ${pctStr(r.fold)}, calls ${pctStr(r.call)}, raises ${pctStr(r.raise)}. ` +
+      `Betting ${Math.round(f * 100)}% pot: the modeled opponent folds ${pctStr(r.fold)}, calls ${pctStr(r.call)}, raises ${pctStr(r.raise)}. ` +
         `${pctStr(r.worseCalls)} of their range is currently worse than you and continues (value), while ${pctStr(r.betterFolds)} is currently better and folds.` +
         (Number.isFinite(r.equityWhenCalled) ? ` When called you win ${pctStr(r.equityWhenCalled)} of the time.` : ''),
     );
@@ -195,7 +195,7 @@ export function bettingGuidance(ctx: DecisionContext, opts: BetOpts = {}): Guida
   if (eq >= vt + 0.15) {
     ratings.bet = 'preferred';
     ratings.check = 'mixed';
-    reasons.push('You are well ahead of the modelled range, so betting gets value from worse hands and denies equity to draws. Checking can still be reasonable to keep bluffs in or to protect your checking range.');
+    reasons.push('You are well ahead of the modeled range, so betting gets value from worse hands and denies equity to draws. Checking can still be reasonable to keep bluffs in or to protect your checking range.');
     sizing = sizingForTexture(ctx, ctx.street === 'river' ? 'polar' : 'value');
   } else if (eq >= vt) {
     ratings.bet = 'preferred';
@@ -205,7 +205,7 @@ export function bettingGuidance(ctx: DecisionContext, opts: BetOpts = {}): Guida
   } else if (eq >= 0.4) {
     ratings.check = 'preferred';
     ratings.bet = 'mixed';
-    reasons.push('Medium-strength hands have showdown value. Betting tends to fold out worse hands and get called by better ones; checking realises your equity cheaply.');
+    reasons.push('Medium-strength hands have showdown value. Betting tends to fold out worse hands and get called by better ones; checking realizes your equity cheaply.');
     sizing = { preferred: [0.25, 0.45], acceptable: [0.2, 0.66], note: 'If you bet a medium hand, keep it small so worse hands can call.' };
   } else if (draw >= 0.25) {
     ratings.bet = 'mixed';

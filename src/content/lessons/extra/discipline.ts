@@ -29,7 +29,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
       'For each decision, write what you knew before deciding.',
       'List ranges and options, then compare EVs.',
       'Note the assumptions your conclusion depends on.',
-      'Turn what you learn into a short rule to practise.',
+      'Turn what you learn into a short rule to practice.',
     ],
     examples: [
       {
@@ -66,7 +66,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
       {
         heading: 'Fixing leaks',
         body: [
-          'Pick one leak at a time. Read the lesson, then practise that spot until your unassisted score improves. Check again after a week to see whether the improvement held.',
+          'Pick one leak at a time. Read the lesson, then practice that spot until your unassisted score improves. Check again after a week to see whether the improvement held.',
           'Fixing one leak is usually worth more than learning a new advanced concept.',
         ],
       },
@@ -74,7 +74,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
     apply: [
       'Look at your scores by concept in Progress.',
       'Choose the weakest concept with enough attempts to matter.',
-      'Read the matching lesson, then practise the spot.',
+      'Read the matching lesson, then practice the spot.',
       'Measure your unassisted score again after a week.',
     ],
     examples: [
@@ -82,8 +82,8 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
         title: 'A one-week leak plan',
         steps: [
           'Progress shows repeated low scores in “Facing a c-bet”.',
-          'Day 1: read “Pot odds”, “Blind defence” and “Minimum defence frequency”.',
-          'Days 2–5: ten guided c-bet-defence scenarios a day, then five in assessment mode.',
+          'Day 1: read “Pot odds”, “Blind defense” and “Minimum defense frequency”.',
+          'Days 2–5: ten guided c-bet-defense scenarios a day, then five in assessment mode.',
           'Day 7: compare your unassisted score with the start of the week.',
         ],
       },
@@ -98,7 +98,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
     terms: [
       ['Results-oriented thinking', 'Judging a decision by its outcome.'],
       ['Process-oriented thinking', 'Judging a decision by the information and reasoning behind it.'],
-      ['Bad beat', 'Losing a hand where you were a big favourite.'],
+      ['Bad beat', 'Losing a hand where you were a big favorite.'],
       ['Hindsight bias', 'Believing after the fact that the outcome was predictable.'],
     ],
     deeper: [
@@ -254,7 +254,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
     ],
     apply: [
       'Choose one concept per session.',
-      'Read the lesson, practise with help, then practise without help.',
+      'Read the lesson, practice with help, then practice without help.',
       'Review your lowest-scoring decisions at the end of the week.',
       'Revisit old concepts every few weeks.',
     ],
@@ -262,7 +262,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
       {
         title: 'A four-week plan',
         steps: [
-          'Week 1: preflop opening and blind defence (lessons + preflop scenarios).',
+          'Week 1: preflop opening and blind defense (lessons + preflop scenarios).',
           'Week 2: c-betting and facing c-bets.',
           'Week 3: turn and river decisions — barrels, thin value, bluff-catching.',
           'Week 4: review all three weeks with unassisted scenarios and compare scores with week 1.',

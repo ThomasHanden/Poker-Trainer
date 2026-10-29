@@ -45,7 +45,7 @@ const CASH_ASSUMPTIONS = [
 function chart(c: Omit<Chart, 'raise' | 'call'> & { raise: string; call?: string }): Chart {
   const raise = parseRange(c.raise);
   const call = c.call ? parseRange(c.call) : emptyRange();
-  // make raise + call <= 1, prioritising the raise frequency
+  // make raise + call <= 1, prioritizing the raise frequency
   for (const h of ALL_CLASSES) call[h] = Math.max(0, Math.min(call[h], 1 - raise[h]));
   return { ...c, raise, call };
 }

@@ -19,7 +19,7 @@ export const MATH_X: Record<string, LessonExtra> = {
       {
         heading: 'Where pot odds are exact and where they are not',
         body: [
-          'Pot odds are exact when calling ends the betting: on the river, or when the opponent is all-in. On earlier streets, the call is only the first payment. You may face more bets (reverse implied odds) or win more when you hit (implied odds), and you will not always realise your equity.',
+          'Pot odds are exact when calling ends the betting: on the river, or when the opponent is all-in. On earlier streets, the call is only the first payment. You may face more bets (reverse implied odds) or win more when you hit (implied odds), and you will not always realize your equity.',
           'Still, pot odds are the starting point. If your equity is far above the price, calling is usually fine; if it is far below, you need a strong reason (implied odds, fold equity) to continue.',
         ],
       },
@@ -367,7 +367,7 @@ export const MATH_X: Record<string, LessonExtra> = {
     terms: [
       ['Value-to-bluff ratio', 'How many value combos the bettor has for each bluff.'],
       ['Indifference', 'When two actions have the same EV, so the player does not mind which they choose.'],
-      ['Polarised river', 'A river spot where the bettor has only strong hands or bluffs.'],
+      ['Polarized river', 'A river spot where the bettor has only strong hands or bluffs.'],
       ['Toy game', 'A simplified model used to understand a principle.'],
     ],
     deeper: [
@@ -410,7 +410,7 @@ export const MATH_X: Record<string, LessonExtra> = {
 
   mdf: {
     terms: [
-      ['MDF', 'Minimum defence frequency: pot ÷ (pot + bet).'],
+      ['MDF', 'Minimum defense frequency: pot ÷ (pot + bet).'],
       ['Any-two-cards bluff', 'A bluff that would profit with any hand because you fold too often.'],
       ['Over-folding', 'Folding more than MDF suggests.'],
       ['Exploitative deviation', 'Folding or calling more than MDF based on the opponent’s tendencies.'],
@@ -457,7 +457,7 @@ export const MATH_X: Record<string, LessonExtra> = {
   'equity-not-action': {
     terms: [
       ['Raw equity', 'All-in equity with no more betting.'],
-      ['Realisation', 'How much of your equity you actually win.'],
+      ['Realization', 'How much of your equity you actually win.'],
       ['Fold equity', 'Value from the opponent folding.'],
       ['Strategic value', 'Things equity does not capture: position, future decisions, ranges.'],
     ],
@@ -465,7 +465,7 @@ export const MATH_X: Record<string, LessonExtra> = {
       {
         heading: 'Three reasons equity is not enough',
         body: [
-          'First, realisation: out of position, or with weak hands, you win less than your equity. Second, fold equity: a bet can win the pot even when you are behind, so a hand with low equity can still bet. Third, what happens next: a hand with high equity may still prefer to check if a bet only gets called by better hands.',
+          'First, realization: out of position, or with weak hands, you win less than your equity. Second, fold equity: a bet can win the pot even when you are behind, so a hand with low equity can still bet. Third, what happens next: a hand with high equity may still prefer to check if a bet only gets called by better hands.',
           'This is why “I had 60% so I should bet” and “I had 30% so I should fold” are both incomplete. Compare the EV of the actions instead.',
         ],
       },
@@ -479,7 +479,7 @@ export const MATH_X: Record<string, LessonExtra> = {
     ],
     apply: [
       'Treat equity as one input, not the answer.',
-      'Ask how much of it you will realise.',
+      'Ask how much of it you will realize.',
       'Ask how the opponent responds to each action.',
       'Compare EVs of all options before choosing.',
     ],

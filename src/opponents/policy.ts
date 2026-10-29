@@ -297,10 +297,10 @@ function finishPreflop(
     const foldP = 1 - raiseP - callP;
     if (foldP > 1e-9) out.push({ action: { type: 'fold' }, prob: foldP, kind: 'fold', label: 'fold' });
   }
-  return normalise(out);
+  return normalize(out);
 }
 
-function normalise(opts: ActionOption[]): ActionOption[] {
+function normalize(opts: ActionOption[]): ActionOption[] {
   const filtered = opts.filter((o) => o.prob > 1e-9);
   const t = filtered.reduce((a, o) => a + o.prob, 0);
   if (t <= 0) return opts.slice(0, 1).map((o) => ({ ...o, prob: 1 }));
@@ -386,7 +386,7 @@ function postflopPolicy(view: PublicView, profile: OpponentProfile): ActionOptio
     }
     if (callP > 0) out.push({ action: { type: 'call' }, prob: callP, kind: 'call', label: 'call' });
     if (foldP > 0) out.push({ action: { type: 'fold' }, prob: foldP, kind: 'fold', label: 'fold' });
-    return normalise(out);
+    return normalize(out);
   }
 
   // Not facing a bet: check or bet.
@@ -423,7 +423,7 @@ function postflopPolicy(view: PublicView, profile: OpponentProfile): ActionOptio
     out.push({ action: { type: 'bet', to: sz.large }, prob: betP * largeP, kind: 'bet', label: sz.largeLabel });
   }
   out.push({ action: { type: 'check' }, prob: 1 - betP, kind: 'check', label: 'check' });
-  return normalise(out);
+  return normalize(out);
 }
 
 /** The two bet sizes the policy uses in this public state (independent of hole cards except the overbet flag). */

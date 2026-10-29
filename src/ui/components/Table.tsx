@@ -37,7 +37,7 @@ function lastStreetAction(s: HandState, player: number): ActionRecord | undefine
   return undefined;
 }
 
-/** Point on a stadium (pill) outline, by fraction of the perimeter, starting at the bottom centre and going clockwise on screen. Returns percentages of the box. */
+/** Point on a stadium (pill) outline, by fraction of the perimeter, starting at the bottom center and going clockwise on screen. Returns percentages of the box. */
 function stadiumPoint(t: number, w: number, h: number, scale = 1): { x: number; y: number } {
   const sw = w * scale;
   const sh = h * scale;
@@ -106,7 +106,7 @@ export function Table({
   const totalPot = potSize(state);
   const streetBets = state.players.reduce((a, p) => a + p.streetCommitted, 0);
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
-  // seat geometry: hero at the bottom centre, others evenly spaced clockwise along the rail
+  // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
   const box = narrow ? PORTRAIT : LANDSCAPE;
   const geo = (i: number) => {

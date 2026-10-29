@@ -128,13 +128,13 @@ export const POSTFLOP: Lesson[] = [
   {
     id: 'equity-denial-realization',
     section: 'postflop',
-    title: 'Equity denial and equity realisation',
+    title: 'Equity denial and equity realization',
     summary: 'Bets make weak hands with some equity fold; position and hand type decide how much of your equity you actually win.',
     level: 'intermediate',
     format: 'both',
     plain: [
       'Equity denial: when you bet and an opponent folds a hand with, say, 25% equity, you have denied them the chance to win 25% of the pot. This matters most on wet boards and early streets.',
-      'Equity realisation: raw equity assumes every hand reaches showdown for free. In reality, hands out of position, weak hands that must fold to pressure, and hands without draws realise less; hands in position and strong draws can realise more than their raw equity.',
+      'Equity realization: raw equity assumes every hand reaches showdown for free. In reality, hands out of position, weak hands that must fold to pressure, and hands without draws realize less; hands in position and strong draws can realize more than their raw equity.',
       'Together these ideas explain why a vulnerable hand bets on a wet board, and why the big blind cannot simply call with every hand that meets the raw pot-odds price.',
     ],
     why: ['They connect equity numbers to real decisions.', 'They explain many “why bet here?” and “why fold that?” questions.'],
@@ -147,10 +147,10 @@ export const POSTFLOP: Lesson[] = [
       ],
     },
     mistakes: ['Treating raw equity as the decision: “I have 30%, so I call” out of position without considering later streets.', 'Slow-playing vulnerable hands on wet boards.'],
-    assumptions: ['Realisation is not a single number per hand; it depends on ranges, position and stack depth. Figures like “OOP realises ~80%” are rough heuristics.'],
+    assumptions: ['Realization is not a single number per hand; it depends on ranges, position and stack depth. Figures like “OOP realizes ~80%” are rough heuristics.'],
     quiz: [
       { q: 'Equity denial matters most…', options: ['On dry rivers', 'On wet flops and turns', 'Preflop all-in'], answer: 1, explain: 'There are many hands with live equity to fold out.' },
-      { q: 'Which hand typically realises its equity better?', options: ['A flush draw in position', 'Offsuit overcards out of position'], answer: 0, explain: 'Position and the draw’s clear outs help it reach showdown or win big when it hits.' },
+      { q: 'Which hand typically realizes its equity better?', options: ['A flush draw in position', 'Offsuit overcards out of position'], answer: 0, explain: 'Position and the draw’s clear outs help it reach showdown or win big when it hits.' },
     ],
     practice: { label: 'Facing a c-bet', templates: ['fl-defend-cbet', 'fl-cbet-wet-ip'], concepts: ['equity-realization'] },
     related: ['pot-odds', 'equity-not-action', 'position'],
@@ -165,7 +165,7 @@ export const POSTFLOP: Lesson[] = [
     format: 'both',
     plain: [
       'A continuation bet (c-bet) is the preflop raiser betting the flop. It is profitable when the opponent’s range has many hands that cannot continue.',
-      'Frequency and size depend on texture and position: in position on dry high-card boards, betting small with much of your range is common. Out of position and on boards that favour the caller, check more.',
+      'Frequency and size depend on texture and position: in position on dry high-card boards, betting small with much of your range is common. Out of position and on boards that favor the caller, check more.',
       'Your checking range should contain some strong hands too. If you only check weak hands, an observant opponent bets every time you check. Checking strong hands on dry boards (where few cards hurt) is a good way to protect your checks.',
     ],
     why: ['C-bet decisions come up in most hands you raise preflop.', 'Auto-c-betting every flop is one of the most exploitable leaks.'],
@@ -226,7 +226,7 @@ export const POSTFLOP: Lesson[] = [
     plain: [
       'A donk bet (lead) is a bet out of position into the player who was the aggressor on the previous street, before they can c-bet. A probe bet is a turn bet out of position after the preflop raiser checked back the flop.',
       'Probing is common and natural: the raiser’s flop check caps its range, so the out-of-position player can bet for value and protection with medium hands and draws.',
-      'Flop donk bets are used more selectively in modern strategy — mostly on boards that strongly favour the caller (for example low, connected boards in single-raised pots, or certain turn cards). Against many players, a simple “check to the raiser” baseline is fine.',
+      'Flop donk bets are used more selectively in modern strategy — mostly on boards that strongly favor the caller (for example low, connected boards in single-raised pots, or certain turn cards). Against many players, a simple “check to the raiser” baseline is fine.',
     ],
     why: ['Probes collect value that would be lost if you always check to the raiser.', 'Understanding donk bets helps you respond to them.'],
     example: {
@@ -255,7 +255,7 @@ export const POSTFLOP: Lesson[] = [
     plain: [
       'Out of position, check-raising lets you put in a raise after the in-position player bets. Value check-raises use strong hands that want a big pot; semi-bluff check-raises use draws with good equity.',
       'Check-raises are sized around 3–4x a small c-bet. They work best on boards where the caller has a nut advantage or many strong draws.',
-      'Facing a raise, remember that raising ranges are polarised toward strong hands and draws. One-pair hands that were happy to bet small are often in trouble; continue with hands that have enough equity against the raising range.',
+      'Facing a raise, remember that raising ranges are polarized toward strong hands and draws. One-pair hands that were happy to bet small are often in trouble; continue with hands that have enough equity against the raising range.',
     ],
     why: ['Without check-raises, players in position can c-bet you freely.', 'Correctly folding to raises saves many big blinds.'],
     example: {
@@ -270,7 +270,7 @@ export const POSTFLOP: Lesson[] = [
     assumptions: ['The strength of raising ranges varies a lot between players; many low-stakes players under-bluff raises.'],
     quiz: [
       { q: 'Good semi-bluff check-raise candidates are…', options: ['Combo draws', 'Bottom pair with no draw'], answer: 0, explain: 'High equity plus fold equity.' },
-      { q: 'Facing a raise, the raiser’s range is usually…', options: ['Weaker than their betting range', 'Polarised toward strong hands and draws'], answer: 1, explain: 'Raises come from the top and from draws.' },
+      { q: 'Facing a raise, the raiser’s range is usually…', options: ['Weaker than their betting range', 'Polarized toward strong hands and draws'], answer: 1, explain: 'Raises come from the top and from draws.' },
     ],
     practice: { label: 'Check-raises and facing raises', templates: ['fl-checkraise-draw', 'fl-facing-checkraise', 'rv-facing-raise'], concepts: ['check-raise', 'facing-raise'] },
     related: ['value-bluff-semibluff', 'narrowing-ranges'],
@@ -285,7 +285,7 @@ export const POSTFLOP: Lesson[] = [
     format: 'both',
     plain: [
       'Good flop decisions anticipate the turn: if you bet the flop, which turn cards are good to keep betting (cards that improve your range or your hand) and which are bad (cards that complete the caller’s draws)?',
-      'Barrel with value hands and with hands that have equity (draws). Give up with hands that have neither equity nor a good card to represent. Overcards to the board often favour the preflop raiser; flush-completing cards often favour the caller.',
+      'Barrel with value hands and with hands that have equity (draws). Give up with hands that have neither equity nor a good card to represent. Overcards to the board often favor the preflop raiser; flush-completing cards often favor the caller.',
       'Plan sizes across streets: if you want to get all-in by the river with a strong hand, use sizes that make that possible (see geometric sizing).',
     ],
     why: ['Most big pots are decided on the turn and river.', 'Planning avoids “I bet the flop, now I don’t know what to do”.'],
@@ -300,7 +300,7 @@ export const POSTFLOP: Lesson[] = [
     mistakes: ['Barrelling every turn after a flop c-bet.', 'Giving up with strong draws on good turn cards.'],
     assumptions: ['Heads-up single-raised pots with standard ranges.'],
     quiz: [
-      { q: 'Which turn card usually favours the preflop raiser on J-7-3?', options: ['A king', 'A card completing a flush draw the caller had'], answer: 0, explain: 'High cards hit the raiser’s range.' },
+      { q: 'Which turn card usually favors the preflop raiser on J-7-3?', options: ['A king', 'A card completing a flush draw the caller had'], answer: 0, explain: 'High cards hit the raiser’s range.' },
     ],
     practice: { label: 'Turn barrels', templates: ['tu-barrel', 'tu-overbet'], concepts: ['barreling'] },
     related: ['geometric-sizing', 'cbetting', 'value-bluff-semibluff'],
@@ -355,7 +355,7 @@ export const POSTFLOP: Lesson[] = [
       steps: [
         'Pot 20bb, opponent bets 20bb. You must call 20 to win 40: you need 33% equity.',
         'If you believe the betting range is about 25% bluffs, fold; if 40%, call.',
-        'In this app, the bluff-catch scenario computes your exact river equity against the modelled betting range and shows how blockers shift it.',
+        'In this app, the bluff-catch scenario computes your exact river equity against the modeled betting range and shows how blockers shift it.',
       ],
     },
     mistakes: ['Calling because “they could be bluffing” without comparing to the price.', 'Ignoring the opponent’s actual bluffing tendencies.', 'Choosing bluff-catchers that block bluffs.'],
@@ -392,7 +392,7 @@ export const POSTFLOP: Lesson[] = [
     },
     mistakes: ['C-betting air into several opponents.', 'Slow-playing strong hands multiway where someone else will bet.'],
     math: { formulas: ['P(all fold) = product of each player’s fold probability (if independent)'], notes: ['Independence is a simplification; folds are correlated with the board.'] },
-    assumptions: ['Generalisations; specific boards can still favour the aggressor strongly.'],
+    assumptions: ['Generalizations; specific boards can still favor the aggressor strongly.'],
     quiz: [
       { q: 'Two opponents each fold 50%. Chance both fold (independent)?', options: ['25%', '50%', '75%'], answer: 0, explain: '0.5 × 0.5 = 0.25.' },
     ],

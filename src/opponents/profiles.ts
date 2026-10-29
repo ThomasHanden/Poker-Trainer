@@ -1,5 +1,5 @@
-// Opponent tendency profiles. These parameterise one shared policy (policy.ts).
-// They are simplified behavioural models for training, not population statistics.
+// Opponent tendency profiles. These parameterize one shared policy (policy.ts).
+// They are simplified behavioral models for training, not population statistics.
 
 export type ProfileId = 'unknown' | 'tag' | 'nit' | 'station' | 'lag' | 'overfolder';
 
@@ -34,7 +34,7 @@ export const PROFILES: Record<ProfileId, OpponentProfile> = {
     name: 'Unknown / baseline',
     short: 'Unknown',
     description:
-      'No reads. Modelled as a reasonably competent player who plays near the baseline charts, bets strong hands and draws, bluffs at a moderate rate, and defends roughly in line with pot odds.',
+      'No reads. Modeled as a reasonably competent player who plays near the baseline charts, bets strong hands and draws, bluffs at a moderate rate, and defends roughly in line with pot odds.',
     looseness: 0,
     aggression: 0.5,
     callShift: 0,
@@ -43,7 +43,7 @@ export const PROFILES: Record<ProfileId, OpponentProfile> = {
     cbet: 0.55,
     slowplay: 0.12,
     bigSizing: 0.4,
-    exploitNotes: ['Without reads, prefer strategies that are hard to exploit: balanced sizings, pot-odds based defence, and value-heavy big bets.'],
+    exploitNotes: ['Without reads, prefer strategies that are hard to exploit: balanced sizings, pot-odds based defense, and value-heavy big bets.'],
   },
   tag: {
     id: 'tag',

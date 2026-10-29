@@ -2,8 +2,8 @@
 
 Templates live in `src/scenarios/templates/{preflop,tournament,postflop}.ts` and are registered in `templates/index.ts`. A template is a `ScenarioTemplate` (see `src/scenarios/types.ts`):
 
-1. **Metadata**: `id` (stable), `version` (bump when behaviour changes — stored with results), `title`, `summary`, `objectives`, `street` (key decision), `category`, `concepts` (from `content/concepts.ts`), `lessons` (lesson ids), `formats`, `tableSizes`, `heroPositions`, `stackBB`, `potType`, `multiway`, `facing`, `difficulties`, `evaluation {method, assumptions}`, `setupText`, `hint`.
-2. **`build(ctx)`** returns a `ScenarioScript` or `null` if the settings cannot be satisfied (use helpers `tableSizeFor`, `positionFor`, `stackFor` which honour user settings):
+1. **Metadata**: `id` (stable), `version` (bump when behavior changes — stored with results), `title`, `summary`, `objectives`, `street` (key decision), `category`, `concepts` (from `content/concepts.ts`), `lessons` (lesson ids), `formats`, `tableSizes`, `heroPositions`, `stackBB`, `potType`, `multiway`, `facing`, `difficulties`, `evaluation {method, assumptions}`, `setupText`, `hint`.
+2. **`build(ctx)`** returns a `ScenarioScript` or `null` if the settings cannot be satisfied (use helpers `tableSizeFor`, `positionFor`, `stackFor` which honor user settings):
    - `config` (`cashConfig(n)` / `tourneyConfig(n)`), `stacksBB`, `heroPos`, `profiles` (by position; use `ctx.pickProfile()`),
    - `preflop` actions (`{pos, act, size}`; players not listed before the next actor fold automatically preflop),
    - optional `flop`/`turn`/`river` with `cards(newCards, prior)` constraints and explicit actions,

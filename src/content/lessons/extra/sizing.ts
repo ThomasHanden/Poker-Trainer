@@ -50,7 +50,7 @@ export const SIZING_X: Record<string, LessonExtra> = {
   'small-vs-large': {
     terms: [
       ['Block bet', 'A small bet out of position, often meant to set a cheap price.'],
-      ['Polarise', 'Bet with strong hands and bluffs, check the middle.'],
+      ['Polarize', 'Bet with strong hands and bluffs, check the middle.'],
       ['Range bet', 'Bet with your whole range, usually small.'],
       ['Pressure', 'Forcing difficult decisions on bluff-catchers with large sizes.'],
     ],
@@ -110,7 +110,7 @@ export const SIZING_X: Record<string, LessonExtra> = {
       {
         heading: 'When to use it',
         body: [
-          'Geometric sizing is a reference for strong hands and polarised ranges: it gets the most money in by the river against a hand that calls every street. Many real strategies use smaller sizes on early streets (with wider ranges) and bigger ones later, but knowing the geometric size tells you whether you are on track.',
+          'Geometric sizing is a reference for strong hands and polarized ranges: it gets the most money in by the river against a hand that calls every street. Many real strategies use smaller sizes on early streets (with wider ranges) and bigger ones later, but knowing the geometric size tells you whether you are on track.',
           'If your sizes are too small early, you end up making a huge overbet on the river or leaving money behind. If they are too big early, you may fold out the hands that would have paid you on later streets.',
         ],
       },
@@ -155,7 +155,7 @@ export const SIZING_X: Record<string, LessonExtra> = {
       {
         heading: 'When underbets work',
         body: [
-          'Very small bets work when your whole range is ahead and the opponent has many weak hands, for example on boards that strongly favour the preflop raiser. They also work as cheap probes and block bets on the river.',
+          'Very small bets work when your whole range is ahead and the opponent has many weak hands, for example on boards that strongly favor the preflop raiser. They also work as cheap probes and block bets on the river.',
           'Underbets are easy to raise, so they should not come from a range that cannot stand a raise unless the opponent rarely raises.',
         ],
       },
@@ -184,7 +184,7 @@ export const SIZING_X: Record<string, LessonExtra> = {
 
   'polarized-merged': {
     terms: [
-      ['Polarised range', 'A betting range of strong hands and bluffs.'],
+      ['Polarized range', 'A betting range of strong hands and bluffs.'],
       ['Merged range', 'A betting range that includes medium-strength hands for thin value.'],
       ['Bluff-catcher', 'A hand that beats only bluffs.'],
       ['Showdown value', 'The chance to win without betting.'],
@@ -193,20 +193,20 @@ export const SIZING_X: Record<string, LessonExtra> = {
       {
         heading: 'Which structure suits which size',
         body: [
-          'A polarised range goes with large bets: the strong hands want a big pot and the bluffs want maximum fold equity. The middle hands check, because they would rather see a showdown than face a raise.',
+          'A polarized range goes with large bets: the strong hands want a big pot and the bluffs want maximum fold equity. The middle hands check, because they would rather see a showdown than face a raise.',
           'A merged range goes with smaller bets: you bet a wide band of hands that are ahead of the opponent’s calling range, including medium ones. This works when the opponent calls with many worse hands.',
         ],
       },
       {
         heading: 'Reading the opponent’s structure',
         body: [
-          'When an opponent makes a big bet after a passive line, their range is often polarised. Your medium hands become bluff-catchers: you decide based on the price and how often they bluff.',
+          'When an opponent makes a big bet after a passive line, their range is often polarized. Your medium hands become bluff-catchers: you decide based on the price and how often they bluff.',
           'When an opponent makes a small bet, their range is often merged: it contains many medium hands, and raising can sometimes fold out better hands or get value from worse ones.',
         ],
       },
     ],
     apply: [
-      'Big bet → polarised range; check your medium hands.',
+      'Big bet → polarized range; check your medium hands.',
       'Small bet → merged range; include more medium hands.',
       'Against a big bet, treat medium hands as bluff-catchers.',
       'Against small bets, consider raising strong hands and some bluffs.',
@@ -216,14 +216,14 @@ export const SIZING_X: Record<string, LessonExtra> = {
         title: 'River with a medium hand',
         steps: [
           'River: J♠ 9♦ 4♣ 2♠ 6♥, you hold J♥ 8♥ in position and the opponent checks.',
-          'A large bet would fold most worse hands and get called by better jacks. Not a good polarised bet.',
+          'A large bet would fold most worse hands and get called by better jacks. Not a good polarized bet.',
           'A small bet could get called by 9x, 4x and weaker jacks against a loose player: a merged value bet. Against a tight player, checking is better.',
         ],
       },
     ],
     quiz: [
-      { q: 'Large bets usually come from…', options: ['Polarised ranges', 'Merged ranges'], answer: 0, explain: 'Strong hands and bluffs want big pots or big fold equity.' },
-      { q: 'Against a polarised river bet, a medium pair is…', options: ['A bluff-catcher', 'A value raise', 'Always a fold'], answer: 0, explain: 'It beats the bluffs and loses to the value.' },
+      { q: 'Large bets usually come from…', options: ['Polarized ranges', 'Merged ranges'], answer: 0, explain: 'Strong hands and bluffs want big pots or big fold equity.' },
+      { q: 'Against a polarized river bet, a medium pair is…', options: ['A bluff-catcher', 'A value raise', 'Always a fold'], answer: 0, explain: 'It beats the bluffs and loses to the value.' },
     ],
   },
 
@@ -246,7 +246,7 @@ export const SIZING_X: Record<string, LessonExtra> = {
         heading: 'Elastic and inelastic opponents',
         body: [
           'Some players fold more as the bet gets bigger, which is the expected response (elastic). Others call or fold based on their hand, almost regardless of size (inelastic). Against inelastic callers, bet bigger with value hands because they pay anyway. Against inelastic folders, bluff smaller because they fold anyway.',
-          'Recognising which type you face is one of the most valuable sizing reads.',
+          'Recognizing which type you face is one of the most valuable sizing reads.',
         ],
       },
     ],

@@ -1,5 +1,5 @@
 // Range practice drills. Reference answers are computed (charts, exact river equities vs the
-// modelled ranges, blocker counts, range composition), never hand-written.
+// modeled ranges, blocker counts, range composition), never hand-written.
 
 import { Card, createRng, cardsToString, rankOf, suitOf, deckWithout } from '../engine/cards';
 import { evaluate } from '../engine/evaluator';
@@ -77,7 +77,7 @@ function openDrill(seed: number): MatrixDrill {
   };
 }
 
-/** River: which hands in a bluff-catching range should call a big bet? Exact equities vs the modelled betting range. */
+/** River: which hands in a bluff-catching range should call a big bet? Exact equities vs the modeled betting range. */
 function continueDrill(seed: number): MatrixDrill {
   let best: MatrixDrill | null = null;
   for (let k = 0; k < 6; k++) {
@@ -289,7 +289,7 @@ function boardAdvantageDrill(seed: number): ChoiceDrill {
   const correct = diff > 0.05 ? 0 : diff < -0.05 ? 1 : 2;
   return {
     kind: 'board-advantage',
-    title: 'Which range does this flop favour?',
+    title: 'Which range does this flop favor?',
     prompt: `UTG opens and the big blind calls (100bb cash). Flop: ${cardsToString(board)}. Which range has the advantage?`,
     board,
     options: [
@@ -300,7 +300,7 @@ function boardAdvantageDrill(seed: number): ChoiceDrill {
     correct,
     explanation: [
       adv.text,
-      'High cards (A, K, Q) usually favour the preflop raiser, whose range has more big cards and big pairs. Low, connected boards favour the caller, who has more small pairs and suited connectors.',
+      'High cards (A, K, Q) usually favor the preflop raiser, whose range has more big cards and big pairs. Low, connected boards favor the caller, who has more small pairs and suited connectors.',
       'Measured here as the share of each range with top pair or better and with two pair or better (using the illustrative baseline charts).',
     ],
   };

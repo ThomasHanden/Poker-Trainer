@@ -26,7 +26,7 @@ import { PROFILES } from '../../opponents/profiles';
 const POSTFLOP_ASSUMPTIONS = [
   'Strategic ratings are heuristic teaching guidance (not solver output).',
   'Opponent ranges and responses come from the simulated opponent model and its stated profile.',
-  'Equities are exact on the turn/river (enumeration) and simulated on the flop vs the modelled range.',
+  'Equities are exact on the turn/river (enumeration) and simulated on the flop vs the modeled range.',
 ];
 
 type Base = 'btn-bb' | 'co-btn' | 'bb-3bet-btn' | 'co-btn-bb';
@@ -216,8 +216,8 @@ const cbetWet = postflopTemplate({
   meta: {
     id: 'fl-cbet-wet-ip',
     title: 'C-bet in position on a low, connected board',
-    summary: 'Button vs big blind; a low connected flop that favours the caller.',
-    objectives: ['Recognise when the caller has the range advantage.', 'Check more, and bet bigger when you do bet.'],
+    summary: 'Button vs big blind; a low connected flop that favors the caller.',
+    objectives: ['Recognize when the caller has the range advantage.', 'Check more, and bet bigger when you do bet.'],
     street: 'flop',
     category: 'Continuation betting',
     concepts: ['cbet', 'board-texture', 'range-advantage', 'checking-range'],
@@ -257,7 +257,7 @@ const cbetWet = postflopTemplate({
     } else if (p >= 0.6) {
       ratings.check = 'preferred';
       ratings.bet = 'mixed';
-      reasons.push('Medium one-pair hands prefer checking on a board that favours the caller: bets get called by better hands and draws and raised by strong hands.');
+      reasons.push('Medium one-pair hands prefer checking on a board that favors the caller: bets get called by better hands and draws and raised by strong hands.');
       sizing = { preferred: [0.25, 0.5], acceptable: [0.2, 0.7], note: 'If you bet a medium hand, keep it small.' };
     } else {
       ratings.check = 'preferred';
@@ -338,7 +338,7 @@ const cbet3bp = postflopTemplate({
     facing: 'first-to-act',
     difficulties: ['intermediate', 'advanced', 'expert'],
     setupText: '3-bet pot: you 3-bet the button from the big blind and got called. You act first on the flop.',
-    hint: 'With about four pots behind, how many bets does it take to get all-in? Which board cards favour the 3-bettor?',
+    hint: 'With about four pots behind, how many bets does it take to get all-in? Which board cards favor the 3-bettor?',
   },
   base: 'bb-3bet-btn',
   heroSide: 'pfr',
@@ -396,7 +396,7 @@ const defendCbet = postflopTemplate({
     facing: 'bet',
     difficulties: ['beginner', 'intermediate', 'advanced', 'expert'],
     setupText: 'You called a button open from the big blind and checked the flop. The button bets.',
-    hint: 'Start with the price: what equity do you need to call? Then ask whether your hand will realise that equity out of position.',
+    hint: 'Start with the price: what equity do you need to call? Then ask whether your hand will realize that equity out of position.',
   },
   base: 'btn-bb',
   heroSide: 'caller',
@@ -408,7 +408,7 @@ const defendCbet = postflopTemplate({
     const potBefore = ctx.pot - betSize;
     const mdf = potBefore / (potBefore + betSize);
     g.reasons.push(
-      `Minimum defence frequency for this size is ${pctStr(mdf)}: if you fold more than ${pctStr(1 - mdf)} of your range, any two cards would profit as a bluff (in a simplified model). It is a benchmark for your whole range, not a rule for a single hand — on the flop, equity realisation and future streets matter.`,
+      `Minimum defense frequency for this size is ${pctStr(mdf)}: if you fold more than ${pctStr(1 - mdf)} of your range, any two cards would profit as a bluff (in a simplified model). It is a benchmark for your whole range, not a rule for a single hand — on the flop, equity realization and future streets matter.`,
     );
     return g;
   },
@@ -450,7 +450,7 @@ const checkRaiseDraw = postflopTemplate({
       `Your draw has about ${pctStr(d.drawEquity, 0)} raw equity from ${d.strongOuts} strong outs over two cards — far more than the ${pctStr(ctx.requiredEquity, 0)} needed to call, so folding is never right here.`,
       combo
         ? 'With a very strong draw, raising is attractive: it adds fold equity on top of your draw equity, and if you get called you still have close to a coin flip.'
-        : 'With a regular draw, both calling and raising are fine: calling keeps the button’s bluffs in and realises your equity cheaply; raising adds fold equity.',
+        : 'With a regular draw, both calling and raising are fine: calling keeps the button’s bluffs in and realizes your equity cheaply; raising adds fold equity.',
     );
     if (r) g.reasons.push(`Under the model, a check-raise to ${bbStr(raiseTo, ctx.bb)} makes the button fold ${pctStr(r.fold)} of its betting range.`);
     g.sizing = { preferred: [0.6, 1.0], acceptable: [0.4, 1.3], note: 'Check-raises are usually around 3–4x a small c-bet (roughly 60–100% of the pot after calling).' };
@@ -513,7 +513,7 @@ const multiwayCbet = postflopTemplate({
     id: 'fl-multiway-cbet',
     title: 'C-bet in a three-way pot',
     summary: 'You opened the cutoff; the button and big blind called. Big blind checks.',
-    objectives: ['Bet less often multiway.', 'Favour value and strong draws over pure bluffs.'],
+    objectives: ['Bet less often multiway.', 'Favor value and strong draws over pure bluffs.'],
     street: 'flop',
     category: 'Multiway',
     concepts: ['multiway', 'cbet', 'bluff'],
@@ -585,7 +585,7 @@ const facingCheckRaise = postflopTemplate({
   heroFilter: (ctx) => ({ weight: mixWeight(ctx, (h, b) => pct(h, b) >= 0.93 || isAir(h, b), (h, b) => isMedium(h, b) || hasDraw(h, b) || made(h, b) === 'overpair') }),
   guide(ctx) {
     const g = facingBetGuidance(ctx);
-    g.reasons.unshift('A check-raise range is polarised toward strong hands and draws; one-pair hands that were happy to bet small are often in a much worse spot now.');
+    g.reasons.unshift('A check-raise range is polarized toward strong hands and draws; one-pair hands that were happy to bet small are often in a much worse spot now.');
     return g;
   },
 });
@@ -632,7 +632,7 @@ const turnBarrel = postflopTemplate({
     const reasons: string[] = [];
     reasons.push(
       over
-        ? 'The turn is an overcard. High cards favour the preflop raiser (more big cards in your range, fewer in the big blind’s flop-calling range), so this is a good card to continue betting.'
+        ? 'The turn is an overcard. High cards favor the preflop raiser (more big cards in your range, fewer in the big blind’s flop-calling range), so this is a good card to continue betting.'
         : flushy
           ? 'The turn completes a flush draw. The big blind called the flop with many draws, so this card improves their range; barrel mostly with strong hands and with hands holding a card of the flush suit (blockers).'
           : 'The turn is a low, mostly blank card: it changes little, so the big blind’s flop calls (pairs and draws) are still there.',
@@ -653,7 +653,7 @@ const turnBarrel = postflopTemplate({
       const blocker = flushy && ctx.hole.some((c) => suitOf(c) === suitOf(turn));
       ratings.check = over || blocker ? 'mixed' : 'preferred';
       ratings.bet = over || blocker ? 'mixed' : 'discouraged';
-      reasons.push(over || blocker ? 'A weak hand can bluff on a card that favours you (or with a blocker), but it has no equity if called — choose these bluffs selectively.' : 'Hands with no equity and no good card to represent should usually give up.');
+      reasons.push(over || blocker ? 'A weak hand can bluff on a card that favors you (or with a blocker), but it has no equity if called — choose these bluffs selectively.' : 'Hands with no equity and no good card to represent should usually give up.');
     }
     reasons.push(equityLine(ctx), ...betMechanics(ctx, [0.5, 0.75]));
     return { ratings, reasons, sizing: { preferred: [0.5, 0.8], acceptable: [0.33, 1.1], note: 'Turn barrels are typically half to three-quarters of the pot, setting up a river shove or large bet (geometric sizing).' }, confidence: 'medium', source: 'heuristic' };
@@ -665,7 +665,7 @@ const turnProbe = postflopTemplate({
     id: 'tu-probe',
     title: 'Turn probe after the raiser checks back',
     summary: 'The button checked back the flop. You are first to act on the turn from the big blind.',
-    objectives: ['Recognise a capped checking range.', 'Bet for value and protection when the aggressor declined to bet.'],
+    objectives: ['Recognize a capped checking range.', 'Bet for value and protection when the aggressor declined to bet.'],
     street: 'turn',
     category: 'Turn play',
     concepts: ['probe', 'range-advantage', 'value-bet'],
@@ -827,7 +827,7 @@ const turnOverbet = postflopTemplate({
     return {
       ratings,
       reasons,
-      sizing: capped ? { preferred: [1.0, 1.6], acceptable: [0.6, 2.2], note: 'Overbets (100–150% pot) maximise value when you have the nut advantage.' } : { preferred: [0.66, 1.25], acceptable: [0.5, 1.8], note: 'A large bet builds the pot for the river.' },
+      sizing: capped ? { preferred: [1.0, 1.6], acceptable: [0.6, 2.2], note: 'Overbets (100–150% pot) maximize value when you have the nut advantage.' } : { preferred: [0.66, 1.25], acceptable: [0.5, 1.8], note: 'A large bet builds the pot for the river.' },
       confidence: 'medium',
       source: 'heuristic',
     };
@@ -876,7 +876,7 @@ const riverThinValue = postflopTemplate({
     const e = small?.equityWhenCalled ?? NaN;
     if (small) {
       reasons.push(
-        `If you bet a third of the pot, the modelled opponent calls or raises ${pctStr(small.call + small.raise)} of the time and you win ${pctStr(e)} when called. A value bet is profitable when you win more than half the time when called (and are rarely raised off the best hand).`,
+        `If you bet a third of the pot, the modeled opponent calls or raises ${pctStr(small.call + small.raise)} of the time and you win ${pctStr(e)} when called. A value bet is profitable when you win more than half the time when called (and are rarely raised off the best hand).`,
       );
     }
     if (Number.isFinite(e) && e >= 0.55) {
@@ -933,9 +933,9 @@ const riverBluff = postflopTemplate({
     const be = (to - ctx.state.players[ctx.hero].streetCommitted) / (ctx.pot + to);
     const bl = blockersForBet(ctx, { type: 'bet', to });
     const ratings: Guidance['ratings'] = {};
-    const reasons: string[] = [`Your hand cannot win at showdown often (${equityLine(ctx).replace('Your equity against the modelled range is ', '')}), so a bet is a bluff: it profits only through folds.`];
+    const reasons: string[] = [`Your hand cannot win at showdown often (${equityLine(ctx).replace('Your equity against the modeled range is ', '')}), so a bet is a bluff: it profits only through folds.`];
     if (r) {
-      reasons.push(`A 75% pot bet needs folds ${pctStr(be, 0)} of the time to break even. The modelled opponent folds ${pctStr(r.fold, 0)}.`);
+      reasons.push(`A 75% pot bet needs folds ${pctStr(be, 0)} of the time to break even. The modeled opponent folds ${pctStr(r.fold, 0)}.`);
       if (r.fold >= be + 0.05) {
         ratings.bet = 'preferred';
         ratings.check = 'mixed';
@@ -955,7 +955,7 @@ const riverBluff = postflopTemplate({
       sizing: { preferred: [0.66, 1.3], acceptable: [0.45, 2.0], note: 'River bluffs usually use the same large size as your value bets so the two are hard to tell apart.' },
       confidence: 'medium',
       source: 'heuristic',
-      math: [{ label: 'Bluff break-even fold rate (75% pot)', value: `B/(P+B) = ${pctStr(be, 1)}`, kind: 'exact' }, ...(r ? [{ label: 'Modelled fold rate', value: pctStr(r.fold, 1), kind: 'model' as const }] : [])],
+      math: [{ label: 'Bluff break-even fold rate (75% pot)', value: `B/(P+B) = ${pctStr(be, 1)}`, kind: 'exact' }, ...(r ? [{ label: 'Modeled fold rate', value: pctStr(r.fold, 1), kind: 'model' as const }] : [])],
     };
   },
 });
@@ -965,7 +965,7 @@ const riverBluffCatch = postflopTemplate({
     id: 'rv-bluff-catch',
     title: 'River bluff-catch facing a big bet',
     summary: 'You hold a one-pair hand and face a large river bet.',
-    objectives: ['Use pot odds against a polarised betting range.', 'Weigh blockers and opponent tendencies.'],
+    objectives: ['Use pot odds against a polarized betting range.', 'Weigh blockers and opponent tendencies.'],
     street: 'river',
     category: 'River play',
     concepts: ['bluff-catch', 'pot-odds', 'mdf', 'blockers'],
@@ -996,7 +996,7 @@ const riverBluffCatch = postflopTemplate({
     if (bl) g.reasons.push(bl.text);
     const potBefore = ctx.pot - ctx.toCall;
     g.reasons.push(
-      `In a simplified river model, a bettor making you indifferent would bluff ${pctStr(ctx.toCall / (potBefore + 2 * ctx.toCall), 0)} of its betting range at this size. Real players often bluff less than that (especially passive players), which favours folding marginal bluff-catchers; aggressive players often bluff more.`,
+      `In a simplified river model, a bettor making you indifferent would bluff ${pctStr(ctx.toCall / (potBefore + 2 * ctx.toCall), 0)} of its betting range at this size. Real players often bluff less than that (especially passive players), which favors folding marginal bluff-catchers; aggressive players often bluff more.`,
     );
     g.confidence = 'medium';
     return g;
@@ -1006,9 +1006,9 @@ const riverBluffCatch = postflopTemplate({
 const riverOverbet = postflopTemplate({
   meta: {
     id: 'rv-overbet',
-    title: 'River overbet with a polarised hand',
+    title: 'River overbet with a polarized hand',
     summary: 'You hold either the nuts or nothing; the big blind checks the river after a capped line.',
-    objectives: ['Use large sizes with polarised ranges.', 'Size up when the opponent cannot have many strong hands.'],
+    objectives: ['Use large sizes with polarized ranges.', 'Size up when the opponent cannot have many strong hands.'],
     street: 'river',
     category: 'Bet sizing',
     concepts: ['overbet', 'bluff', 'value-bet', 'bet-sizing'],
@@ -1041,7 +1041,7 @@ const riverOverbet = postflopTemplate({
       ratings.bet = 'preferred';
       ratings.check = 'mistake';
       reasons.push('With the nuts or near-nuts, checking gives up value. The opponent checked the turn back to you and the river, so their range is capped and your big bets get called by their best one-pair hands.');
-      if (r) reasons.push(`A 125% pot bet is called ${pctStr(r.call + r.raise)} of the time by the modelled opponent.`);
+      if (r) reasons.push(`A 125% pot bet is called ${pctStr(r.call + r.raise)} of the time by the modeled opponent.`);
     } else {
       if (r) {
         reasons.push(`As a bluff, a 125% pot bet needs ${pctStr(be, 0)} folds; the model folds ${pctStr(r.fold, 0)}.`);
@@ -1055,7 +1055,7 @@ const riverOverbet = postflopTemplate({
     return {
       ratings,
       reasons,
-      sizing: { preferred: [1.0, 2.0], acceptable: [0.66, 2.5], note: 'A polarised range with a nut advantage can bet 100–200% of the pot.' },
+      sizing: { preferred: [1.0, 2.0], acceptable: [0.66, 2.5], note: 'A polarized range with a nut advantage can bet 100–200% of the pot.' },
       confidence: 'medium',
       source: 'heuristic',
     };

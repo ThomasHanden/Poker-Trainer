@@ -321,7 +321,7 @@ export function PracticePage() {
                   )}
                   {assist.equity && help?.equity && (
                     <p className="hint">
-                      <Term id="equity">Equity</Term> vs the modelled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
+                      <Term id="equity">Equity</Term> vs the modeled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
                       {help.equity.samples && help.equity.se > 0 ? `, ±${(196 * help.equity.se).toFixed(1)}%` : ''}). {help.rangeSummary}
                     </p>
                   )}

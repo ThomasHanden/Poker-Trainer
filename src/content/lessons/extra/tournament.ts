@@ -262,7 +262,7 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
         steps: [
           'Final table, six players. One player has 3bb. You have 20bb, and the chip leader (60bb) shoves into you.',
           'You hold A♠ J♦, a hand you would call in chip EV terms.',
-          'If you lose, you bust before the 3bb stack. If you fold, there is a good chance the short stack busts first and you move up. ICM often favours folding.',
+          'If you lose, you bust before the 3bb stack. If you fold, there is a good chance the short stack busts first and you move up. ICM often favors folding.',
         ],
       },
     ],

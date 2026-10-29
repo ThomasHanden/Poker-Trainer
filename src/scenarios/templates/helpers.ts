@@ -11,7 +11,7 @@ export const tourneyConfig = (n: number, bbAnte = true): TableConfig => ({ forma
 
 export const evenStacks = (n: number, bb: number) => Array(n).fill(bb);
 
-/** Choose from options, honouring a setting value when it is one of them. */
+/** Choose from options, honoring a setting value when it is one of them. */
 export function choose<T>(ctx: BuildContext, options: T[], setting: T | 'any' | undefined): T | null {
   if (setting !== undefined && setting !== 'any') return options.includes(setting as T) ? (setting as T) : null;
   return ctx.rng.pick(options);
@@ -49,7 +49,7 @@ function edgeDistance(freq: (h: HandClass) => number, h: HandClass): number {
 }
 
 /**
- * Hero spec for chart decisions: favours a mix of clear and borderline hands depending on
+ * Hero spec for chart decisions: favors a mix of clear and borderline hands depending on
  * ambiguity, and keeps roughly half of hands inside the "play" region so practice is useful.
  */
 export function chartHeroSpec(ctx: BuildContext, chart: Chart, playShare = 0.55): HeroSpec {
@@ -66,7 +66,7 @@ export function chartHeroSpec(ctx: BuildContext, chart: Chart, playShare = 0.55)
       const borderline = mixed || dist <= 18;
       const base = p >= 0.5 ? playShare : 1 - playShare;
       const amb = ctx.ambiguity;
-      // normalise by class frequency so the in/out split is roughly playShare
+      // normalize by class frequency so the in/out split is roughly playShare
       return base * (borderline ? amb : 1 - amb) * (borderline ? 3 : 1);
     },
   };
@@ -168,8 +168,8 @@ export function explainPreflopHand(h: HandClass, f: { raise: number; call: numbe
         : 'A pocket pair flops a set or better about 12% of the time (roughly 1 in 8.5). Small pairs depend on that, so they need stacks deep enough to get paid when they hit (implied odds), and they struggle to continue on boards with overcards.',
     );
   } else {
-    if (isSuited(h)) out.push('Being suited adds roughly 2–3% raw equity and, more importantly, flush draws and backdoor draws that let you continue on more flops (better equity realisation).');
-    else out.push('Offsuit hands make flushes far less often and flop fewer draws, so they realise less of their equity — especially out of position.');
+    if (isSuited(h)) out.push('Being suited adds roughly 2–3% raw equity and, more importantly, flush draws and backdoor draws that let you continue on more flops (better equity realization).');
+    else out.push('Offsuit hands make flushes far less often and flop fewer draws, so they realize less of their equity — especially out of position.');
     if (gap === 1) out.push('Connected cards make the most straights; they can continue on many boards with draws.');
     else if (gap === 2 || gap === 3) out.push(`A ${gap - 1}-gap reduces straight possibilities compared to a connector.`);
     if (h[0] === 'A') {

@@ -76,7 +76,7 @@ export function ProgressPage() {
       <h1>Progress</h1>
       {hist.length === 0 ? (
         <div className="empty">
-          <p>No completed scenarios yet. <Link to="/practice">Start practising</Link> — your strengths, weaknesses and trends will appear here.</p>
+          <p>No completed scenarios yet. <Link to="/practice">Start practicing</Link> — your strengths, weaknesses and trends will appear here.</p>
         </div>
       ) : (
         <>
@@ -105,7 +105,7 @@ export function ProgressPage() {
             </div>
           </section>
           {versions.size > 1 && <p className="banner warn">Your history contains hands scored with different scoring versions ({[...versions].join(', ')}; current {SCORING_VERSION}). Compare them with care.</p>}
-          <div className="seg" role="radiogroup" aria-label="Which decisions to analyse">
+          <div className="seg" role="radiogroup" aria-label="Which decisions to analyze">
             {(['unassisted', 'assisted'] as const).map((v) => (
               <button key={v} role="radio" aria-checked={assistedView === v} className={assistedView === v ? 'on' : ''} onClick={() => setAssistedView(v)}>
                 {v === 'unassisted' ? 'Unassisted decisions' : 'Assisted decisions'}
@@ -123,7 +123,7 @@ export function ProgressPage() {
                     return (
                       <li key={w.key}>
                         <strong>{c?.name ?? w.key}</strong> — average {w.avg.toFixed(0)} over {w.n} decisions ({w.mistakes} below “reasonable”).{' '}
-                        <Link to={`/practice?concept=${w.key}`}>Practise</Link>
+                        <Link to={`/practice?concept=${w.key}`}>Practice</Link>
                         {c && LESSON_INDEX[c.lesson] && (
                           <>
                             {' · '}

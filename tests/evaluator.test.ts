@@ -6,7 +6,7 @@ const ev = (s: string) => evaluate(parseCards(s));
 const cat = (s: string) => categoryOf(ev(s));
 
 describe('hand categories', () => {
-  it('recognises each category', () => {
+  it('recognizes each category', () => {
     expect(cat('As Ks Qs Js Ts 2c 3d')).toBe(HandCategory.StraightFlush);
     expect(cat('9h 9d 9s 9c 2d 3c 4h')).toBe(HandCategory.Quads);
     expect(cat('Kh Kd Ks 2c 2d 7h 8s')).toBe(HandCategory.FullHouse);

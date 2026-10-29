@@ -57,7 +57,7 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
     terms: [
       ['In position (IP)', 'Acting after your opponent on the current and later streets.'],
       ['Out of position (OOP)', 'Acting first, before you know what your opponent will do.'],
-      ['Equity realisation', 'How much of your raw equity you actually win on average once betting is taken into account. Position raises it.'],
+      ['Equity realization', 'How much of your raw equity you actually win on average once betting is taken into account. Position raises it.'],
       ['Check behind', 'Checking as the last player to act, which ends the betting round and gives a free card.'],
     ],
     deeper: [
@@ -162,14 +162,14 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
         heading: 'Why passive play is a leak',
         body: [
           'A player who mostly checks and calls never wins pots when both players miss, which happens on most flops. They also give their opponents free cards and let them control the size of the pot.',
-          'But aggression without purpose is just as costly. The goal is selective aggression: bet and raise with hands that benefit (strong hands, good draws and well-chosen bluffs), and check with hands that want to keep the pot small or realise their equity cheaply.',
+          'But aggression without purpose is just as costly. The goal is selective aggression: bet and raise with hands that benefit (strong hands, good draws and well-chosen bluffs), and check with hands that want to keep the pot small or realize their equity cheaply.',
         ],
       },
     ],
     apply: [
       'Before betting, name the hands that call and the hands that fold.',
       'If you cannot name a purpose (value, bluff or denial), check.',
-      'As the preflop raiser, expect to be checked to and use that initiative on boards that favour your range.',
+      'As the preflop raiser, expect to be checked to and use that initiative on boards that favor your range.',
       'With medium hands, ask whether keeping the pot small beats building it.',
     ],
     examples: [
@@ -194,14 +194,14 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
       ['Equity', 'Your share of the pot if all cards were dealt with no more betting.'],
       ['EV (expected value)', 'The average profit of a decision across all the ways the hand can play out.'],
       ['Sunk cost', 'Chips you have already put in. They do not belong to you any more and should not affect your next decision.'],
-      ['Realisation', 'How much of your equity turns into actual winnings; above 100% when you win extra bets, below when you are forced to fold.'],
+      ['Realization', 'How much of your equity turns into actual winnings; above 100% when you win extra bets, below when you are forced to fold.'],
     ],
     deeper: [
       {
         heading: 'Why equity is not the whole story',
         body: [
           'Equity assumes you always see every card for free. In real hands you can be bet off your equity, or you can win extra money when you hit. Two hands with 35% equity can have very different EVs: a nut flush draw in position wins big pots when it hits, while a weak pair out of position may have to fold to a turn bet and win nothing.',
-          'This is why players talk about equity realisation. In position, with a hand that makes strong hands, you tend to realise more than your raw equity. Out of position, with a hand that makes weak pairs, you tend to realise less.',
+          'This is why players talk about equity realization. In position, with a hand that makes strong hands, you tend to realize more than your raw equity. Out of position, with a hand that makes weak pairs, you tend to realize less.',
         ],
       },
       {
@@ -224,14 +224,14 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
         steps: [
           'Flop, pot 10bb, you face a 5bb bet. Hand A: A♥ 5♥ on K♥ 8♥ 2♣ in position. Hand B: 4♠ 4♦ on the same board, out of position.',
           'Both have roughly 35% equity against a typical betting range.',
-          'Hand A makes the nut flush and can win a big pot; it will rarely be bet off its equity. It realises more than 35%.',
-          'Hand B will face more bets on most turns and has to fold often; when it improves to a set it can win, but it hits only about 4% per card. It realises much less than 35%.',
+          'Hand A makes the nut flush and can win a big pot; it will rarely be bet off its equity. It realizes more than 35%.',
+          'Hand B will face more bets on most turns and has to fold often; when it improves to a set it can win, but it hits only about 4% per card. It realizes much less than 35%.',
         ],
       },
     ],
     quiz: [
       { q: 'You put 20bb into the pot earlier. Should that make you more likely to call now?', options: ['Yes, to protect your investment', 'No, those chips are sunk'], answer: 1, explain: 'Only the future cost and the current pot matter.' },
-      { q: 'Which usually realises more of its equity?', options: ['A nut flush draw in position', 'A small pair out of position'], answer: 0, explain: 'Position and the ability to make strong hands increase realisation.' },
+      { q: 'Which usually realizes more of its equity?', options: ['A nut flush draw in position', 'A small pair out of position'], answer: 0, explain: 'Position and the ability to make strong hands increase realization.' },
     ],
   },
 
@@ -246,7 +246,7 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
       {
         heading: 'Why short-term results mislead',
         body: [
-          'In a single session, the cards you are dealt and how the board runs out dominate. A strong player who gets stacks in as an 80% favourite still loses one time in five. Over a few hundred hands, a handful of these spots can decide the whole result.',
+          'In a single session, the cards you are dealt and how the board runs out dominate. A strong player who gets stacks in as an 80% favorite still loses one time in five. Over a few hundred hands, a handful of these spots can decide the whole result.',
           'Skill shows up only as an average over many hands. That is why serious players track results over tens of thousands of hands, and why reviewing decisions is a much faster feedback loop than looking at profit.',
         ],
       },
@@ -266,7 +266,7 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
     ],
     examples: [
       {
-        title: 'A favourite loses',
+        title: 'A favorite loses',
         steps: [
           'You get all-in preflop with A♠ A♦ against K♣ K♥. You win about 82% of the time.',
           'If this happens five times, losing at least once is more likely than not: 1 − 0.82⁵ ≈ 63%.',
@@ -317,7 +317,7 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
           'The cutoff opens and you call on the button. Flop: J♠ 8♠ 3♦. The cutoff bets small.',
           'A small bet on this board comes from a wide range: overpairs, jacks, flush draws, straight draws and some air.',
           'Turn 2♣, the cutoff bets big. Weak air and some marginal hands give up; strong jacks, overpairs, sets and the best draws continue.',
-          'River K♦, the cutoff bets big again. Draws missed, so the range is now polarised: strong value (overpairs, sets, two pair, maybe AK) plus missed draws that decided to bluff.',
+          'River K♦, the cutoff bets big again. Draws missed, so the range is now polarized: strong value (overpairs, sets, two pair, maybe AK) plus missed draws that decided to bluff.',
         ],
       },
     ],

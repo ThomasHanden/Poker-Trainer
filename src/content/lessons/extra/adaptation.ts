@@ -227,8 +227,8 @@ export const ADAPTATION_X: Record<string, LessonExtra> = {
       {
         heading: 'What they are not',
         body: [
-          'They do not maximise profit against weak players. A strategy that never adjusts leaves money on the table against stations and nits. They also depend on the model: allowed bet sizes, rake, stacks and ranges. A chart solved for one setting can be quite wrong in another.',
-          'This app does not run a full solver. Its computed charts (push/fold) use a stated, simplified model, and the other charts are labelled illustrative.',
+          'They do not maximize profit against weak players. A strategy that never adjusts leaves money on the table against stations and nits. They also depend on the model: allowed bet sizes, rake, stacks and ranges. A chart solved for one setting can be quite wrong in another.',
+          'This app does not run a full solver. Its computed charts (push/fold) use a stated, simplified model, and the other charts are labeled illustrative.',
         ],
       },
     ],

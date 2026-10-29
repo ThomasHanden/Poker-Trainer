@@ -264,7 +264,7 @@ export const MATH: Lesson[] = [
     },
     mistakes: ['Applying river ratios on the flop (where hands have equity and future streets matter).', 'Assuming real opponents bluff at the balanced rate.'],
     math: { formulas: ['Bluff share = B / (P + 2B)', 'Value : bluff = (P + B) : B'], notes: ['P = pot before the bet, B = bet.'] },
-    assumptions: ['Polarised heads-up river with no card removal; strict simplification.'],
+    assumptions: ['Polarized heads-up river with no card removal; strict simplification.'],
     quiz: [{ q: 'Half-pot river bet: balanced bluff share?', options: ['20%', '25%', '33%'], answer: 1, explain: '0.5 / (1 + 1) = 25%.' }],
     practice: { label: 'River bluffing and bluff-catching', templates: ['rv-bluff-blockers', 'rv-bluff-catch'], concepts: ['bluff', 'bluff-catch'] },
     related: ['mdf', 'value-bluff-composition'],
@@ -273,12 +273,12 @@ export const MATH: Lesson[] = [
   {
     id: 'mdf',
     section: 'math',
-    title: 'Minimum defence frequency and its limitations',
+    title: 'Minimum defense frequency and its limitations',
     summary: 'pot / (pot + bet) is how much of your range must continue to stop any-two-cards bluffs — in a simplified model.',
     level: 'intermediate',
     format: 'both',
     plain: [
-      'If you fold too often, your opponent can profitably bet any two cards. Minimum defence frequency (MDF) = pot / (pot + bet) is the share of your range you must continue with to prevent that, in a simplified one-street model.',
+      'If you fold too often, your opponent can profitably bet any two cards. Minimum defense frequency (MDF) = pot / (pot + bet) is the share of your range you must continue with to prevent that, in a simplified one-street model.',
       'For a half-pot bet MDF is 67%; for a pot bet 50%; for a 2× overbet 33%.',
       'Limitations: MDF is a property of your whole range, not a rule for a single hand. It assumes a balanced opponent, ignores future streets (you can fold later), and ignores that your range may simply be weak on some boards. Against players who under-bluff, defending less is correct; against over-bluffers, defend more.',
     ],
@@ -302,7 +302,7 @@ export const MATH: Lesson[] = [
     id: 'equity-not-action',
     section: 'math',
     title: 'Why raw equity does not automatically determine the action',
-    summary: 'Equity is one input. Realisation, fold equity, position, stack depth and the opponent’s response matter as much.',
+    summary: 'Equity is one input. Realization, fold equity, position, stack depth and the opponent’s response matter as much.',
     level: 'advanced',
     format: 'both',
     plain: [

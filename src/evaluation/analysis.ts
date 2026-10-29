@@ -100,10 +100,10 @@ export function computeEquity(ctx: DecisionContext, samples: number, rng: Rng): 
   }
   if (ranges.length === 1) {
     const r = equityVsRange(ctx.hole, ranges[0], ctx.board, { samples, rng });
-    return { ...r, source: r.method === 'exact' ? 'exact enumeration vs modelled range' : 'Monte Carlo vs modelled range' };
+    return { ...r, source: r.method === 'exact' ? 'exact enumeration vs modeled range' : 'Monte Carlo vs modeled range' };
   }
   const r = equityMultiway(ctx.hole, ranges, ctx.board, Math.max(3000, samples / 2), rng);
-  return { ...r, source: 'Monte Carlo vs modelled ranges (multiway)' };
+  return { ...r, source: 'Monte Carlo vs modeled ranges (multiway)' };
 }
 
 // ---------------- Range composition ----------------
@@ -268,7 +268,7 @@ export interface RolloutResult {
 }
 
 /**
- * Estimate the EV of each candidate action against the modelled opponents:
+ * Estimate the EV of each candidate action against the modeled opponents:
  * opponents' hands are drawn from their inferred ranges, future cards are random (not the real
  * deck), opponents act by the policy with the shown profile, and the hero's later decisions are
  * made by the same baseline policy ("unknown" profile). Common random numbers across candidates.
