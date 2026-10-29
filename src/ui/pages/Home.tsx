@@ -191,8 +191,8 @@ function PuzzleGame({
         <h2 id="pz-title">{mode === 'daily' ? 'Five quick poker questions' : 'How long can you last?'}</h2>
         <p>
           {mode === 'daily'
-            ? 'Which hands to play, a bit of simple math, who wins the hand, and two surprises. Everyone gets the same five today.'
-            : `Questions keep coming until you get ${LIVES} wrong. Any kind of question can show up.`}
+            ? 'A preflop decision, some quick poker math, a hand to read and two surprises. Everyone gets the same five today.'
+            : `Questions keep coming until you miss ${LIVES}. Any puzzle type can show up.`}
         </p>
         <ul className="pz-rules">
           <li>
@@ -202,7 +202,7 @@ function PuzzleGame({
             up to <strong>+50</strong> more for answering fast
           </li>
           <li>
-            <strong>combo</strong> bonus for answers right in a row (up to double points)
+            a <strong>combo</strong> multiplier for answers in a row (up to ×2)
           </li>
         </ul>
         <button
