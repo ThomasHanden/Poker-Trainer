@@ -212,7 +212,7 @@ export const TOURNAMENT: Lesson[] = [
     why: ['Bounty formats are popular and change correct calling ranges a lot.'],
     example: { title: 'Calling a shove for a bounty', steps: ['Pot odds say you need 40% equity. Adding the bounty as extra pot money might reduce the requirement to 32% — if you cover the shover.'] },
     mistakes: ['Calling for bounties when you do not cover the opponent (you cannot win the bounty).', 'Ignoring ICM late in bounty events.'],
-    assumptions: ['The approximation ignores future bounty dynamics and ICM. This app does not include bounty scenarios (see Coverage).'],
+    assumptions: ['The approximation ignores future bounty dynamics and ICM. This app does not include bounty scenarios yet.'],
     quiz: [{ q: 'You can win an opponent’s bounty in an all-in only if…', options: ['You cover them', 'You are covered'], answer: 0, explain: 'You must be able to eliminate them.' }],
     practice: { label: 'Calling shoves (no bounty model yet)', templates: ['tr-bb-call-shove'], concepts: ['pot-odds'] },
     related: ['covering-stacks', 'pot-odds'],

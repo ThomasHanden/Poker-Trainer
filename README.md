@@ -34,7 +34,7 @@ npm run gen:equity -- 4000     # regenerate the preflop equity table (≈5 min)
 | **Learn** | 81 lessons in 9 sections covering the full requested curriculum, each with explanation, why it matters, worked example, mistakes, math, assumptions, knowledge check and practice link. Search, levels, optional study sequences, completion tracking. |
 | **Ranges** | 13×13 matrix: presets with stated assumptions (illustrative charts + computed push/fold), weighted painting, card removal, combo counts/percentages, “why is this hand here?”, save/load, import/export text, compare A vs B, equity calculator (exact or simulated with SE), five drills (opening range, river continue, value/bluff sorting, blockers, board advantage) with computed answers. |
 | **Progress** | Strengths/weaknesses by concept, street, position, difficulty (min-sample guard), trend chart with table view, suggested practice, assisted vs unassisted kept separate, export/import/reset. |
-| **Coverage / Method** | In-app coverage map (implemented / approximate / unsupported) and a full description of evaluation sources and limitations. |
+| **Evaluation notes** | Each review lists its assumptions and evaluation sources; full details in docs/EVALUATION.md and docs/COVERAGE.md. |
 
 ## Architecture
 

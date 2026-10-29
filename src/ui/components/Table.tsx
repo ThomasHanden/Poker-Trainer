@@ -41,79 +41,106 @@ export function Table({
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
   const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - state.players[hero].streetCommitted, state.players[hero].stack)) : 0;
   const me = state.players[hero];
+  // seat geometry: hero at the bottom, others evenly spaced clockwise
+  const geo = (i: number) => {
+    const rel = (i - hero + n) % n;
+    const ang = Math.PI / 2 + (rel * 2 * Math.PI) / n;
+    const cos = Math.cos(ang);
+    const sin = Math.sin(ang);
+    return {
+      seat: { left: `${50 + 47 * cos}%`, top: `${50 + 47 * sin}%` },
+      chip: { left: `${50 + 35 * cos}%`, top: `${50 + 31 * sin}%` },
+      button: { left: `${50 + 33 * Math.cos(ang - 0.38)}%`, top: `${50 + 30 * Math.sin(ang - 0.38)}%` },
+      low: sin > 0.35, // seat is in the lower part of the table: show cards above the plate
+    };
+  };
   return (
     <div className="table-wrap" aria-label="Poker table">
       <div className="felt">
+        <div className="felt-line" aria-hidden="true" />
         <div className="table-center">
+          <div className="pot-pill" aria-live="polite">
+            <Term id="pot">Pot</Term> <strong data-testid="pot">{fmtBB(totalPot, bb)}</strong>
+          </div>
           <div className="board" aria-label="Community cards">
             <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} />
           </div>
-          <div className="pot-line">
-            <span className="pot-main">
-              <Term id="pot">Pot</Term>: <strong data-testid="pot">{fmtBB(totalPot, bb)}</strong>
-            </span>
-            {streetBets > 0 && !state.complete && <span className="pot-sub">({fmtBB(potBefore, bb)} + {fmtBB(streetBets, bb)} in bets this street)</span>}
+          <div className="pot-sub">
+            {streetBets > 0 && !state.complete ? `${fmtBB(potBefore, bb)} in the middle + ${fmtBB(streetBets, bb)} bet this street` : '\u00a0'}
+            {state.config.anteType !== 'none' && state.config.ante > 0 && (
+              <span className="blinds-line">
+                Blinds {fmtBB(state.config.sb, bb)}/{fmtBB(state.config.bb, bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmtBB(state.config.ante, bb)}
+              </span>
+            )}
           </div>
-          {state.config.anteType !== 'none' && state.config.ante > 0 && (
-            <div className="blinds-line">
-              Blinds {fmtBB(state.config.sb, bb)}/{fmtBB(state.config.bb, bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'Ante'}</Term> {fmtBB(state.config.ante, bb)}
-            </div>
-          )}
         </div>
         {state.players.map((p, i) => {
-          const rel = (i - hero + n) % n; // 0 = hero (bottom)
-          const angle = Math.PI / 2 + (rel * 2 * Math.PI) / n;
-          const x = 50 + 44 * Math.cos(angle);
-          const y = 50 + 40 * Math.sin(angle);
+          const g = geo(i);
           const act = lastStreetAction(state, i);
           const isTurn = state.toAct === i && !state.complete;
           const show = p.isHero || showdown.has(i) || revealAll;
           const prof = profiles[i];
+          const cards =
+            p.folded ? null : p.hole.length === 2 && show ? (
+              <div className={`seat-cards ${p.isHero ? 'big' : ''}`}>
+                <PlayingCard card={p.hole[0]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
+                <PlayingCard card={p.hole[1]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
+              </div>
+            ) : (
+              <div className="seat-cards backs" aria-hidden="true">
+                <PlayingCard size="sm" />
+                <PlayingCard size="sm" />
+              </div>
+            );
           return (
-            <div
-              key={i}
-              className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''}`}
-              style={{ left: `${x}%`, top: `${y}%` }}
-              aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmtBB(p.stack, bb)}`}
-            >
-              <div className="seat-cards">
-                {p.folded ? null : p.hole.length === 2 && show ? (
-                  <>
-                    <PlayingCard card={p.hole[0]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
-                    <PlayingCard card={p.hole[1]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
-                  </>
-                ) : (
-                  <>
-                    <PlayingCard size="sm" />
-                    <PlayingCard size="sm" />
-                  </>
-                )}
+            <div key={i}>
+              <div
+                className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''} ${g.low ? 'low' : 'high'}`}
+                style={g.seat}
+                aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmtBB(p.stack, bb)}`}
+              >
+                {g.low && cards}
+                <div className="plate">
+                  <span className="plate-pos">
+                    {p.position}
+                    {p.isHero ? ' · You' : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
+                  </span>
+                  <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
+                </div>
+                {!g.low && cards}
+                {act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>}
+                {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
               </div>
-              <div className="seat-info">
-                <span className="pos-badge">{p.position}</span>
-                {i === state.buttonIndex && <span className="dealer-btn" title="Dealer button">D</span>}
-                <span className="seat-name">{p.isHero ? 'You' : prof ? PROFILES[prof].short : ''}</span>
-                <span className="seat-stack">{fmtBB(p.stack, bb)}</span>
-                {p.allIn && <span className="tag allin">ALL-IN</span>}
-                {p.folded && <span className="tag">folded</span>}
-              </div>
-              {act && !state.complete && <div className={`seat-action a-${act.type}`}>{ACTION_WORD[act.type] ?? act.type}{act.allIn ? ' all-in' : ''}</div>}
-              {p.streetCommitted > 0 && !state.complete && <div className="bet-chip" aria-label={`committed ${fmtBB(p.streetCommitted, bb)} this street`}>{fmtBB(p.streetCommitted, bb)}</div>}
-              {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
+              {p.streetCommitted > 0 && !state.complete && (
+                <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmtBB(p.streetCommitted, bb)}`}>
+                  <span className="chip-dot" aria-hidden="true" />
+                  {act && (act.type === 'bet' || act.type === 'raise') ? `${ACTION_WORD[act.type]} ` : ''}
+                  {fmtBB(p.streetCommitted, bb)}
+                </div>
+              )}
+              {i === state.buttonIndex && (
+                <div className="dealer-btn" style={g.button} title="Dealer button">
+                  D
+                </div>
+              )}
             </div>
           );
         })}
       </div>
       <div className="table-facts" aria-live="polite">
-        <span>
-          <Term id="effective">Effective stack</Term>: <strong>{fmtBB(effectiveStack(state, hero), bb)}</strong>
-        </span>
         {!state.complete && state.toAct === hero && (
           <span>
-            <Term id="tocall">To call</Term>: <strong data-testid="to-call">{fmtBB(toCall, bb)}</strong>
+            <Term id="tocall">To call</Term> <strong data-testid="to-call">{fmtBB(toCall, bb)}</strong>
           </span>
         )}
-        {me.hole.length === 2 && state.board.length >= 3 && <span>You have: <strong>{describeHolding(me.hole, state.board)}</strong></span>}
+        <span>
+          <Term id="effective">Effective</Term> <strong>{fmtBB(effectiveStack(state, hero), bb)}</strong>
+        </span>
+        {me.hole.length === 2 && state.board.length >= 3 && (
+          <span>
+            You have <strong>{describeHolding(me.hole, state.board)}</strong>
+          </span>
+        )}
       </div>
     </div>
   );

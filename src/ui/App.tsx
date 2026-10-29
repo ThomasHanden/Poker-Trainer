@@ -6,9 +6,7 @@ import { LearnPage, LessonPage } from './pages/Learn';
 import { RangesPage } from './pages/Ranges';
 import { ReviewListPage, ReviewDetailPage } from './pages/Review';
 import { ProgressPage } from './pages/Progress';
-import { CoveragePage } from './pages/Coverage';
 import { HomePage } from './pages/Home';
-import { MethodPage } from './pages/Method';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -79,18 +77,12 @@ function Shell() {
             <Route path="/review" element={<ReviewListPage />} />
             <Route path="/review/:id" element={<ReviewDetailPage />} />
             <Route path="/progress" element={<ProgressPage />} />
-            <Route path="/coverage" element={<CoveragePage />} />
-            <Route path="/method" element={<MethodPage />} />
             <Route path="*" element={<div className="page"><h1>Not found</h1><Link to="/">Home</Link></div>} />
           </Routes>
         </ErrorBoundary>
       </main>
       <footer className="footer">
-        <span>Recommendations are instructional — heuristics, illustrative charts, exact math and simulations against a stated opponent model — not solver output.</span>
-        <span className="footer-links">
-          <Link to="/method">How evaluation works</Link>
-          <Link to="/coverage">Coverage map</Link>
-        </span>
+        <span>Scores are instructional assessments — not solver output. Your progress is stored only in this browser.</span>
       </footer>
     </>
   );

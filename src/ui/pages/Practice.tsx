@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { run } from '../../workers/client';
 import { GenerateResult } from '../../scenarios/generator';
@@ -81,6 +81,10 @@ export function PracticePage() {
         decisionStart.current = Date.now();
         if (st.state.complete) await finish(st);
         else setPhase('playing');
+        // on small screens, bring the whole table into view
+        if (window.matchMedia('(max-width: 680px)').matches) {
+          requestAnimationFrame(() => document.querySelector('.scenario-head')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+        }
       } catch (e) {
         setError({ msg: (e as Error).message });
         setPhase('error');
@@ -91,11 +95,13 @@ export function PracticePage() {
   );
 
   // auto-start from home page / lesson links
-  const autoStarted = useRef(false);
+  const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    if (autoStarted.current) return;
+    const key = params.toString();
+    if (autoStarted.current === key) return;
     if (params.get('start') === '1' || params.get('template') || params.get('concept')) {
-      autoStarted.current = true;
+      autoStarted.current = key;
+      autoSeedUsed.current = false;
       begin();
     }
   }, [params, begin]);
@@ -269,9 +275,6 @@ export function PracticePage() {
               ))}
             </ul>
           )}
-          <p>
-            See the <Link to="/coverage">coverage map</Link> for supported combinations.
-          </p>
         </div>
       )}
       {phase === 'loading' && <div className="loading" role="status">Generating a fresh scenario…</div>}

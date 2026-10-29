@@ -1,6 +1,6 @@
 # Coverage map
 
-The authoritative, always-current coverage map is generated in the app at **#/coverage** from the template metadata, lesson index and `src/content/coverage.ts`.
+Template metadata (supported formats, seats, stacks, streets, difficulties) lives on each template in `src/scenarios/templates/`; the app reports unsupported settings combinations instead of generating misleading scenarios.
 
 Summary:
 - **Implemented**: NLHE rules incl. side pots and TDA-style reopening; 37 scenario templates across preflop/flop/turn/river, cash and tournament (push/fold, re-shove, bubble ICM, final-table ICM); guided and assessment modes; reviews; 81 lessons covering every requested curriculum item; range explorer with drills; progress dashboard; persistence with export/import/reset.

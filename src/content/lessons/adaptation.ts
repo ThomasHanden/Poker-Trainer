@@ -11,7 +11,7 @@ export const ADAPTATION: Lesson[] = [
     plain: [
       'Tight players play few hands; loose players play many. Passive players check and call; aggressive players bet and raise.',
       'Combining them gives familiar types: tight-aggressive (TAG, solid regulars), loose-aggressive (LAG, lots of pressure), tight-passive (nits), loose-passive (calling stations).',
-      'This app’s simulated opponents use these profiles. Their exact parameters are documented in the Coverage page, and reviews explain how the recommendation would change against each type.',
+      'This app’s simulated opponents use these profiles. You can pick one in the practice settings, and reviews explain how the recommendation would change against each type.',
     ],
     why: ['Identifying tendencies tells you which exploits are available.'],
     example: { title: 'Same bet, different meaning', steps: ['A river check-raise from a nit is almost always the nuts. From a LAG it may be a bluff a meaningful part of the time.'] },
