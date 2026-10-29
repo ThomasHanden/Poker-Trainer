@@ -1,0 +1,150 @@
+// Heads-up push/fold equilibrium (small blind shoves or folds; big blind calls or folds).
+// Solved by fictitious play on the 169-class model using the precomputed preflop equity table.
+// Assumptions: equal effective stacks S (in bb, including blinds/antes posted), no limping, no
+// raising smaller than all-in, chip-EV only (no ICM), class-averaged equities. Results approximate
+// the known Nash push/fold charts; small differences come from Monte Carlo noise in the table and
+// from convergence tolerance.
+
+import { ALL_CLASSES, HandClass, Range, emptyRange } from './hands';
+import { classEquity, compatiblePairs } from './preflopEquity';
+import type { Chart } from './presets';
+
+export interface PushFoldSolution {
+  stackBB: number;
+  bbAnte: number;
+  shove: Range;
+  call: Range;
+  iterations: number;
+}
+
+const cache = new Map<string, PushFoldSolution>();
+
+export function solvePushFold(stackBB: number, bbAnte = 0, iterations = 300): PushFoldSolution {
+  const key = `${stackBB}:${bbAnte}:${iterations}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const S = stackBB;
+  const classes = ALL_CLASSES;
+  const n = classes.length;
+  const E: number[][] = classes.map((a) => classes.map((b) => classEquity(a, b)));
+  const C: number[][] = classes.map((a) => classes.map((b) => compatiblePairs(a, b)));
+  const totalC = C.map((row) => row.reduce((x, y) => x + y, 0));
+  // average strategies (fictitious play)
+  const shoveAvg = new Array(n).fill(1);
+  const callAvg = new Array(n).fill(0.5);
+  const sbFoldEV = S - 0.5;
+  const sbStealEV = S + 1 + bbAnte;
+  const bbFoldEV = S - 1 - bbAnte;
+  for (let t = 1; t <= iterations; t++) {
+    // BB best response to shoveAvg
+    const callBR = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      let num = 0;
+      let den = 0;
+      for (let i = 0; i < n; i++) {
+        const w = shoveAvg[i] * C[i][j];
+        if (!w) continue;
+        num += w * E[j][i];
+        den += w;
+      }
+      const eq = den ? num / den : 0;
+      callBR[j] = eq * 2 * S > bbFoldEV ? 1 : 0;
+    }
+    // SB best response to callAvg
+    const shoveBR = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      let pCallNum = 0;
+      let eqNum = 0;
+      for (let j = 0; j < n; j++) {
+        const w = callAvg[j] * C[i][j];
+        if (!w) continue;
+        pCallNum += w;
+        eqNum += w * E[i][j];
+      }
+      const pCall = pCallNum / totalC[i];
+      const eqCalled = pCallNum ? eqNum / pCallNum : 0;
+      const ev = (1 - pCall) * sbStealEV + pCall * eqCalled * 2 * S;
+      shoveBR[i] = ev > sbFoldEV ? 1 : 0;
+    }
+    const a = 1 / (t + 1);
+    for (let i = 0; i < n; i++) {
+      shoveAvg[i] += a * (shoveBR[i] - shoveAvg[i]);
+      callAvg[i] += a * (callBR[i] - callAvg[i]);
+    }
+  }
+  const shove = emptyRange();
+  const call = emptyRange();
+  classes.forEach((h, i) => {
+    shove[h] = roundFreq(shoveAvg[i]);
+    call[h] = roundFreq(callAvg[i]);
+  });
+  const sol = { stackBB, bbAnte, shove, call, iterations };
+  cache.set(key, sol);
+  return sol;
+}
+
+function roundFreq(x: number): number {
+  if (x > 0.93) return 1;
+  if (x < 0.07) return 0;
+  return Math.round(x * 4) / 4;
+}
+
+export const PUSHFOLD_STACKS = [6, 8, 10, 12, 15, 20];
+
+const assumptionsFor = (S: number, ante: number) => [
+  `Heads-up (or folded to the small blind), ${S}bb effective stacks${ante ? `, big-blind ante of ${ante}bb` : ', no antes'}.`,
+  'Small blind may only shove or fold; big blind may only call or fold.',
+  'Chip EV only: no ICM, no payout pressure.',
+  'Equities from this app’s Monte Carlo preflop table (class-averaged), solved by fictitious play. Mixed frequencies are rounded to quarters.',
+  'Computed by this app; close to, but not a substitute for, a dedicated equilibrium solver.',
+];
+
+export function computedPushFoldCharts(): Chart[] {
+  const out: Chart[] = [];
+  for (const ante of [0, 1]) {
+    for (const S of PUSHFOLD_STACKS) {
+      const sol = solvePushFold(S, ante);
+      out.push({
+        id: `pf-sb-shove-${S}${ante ? '-ante' : ''}`,
+        name: `SB shove ${S}bb${ante ? ' (BB ante)' : ''}`,
+        group: 'pushfold',
+        format: 'tournament',
+        tableSize: 2,
+        position: 'SB',
+        vsPosition: 'BB',
+        stackBB: S,
+        priorAction: 'Folded to the small blind (or heads-up).',
+        sizing: 'All-in.',
+        assumptions: assumptionsFor(S, ante),
+        confidence: 'computed',
+        raise: sol.shove,
+        call: emptyRange(),
+        raiseLabel: 'Shove',
+      });
+      out.push({
+        id: `pf-bb-call-${S}${ante ? '-ante' : ''}`,
+        name: `BB call vs SB shove ${S}bb${ante ? ' (BB ante)' : ''}`,
+        group: 'call-shove',
+        format: 'tournament',
+        tableSize: 2,
+        position: 'BB',
+        vsPosition: 'SB',
+        stackBB: S,
+        priorAction: 'Small blind shoves all-in.',
+        sizing: 'Call all-in.',
+        assumptions: assumptionsFor(S, ante),
+        confidence: 'computed',
+        raise: emptyRange(),
+        call: sol.call,
+        raiseLabel: 'Raise',
+        callLabel: 'Call',
+      });
+    }
+  }
+  return out;
+}
+
+export function pushFoldShoveFreq(S: number, h: HandClass, ante = 0): number {
+  const st = PUSHFOLD_STACKS.reduce((a, b) => (Math.abs(b - S) < Math.abs(a - S) ? b : a));
+  return solvePushFold(st, ante).shove[h];
+}
