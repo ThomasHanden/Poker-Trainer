@@ -76,9 +76,9 @@ test('illegal amounts are rejected in the sizing UI', async ({ page }) => {
   await page.locator('.btn.act.raise').click();
   await page.locator('#bet-amount').fill('0.5');
   await expect(page.locator('#sizing-help .error')).toBeVisible();
-  await expect(page.locator('.amount-row .btn.primary')).toBeDisabled();
-  await page.locator('.chip.allin').click();
-  await expect(page.locator('.amount-row .btn.primary')).toBeEnabled();
+  await expect(page.locator('.sizing-confirm')).toBeDisabled();
+  await page.locator('.size-preset.allin').click();
+  await expect(page.locator('.sizing-confirm')).toBeEnabled();
 });
 
 test('unsupported settings are explained, not generated', async ({ page }) => {

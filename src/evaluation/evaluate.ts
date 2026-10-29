@@ -145,11 +145,63 @@ function genericGuidance(ctx: DecisionContext): Guidance {
       source: 'chart',
       plausibleRanges: rangeText(ctx),
       math: equityMath(ctx),
-      sizing: ctx.la.canRaise ? { preferred: [2.2, 4.5], acceptable: [2, 6], note: 'Standard re-raise sizes are about 3x in position and 4x out of position (larger with callers).', unit: 'x-raise' } : undefined,
+      sizing: !ctx.la.canRaise
+        ? undefined
+        : ctx.state.currentBet <= ctx.bb
+          ? { preferred: ctx.state.players[ctx.hero].position === 'SB' ? [2.5, 3.5] : [2, 3], acceptable: [1.8, 4.5], note: 'Standard opens are 2–3bb (about 3bb from the small blind), plus about 1bb for each limper.', unit: 'bb-to' }
+          : ctx.inPosition
+            ? { preferred: [2.5, 3.5], acceptable: [2.2, 4.5], note: 'In position, re-raises are usually about 3x the previous raise.', unit: 'x-raise' }
+            : { preferred: [3.5, 4.5], acceptable: [3, 5.5], note: 'Out of position, re-raises are usually about 4x the previous raise.', unit: 'x-raise' },
     };
   }
   if (ctx.toCall > 0) return facingBetGuidance(ctx);
   return bettingGuidance(ctx, { bluffOk: ctx.inPosition });
+}
+
+// ---------------- concrete recommended size ----------------
+
+const STD_FRACTIONS = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.25, 1.5, 2];
+
+/** Turn the guidance's preferred sizing band into an exact amount, e.g. "Raise to 2.5bb" or "Bet 4.5bb (66% pot)". */
+function recommendedSize(ctx: DecisionContext, k: 'bet' | 'raise', g: Guidance, rollouts: RolloutResult[]): string | undefined {
+  const la = ctx.la;
+  const bb = ctx.bb;
+  let to: number | undefined;
+  let note = '';
+  if (g.sizing) {
+    const [lo, hi] = g.sizing.preferred;
+    const mid = (lo + hi) / 2;
+    const unit = g.sizing.unit ?? 'pot';
+    if (unit === 'pot') {
+      const inBand = STD_FRACTIONS.filter((f) => f >= lo - 1e-9 && f <= hi + 1e-9);
+      const f = inBand.length ? inBand.reduce((a, b) => (Math.abs(b - mid) < Math.abs(a - mid) ? b : a)) : Math.round(mid * 100) / 100;
+      to = potFractionTo(ctx.state, f);
+      note = `${Math.round(f * 100)}% pot`;
+    } else if (unit === 'bb-to') {
+      to = Math.round(mid * 2) * (bb / 2);
+    } else {
+      const m = Math.round(mid * 2) / 2;
+      to = Math.round(m * ctx.state.currentBet);
+      note = `${m}x`;
+    }
+  } else {
+    const rs = rollouts.filter((r) => r.action.type === k && r.label !== 'Your action' && r.action.to !== undefined);
+    const top = rs.length ? rs.reduce((a, b) => (b.ev > a.ev ? b : a)) : undefined;
+    if (top) {
+      to = top.action.to!;
+      const m = /(\d+)%/.exec(top.label);
+      if (m) note = `${m[1]}% pot`;
+    }
+  }
+  // preflop re-raises with short stacks (or facing big raises) are shoves
+  if (to === undefined && ctx.street === 'preflop' && (ctx.effectiveBB <= 25 || ctx.state.currentBet >= 0.2 * la.maxTo)) to = la.maxTo;
+  if (to === undefined) return undefined;
+  // readable amounts: nearest quarter big blind
+  to = Math.round(to / (bb / 4)) * (bb / 4);
+  to = Math.max(la.minTo, Math.min(la.maxTo, to));
+  if (to >= la.maxTo) return `All-in (${bbStr(la.maxTo, bb)})`;
+  if (note.endsWith('% pot')) note = `${Math.round(betSizeFraction(ctx, to) * 100)}% pot`;
+  return `${k === 'bet' ? 'Bet' : 'Raise to'} ${bbStr(to, bb)}${note ? ` (${note})` : ''}`;
 }
 
 // ---------------- candidates for model EV ----------------
@@ -320,7 +372,9 @@ export function evaluateDecision(sc: Scenario, rec: DecisionRecord, opts: EvalOp
   const alternatives: AltEval[] = altKeys.map((k) => {
     const rs = rollouts.filter((r) => r.action.type === k && r.label !== 'Your action');
     const top = rs.length ? rs.reduce((a, b) => (b.ev > a.ev ? b : a)) : undefined;
-    return { key: k, label: top?.label ?? k[0].toUpperCase() + k.slice(1), rating: g.ratings[k], evBB: top ? top.ev / bb : undefined, seBB: top ? top.se / bb : undefined };
+    const sized = k === 'bet' || k === 'raise' ? recommendedSize(ctx, k, g, rollouts) : undefined;
+    const plain = k === 'call' ? `Call ${bbStr(ctx.toCall, bb)}` : k[0].toUpperCase() + k.slice(1);
+    return { key: k, label: sized ?? (k === 'bet' || k === 'raise' ? top?.label ?? plain : plain), rating: g.ratings[k], evBB: top ? top.ev / bb : undefined, seBB: top ? top.se / bb : undefined };
   });
   const preferredKeys = (Object.keys(g.ratings) as ActionKey[]).filter((k) => g.ratings[k] === 'preferred');
   const mixedKeys = (Object.keys(g.ratings) as ActionKey[]).filter((k) => g.ratings[k] === 'mixed' || g.ratings[k] === 'acceptable');
