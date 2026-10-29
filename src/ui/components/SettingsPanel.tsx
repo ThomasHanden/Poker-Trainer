@@ -9,7 +9,7 @@ const DIFF_HELP: Record<string, string> = {
   beginner: 'Clearer spots, mostly baseline opponents, full help available.',
   intermediate: 'More borderline hands and some opponent tendencies.',
   advanced: 'Ambiguous hands, varied opponents, multiway and 3-bet pots.',
-  expert: 'Thin, mixed spots; opponent tendencies hidden (shown as Unknown) unless you choose one.',
+  expert: 'Thin, mixed spots; opponent tendencies hidden (shown as Unknown) unless you choose one; no equity help in guided mode.',
 };
 
 export function SettingsPanel({ settings, onChange }: { settings: PracticeSettings; onChange: (s: PracticeSettings) => void }) {

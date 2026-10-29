@@ -305,7 +305,8 @@ export function PracticePage() {
                       Show pot odds
                     </button>
                   )}
-                  {sc.settings.assists.equity && (
+                  {sc.settings.assists.equity && sc.difficulty === 'expert' && <span className="note">Equity help is not offered at expert difficulty.</span>}
+                  {sc.settings.assists.equity && sc.difficulty !== 'expert' && (
                     <button className="btn" onClick={() => requestHelp('equity')} disabled={helpLoading}>
                       {helpLoading ? 'Calculating…' : 'Equity vs modelled range'}
                     </button>
