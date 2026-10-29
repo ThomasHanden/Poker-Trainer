@@ -89,7 +89,7 @@ export function HomePage() {
           <h2 id="sb-title">Personal bests</h2>
           <dl className="sb-stats">
             <div>
-              <dt>Today</dt>
+              <dt>Daily five</dt>
               <dd>{dailyRun ? dailyRun.points : '—'}</dd>
             </div>
             <div>
