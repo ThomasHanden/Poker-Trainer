@@ -4,7 +4,7 @@
 import { Card, Rng, createRng, hashString, fullDeck, cardToString } from '../engine/cards';
 import { compareHands, describeScore, evaluate, categoryOf, HandCategory } from '../engine/evaluator';
 import { getChart, chartFreq, chartPlayRange } from '../ranges/presets';
-import { ALL_CLASSES, HandClass, combosOf, describeClass, rangePercent } from '../ranges/hands';
+import { ALL_CLASSES, HandClass, combosOf, rangePercent } from '../ranges/hands';
 import { preflopRanking } from '../ranges/preflopEquity';
 
 export interface Puzzle {
@@ -21,9 +21,26 @@ export interface Puzzle {
   lesson: string;
 }
 
-const lower = (t: string) => t[0].toLowerCase() + t.slice(1);
+const lower = (t: string) => {
+  const l = t[0].toLowerCase() + t.slice(1);
+  return /^(pair|flush|straight|full house|royal)/.test(l) ? `a ${l}` : l;
+};
 const pct = (x: number) => `${Math.round(x * 100)}%`;
-const bbs = (x: number) => `${+x.toFixed(1)}bb`;
+const SUIT_SYM = ['♣', '♦', '♥', '♠'];
+const prettyCard = (c: Card) => `${cardToString(c)[0] === 'T' ? '10' : cardToString(c)[0]}${SUIT_SYM[c & 3]}`;
+const chips = (x: number) => `${+x.toFixed(1)} chips`;
+const RANK_WORD: Record<string, string> = { A: 'Ace', K: 'King', Q: 'Queen', J: 'Jack', T: '10' };
+const rankWord = (r: string) => RANK_WORD[r] ?? r;
+const RANK_PLURAL: Record<string, string> = { A: 'Aces', K: 'Kings', Q: 'Queens', J: 'Jacks', T: 'Tens', '9': 'Nines', '8': 'Eights', '7': 'Sevens', '6': 'Sixes', '5': 'Fives', '4': 'Fours', '3': 'Threes', '2': 'Twos' };
+const rankPlural = (r: string) => RANK_PLURAL[r] ?? `${r}s`;
+/** "Queen-6 suited" → plain words for a starting hand. */
+const handWords = (h: HandClass) => (h[0] === h[1] ? `a pair of ${rankPlural(h[0])}` : `${rankWord(h[0])}-${rankWord(h[1])}${h[2] === 's' ? ' of the same suit' : ''}`);
+const SEAT_WORDS: Record<string, string> = {
+  UTG: 'first to act, with five players still to come after you',
+  HJ: 'in the middle of the table, with four players still to come',
+  CO: 'one seat before the dealer, with three players still to come',
+  BTN: 'on the dealer button, the best seat, with only the two blinds left',
+};
 
 function shuffleOptions(rng: Rng, correct: string, wrong: string[]): { options: string[]; answer: number } {
   const w = [...new Set(wrong)].filter((x) => x !== correct).slice(0, 3);
@@ -35,7 +52,8 @@ function shuffleOptions(rng: Rng, correct: string, wrong: string[]): { options: 
 function percentDistractors(correct: number, mistakes: number[]): string[] {
   const c = pct(correct);
   const out: string[] = [];
-  for (const m of [...mistakes, correct + 0.08, correct - 0.07, correct + 0.15, correct - 0.12, correct + 0.22]) {
+  // skip "mistakes" so far off that nobody would pick them
+  for (const m of [...mistakes.filter((x) => x <= 0.8), correct + 0.08, correct - 0.07, correct + 0.15, correct - 0.12, correct + 0.22]) {
     const v = pct(Math.min(0.95, Math.max(0.03, m)));
     if (v !== c && !out.includes(v)) out.push(v);
     if (out.length === 3) break;
@@ -68,12 +86,12 @@ function openPuzzle(rng: Rng, id: string): Puzzle {
   return {
     id,
     kind: 'open',
-    topic: 'Preflop',
-    prompt: `6-max cash, 100bb. Everyone folds to you in the ${pos}. Open-raise or fold?`,
+    topic: 'Starting hands',
+    prompt: `Six players at the table. Everyone before you folded. You are ${SEAT_WORDS[pos]}. Do you raise or fold this hand?`,
     hero: holdingFor(rng, h),
     options: ['Raise', 'Fold'],
     answer: opens ? 0 : 1,
-    explain: `The baseline ${pos} chart ${opens ? 'opens' : 'folds'} ${describeClass(h)} (${h}). From the ${pos} it opens about ${share}% of hands${pos === 'UTG' ? ', the tightest seat because five players still act behind you' : pos === 'BTN' ? ', the widest seat because only the blinds are left' : ''}.`,
+    explain: `${opens ? 'Raise' : 'Fold'}. From this seat a good player plays about ${share}% of hands, and ${handWords(h)} ${opens ? 'is good enough' : 'is not good enough'}. ${pos === 'UTG' ? 'With so many players still to act, someone often has a strong hand, so you play tight.' : pos === 'BTN' ? 'Only two players are left and you act last after the flop, so you can play lots of hands.' : 'The fewer players left behind you, the more hands you can play.'}`,
     lesson: 'opening-ranges',
   };
 }
@@ -88,7 +106,7 @@ function potOddsPuzzle(rng: Rng, id: string): Puzzle {
     ['the size of the pot', 1],
     ['twice the pot', 2],
   ] as [string, number][]);
-  const bet = Math.round(pot * f * 2) / 2;
+  const bet = Math.max(1, Math.round(pot * f));
   const need = bet / (pot + 2 * bet);
   const correct = pct(need);
   // typical mistakes: bet ÷ (pot + bet) and bet ÷ pot
@@ -96,11 +114,11 @@ function potOddsPuzzle(rng: Rng, id: string): Puzzle {
   return {
     id,
     kind: 'potodds',
-    topic: 'Pot odds',
-    prompt: `River. The pot is ${bbs(pot)} and your opponent bets ${bbs(bet)} (${label}). What equity do you need to call?`,
+    topic: 'Calling math',
+    prompt: `All the cards are out. There are ${chips(pot)} in the pot and your opponent bets ${chips(bet)} (${label}). To make calling worth it, how often do you need to win?`,
     options,
     answer,
-    explain: `You call ${bbs(bet)} to win a final pot of ${bbs(pot)} + ${bbs(bet)} + ${bbs(bet)} = ${bbs(pot + 2 * bet)}. Required equity = ${bbs(bet)} ÷ ${bbs(pot + 2 * bet)} ≈ ${correct}.`,
+    explain: `You pay ${bet} to win a total pot of ${pot + 2 * bet} (the ${pot} already there, their ${bet} and your ${bet}). ${bet} out of ${pot + 2 * bet} is about ${correct}, so you need to win at least that often for the call to pay off.`,
     lesson: 'pot-odds',
   };
 }
@@ -122,14 +140,14 @@ function showdownPuzzle(rng: Rng, id: string): Puzzle {
     return {
       id,
       kind: 'showdown',
-      topic: 'Hand reading',
-      prompt: 'Showdown. Who wins the pot?',
+      topic: 'Who wins?',
+      prompt: 'All five shared cards are out and both players show their hands. Who wins?',
       hero,
       villain,
       board,
       options: ['You', 'Opponent', 'Split pot'],
       answer,
-      explain: `You have ${lower(catH)}; your opponent has ${lower(catV)}. ${answer === 2 ? 'Your best five cards are the same, so the pot is split.' : categoryOf(hs) === categoryOf(vs) ? `Same type of hand, so the higher cards decide: ${answer === 0 ? 'yours' : 'theirs'} win.` : `${answer === 0 ? 'Your' : 'Their'} hand ranks higher.`}`,
+      explain: `You have ${lower(catH)}. Your opponent has ${lower(catV)}. ${answer === 2 ? 'Your best five cards are the same, so you split the pot.' : categoryOf(hs) === categoryOf(vs) ? `You both have the same kind of hand, so the higher cards win: ${answer === 0 ? 'yours' : 'theirs'}.` : `${answer === 0 ? 'Your' : 'Their'} kind of hand beats ${answer === 0 ? 'theirs' : 'yours'}.`}`,
       lesson: 'rules-rankings',
     };
   }
@@ -155,16 +173,23 @@ function combosPuzzle(rng: Rng, id: string): Puzzle {
   const full = all.length;
   const wrong = [...new Set([full, n + 3, Math.max(1, n - 3), n * 2, n + 1, n + 6].filter((x) => x !== n && x > 0))].slice(0, 3).map(String);
   const { options, answer } = shuffleOptions(rng, String(n), wrong);
-  const name = h[0] === h[1] ? `pocket ${h[0] === 'T' ? '10' : h[0]}s (${h})` : `${h} (any suits)`;
+  const left = (r: string) => 4 - hero.filter((c) => cardToString(c)[0] === r).length;
+  const name = h[0] === h[1] ? `a pair of ${rankPlural(h[0])}` : `a ${rankWord(h[0])} and a ${rankWord(h[1])}`;
+  const why =
+    h[0] === h[1]
+      ? left(h[0]) === 4
+        ? `There are four ${rankPlural(h[0])} in the deck, which can be paired up 6 different ways. You hold none of them, so all 6 are possible.`
+        : `Normally the four ${rankPlural(h[0])} can be paired up 6 ways. You hold ${4 - left(h[0])} of them, so only ${left(h[0])} are left, and those can be paired up ${n} way${n === 1 ? '' : 's'}.`
+      : `Any of the ${left(h[0])} ${rankPlural(h[0])} left can go with any of the ${left(h[1])} ${rankPlural(h[1])} left: ${left(h[0])} × ${left(h[1])} = ${n}.${left(h[0]) + left(h[1]) < 8 ? ' Your cards took some away; with a full deck it would be 4 × 4 = 16.' : ''}`;
   return {
     id,
     kind: 'combos',
-    topic: 'Combinatorics',
-    prompt: `You hold these two cards. How many combinations of ${name} can your opponent have?`,
+    topic: 'Counting hands',
+    prompt: `You hold these two cards. In how many different ways could your opponent be holding ${name}?`,
     hero,
     options,
     answer,
-    explain: `${h} has ${full} combinations in a full deck (${h[0] === h[1] ? '6 for a pair' : '16 for two different ranks'}). Removing every combination that uses one of your cards leaves ${n}.`,
+    explain: why,
     lesson: 'combinatorics',
   };
 }
@@ -172,7 +197,7 @@ function combosPuzzle(rng: Rng, id: string): Puzzle {
 function bluffPuzzle(rng: Rng, id: string): Puzzle {
   const pot = rng.pick([8, 10, 12, 16, 20, 30]);
   const f = rng.pick([1 / 3, 1 / 2, 2 / 3, 3 / 4, 1, 1.5]);
-  const bet = Math.round(pot * f * 2) / 2;
+  const bet = Math.max(1, Math.round(pot * f));
   const need = bet / (pot + bet);
   const correct = pct(need);
   // typical mistakes: the caller's price, and "a bluff must work half the time"
@@ -180,11 +205,11 @@ function bluffPuzzle(rng: Rng, id: string): Puzzle {
   return {
     id,
     kind: 'bluff',
-    topic: 'Bluffing math',
-    prompt: `River, the pot is ${bbs(pot)}. You bluff ${bbs(bet)} with a hand that cannot win at showdown. How often must your opponent fold for the bluff to break even?`,
+    topic: 'Bluffing',
+    prompt: `All the cards are out and your hand is too weak to win. There are ${chips(pot)} in the pot. You bet ${chips(bet)} to try to make your opponent give up. How often must they fold for this to pay off?`,
     options,
     answer,
-    explain: `You risk ${bbs(bet)} to win ${bbs(pot)}. Break-even fold rate = ${bbs(bet)} ÷ (${bbs(pot)} + ${bbs(bet)}) ≈ ${correct}.`,
+    explain: `You risk ${bet} to win the ${pot} in the pot. ${bet} out of ${bet + pot} (what you risk plus what you win) is about ${correct}, so they need to fold at least that often.`,
     lesson: 'break-even-equity',
   };
 }
@@ -197,12 +222,12 @@ function shovePuzzle(rng: Rng, id: string): Puzzle {
   return {
     id,
     kind: 'shove',
-    topic: 'Push/fold',
-    prompt: `Tournament, heads-up against the big blind. You are in the small blind with ${stack}bb and it is your decision. Shove all-in or fold?`,
+    topic: 'All-in or fold',
+    prompt: `Tournament, just you and one opponent. You have only ${stack} big blinds left, and you act first. Go all-in or fold?`,
     hero: holdingFor(rng, h),
-    options: ['Shove', 'Fold'],
+    options: ['All-in', 'Fold'],
     answer: shove ? 0 : 1,
-    explain: `The computed push/fold chart for ${stack}bb ${shove ? 'shoves' : 'folds'} ${describeClass(h)} (${h}). At this depth it shoves about ${rangePercent(chart.raise).toFixed(0)}% of hands, because the blinds are worth winning and the big blind cannot call wide.`,
+    explain: `${shove ? 'Go all-in' : 'Fold'}. With ${stack} big blinds, the best strategy goes all-in with about ${rangePercent(chart.raise).toFixed(0)}% of hands, and ${handWords(h)} ${shove ? 'is one of them' : 'is not'}. Going all-in often works because your opponent has to fold most of their hands.`,
     lesson: 'push-fold',
   };
 }
@@ -220,19 +245,19 @@ function outsPuzzle(rng: Rng, id: string): Puzzle {
     const flushOuts = outs.filter((c) => categoryOf(evaluate([...hero, ...board, c])) === HandCategory.Flush || categoryOf(evaluate([...hero, ...board, c])) === HandCategory.StraightFlush).length;
     const n = outs.length;
     if (n < 4 || n > 15) continue;
-    const kind = flushOuts >= 9 && n > flushOuts ? 'a flush draw and a straight draw' : flushOuts >= 9 ? 'a flush draw' : n >= 8 ? 'an open-ended (or double gutshot) straight draw' : 'a gutshot straight draw';
+    const kind = flushOuts >= 9 && n > flushOuts ? 'four cards to a flush and to a straight' : flushOuts >= 9 ? 'four cards of the same suit (one away from a flush)' : n >= 8 ? 'four cards in a row (a straight with either end)' : 'a straight missing one middle card';
     const wrong = [...new Set([n + 1, n - 1, n + 4, n === 9 ? 8 : 9, n + 2].filter((x) => x !== n && x > 0))].slice(0, 3).map(String);
     const { options, answer } = shuffleOptions(rng, String(n), wrong);
     return {
       id,
       kind: 'outs',
-      topic: 'Outs',
-      prompt: 'Flop. How many cards on the turn give you a straight or better?',
+      topic: 'Drawing',
+      prompt: 'Three shared cards are out. How many of the cards still in the deck would give you a straight or a flush on the next card?',
       hero,
       board,
       options,
       answer,
-      explain: `You have ${kind}. ${n} of the 47 unseen cards make a straight or better${flushOuts && n > flushOuts ? ` (${flushOuts} flush cards plus ${n - flushOuts} straight cards)` : ''}. With one card to come that is ${n} ÷ 47 ≈ ${pct(n / 47)}; by the river about ${pct(1 - ((47 - n) / 47) * ((46 - n) / 46))}.`,
+      explain: `You have ${kind}. ${n} of the 47 cards you can’t see would complete it${flushOuts && n > flushOuts ? ` (${flushOuts} for the flush and ${n - flushOuts} more for the straight)` : ''}. That gives you about ${pct(n / 47)} on the next card, and about ${pct(1 - ((47 - n) / 47) * ((46 - n) / 46))} if you see both of the last two cards.`,
       lesson: 'outs',
     };
   }
@@ -271,12 +296,12 @@ function nutsPuzzle(rng: Rng, id: string): Puzzle {
   return {
     id,
     kind: 'nuts',
-    topic: 'The nuts',
-    prompt: 'River. What is the best possible hand on this board (the nuts)?',
+    topic: 'Best hand',
+    prompt: 'Look at these five shared cards. What is the best hand anyone at the table could possibly have?',
     board,
     options,
     answer,
-    explain: `The strongest holding is ${cardToString(bestHole[0])} ${cardToString(bestHole[1])}, making ${lower(describeScore(best))}. ${paired ? 'A paired board makes full houses and quads possible.' : 'With no pair on the board, full houses and quads are impossible.'}`,
+    explain: `The best possible hand is ${prettyCard(bestHole[0])} ${prettyCard(bestHole[1])}, which makes ${lower(describeScore(best))}. ${paired ? 'Two shared cards are the same rank, so a full house or four of a kind is possible.' : 'No two shared cards are the same rank, so nobody can have a full house or four of a kind.'}`,
     lesson: 'rules-rankings',
   };
 }
