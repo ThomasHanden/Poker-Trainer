@@ -122,7 +122,7 @@ export const TOURNAMENT: Lesson[] = [
     example: {
       title: 'Bubble call',
       steps: [
-        'Four left, three paid (50/30/20). The chip leader shoves into your 12bb big blind. In chips you need about 42% equity to call (you put in 10bb to win a 24bb pot); under ICM the requirement can rise above 50%.',
+        'Four left, three paid (50/30/20). The chip leader shoves into your 12bb big blind. In chips you need about 45% equity to call (you call 11bb more, since your 1bb blind is already in, to win a final pot of about 24.5bb); under ICM the requirement can rise above 50%.',
         'The bubble-call scenario computes both numbers exactly for the actual stacks.',
       ],
     },

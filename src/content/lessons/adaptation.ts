@@ -112,7 +112,7 @@ export const ADAPTATION: Lesson[] = [
     level: 'intermediate',
     format: 'both',
     plain: [
-      'If a player has 3-bet 2 of 10 opportunities, their true frequency could easily be anywhere from about 3% to 50%. Small samples are noisy.',
+      'If a player has 3-bet 2 of 10 opportunities, their true frequency could easily be anywhere from about 3% to 55%. Small samples are noisy.',
       'Stats like VPIP (how often a player voluntarily puts money in preflop) stabilize after a few dozen hands; rarer stats (river raise frequency, fold to a turn overbet) can take hundreds or thousands of opportunities.',
       'Combine weak evidence with sensible defaults (population tendencies) rather than jumping to strong conclusions.',
     ],

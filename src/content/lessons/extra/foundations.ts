@@ -13,7 +13,7 @@ export const FOUNDATIONS_X: Record<string, LessonExtra> = {
         heading: 'Reading the board in five seconds',
         body: [
           'A reliable routine stops you misreading a hand. First, check whether the board is paired: if it is, full houses and quads are possible. Second, count the suits: three cards of one suit means a flush is possible. Third, look for three cards within a five-card window (for example 7-8-T or 9-J-Q): that makes a straight possible.',
-          'Then ask what the best possible hand is (the nuts), and which of the most likely hands beat you. On K♥ T♥ 9♣ 4♥ 2♠ the nuts is the ace-high flush, and any heart, any QJ, and any set or two pair is ahead of a hand like A♠ K♣.',
+          'Then ask what the best possible hand is (the nuts), and which of the most likely hands beat you. On K♥ T♥ 9♣ 4♥ 2♠ the nuts is the ace-high flush, and any two hearts, any QJ, and any set or two pair is ahead of a hand like A♠ K♣.',
         ],
       },
       {

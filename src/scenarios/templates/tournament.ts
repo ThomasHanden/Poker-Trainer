@@ -317,7 +317,7 @@ const bubbleCall: ScenarioTemplate = {
     ],
   },
   setupText: 'Bubble: 4 players left, 3 paid (50/30/20). The chip leader in the small blind shoves; you are in the big blind.',
-  hint: 'Losing this pot busts you in 4th with nothing, while folding keeps you alive with two shorter stacks at the table. Chips you lose are worth more than chips you win.',
+  hint: 'Losing this pot busts you in 4th with nothing, while folding keeps you alive with two other short stacks at the table that may bust first. Chips you lose are worth more than chips you win.',
   build(ctx) {
     if (!positionFor(ctx, ['BB'])) return null;
     const hero = stackFor(ctx, [10, 12, 15, 20]);

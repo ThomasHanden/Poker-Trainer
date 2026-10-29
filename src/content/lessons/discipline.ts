@@ -94,7 +94,7 @@ export const DISCIPLINE: Lesson[] = [
     format: 'both',
     plain: [
       'A bankroll is money set aside for poker. Because variance is large, you need many buy-ins to survive downswings even as a winning player.',
-      'Common rules of thumb: 20–50 buy-ins for cash games, more (often 100+) for multi-table tournaments, and more again if your win rate is small or uncertain. These depend on win rate, variance and your tolerance for moving down.',
+      'Common rules of thumb: 30–50 buy-ins for cash games, more (often 100+) for multi-table tournaments, and more again if your win rate is small or uncertain. These depend on win rate, variance and your tolerance for moving down.',
       'Risk of ruin (the chance of losing the bankroll) falls quickly as bankroll grows relative to variance; the precise numbers depend on the model.',
     ],
     why: ['Without a bankroll plan, variance can end your poker before skill shows.'],

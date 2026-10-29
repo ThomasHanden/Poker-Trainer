@@ -57,7 +57,7 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
       {
         heading: 'Why re-shoves are so strong',
         body: [
-          'When a player opens from late position, their range is wide. If you re-shove 15–25bb, many of their hands cannot call profitably, so they fold and you win the open plus the blinds and antes. That is often 5–6bb of dead money for a hand that might be behind.',
+          'When a player opens from late position, their range is wide. If you re-shove 15–25bb, many of their hands cannot call profitably, so they fold and you win the open plus the blinds and antes. That is often 4–5bb of dead money (the open, the blinds and the ante) for a hand that might be behind.',
           'When called, you are often flipping or slightly behind, but the fold equity makes the whole play profitable. The best re-shove hands have good equity when called (pairs, strong aces, suited broadways) and block the opener’s calling hands.',
         ],
       },

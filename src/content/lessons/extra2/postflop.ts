@@ -10,7 +10,7 @@ export const POSTFLOP_D: Record<string, LessonDrills> = {
     ],
     problems: [
       { q: 'Classify these flops as dry or wet: A♠ 7♦ 2♣, J♥ T♥ 8♣, K♣ K♦ 4♠, 7♠ 6♠ 5♦.', a: 'A-7-2 rainbow: dry. J-T-8 two-tone: very wet. K-K-4 rainbow: dry (paired). 7-6-5 two-tone: very wet.' },
-      { q: 'On 9♥ 8♥ 6♣, which made hands already exist and which draws are common?', a: 'Straights (T7, 75) and sets (99, 88, 66) and two pairs (98, 96, 86). Common draws: flush draws (two hearts), open-enders (T7 is already a straight; hands like JT, 75, 54) and gutshots.' },
+      { q: 'On 9♥ 8♥ 6♣, which made hands already exist and which draws are common?', a: 'Straights (T7, 75) and sets (99, 88, 66) and two pairs (98, 96, 86). Common draws: flush draws (two hearts), open-ended straight draws such as JT and 74, and gutshots such as 54 and T5.' },
     ],
   },
   'range-advantage': {
@@ -57,7 +57,7 @@ export const POSTFLOP_D: Record<string, LessonDrills> = {
       'Out of position, weak one-pair hands realize much less than their raw equity.',
     ],
     problems: [
-      { q: 'You hold A♠ A♦ on J♥ T♥ 7♣. Name three types of hands with good equity against you.', a: 'Flush draws (two hearts), straight draws (Q9, 98, KQ, 86) and combo draws (Q♥9♥, 9♥8♥). Sets and two pair are already ahead.' },
+      { q: 'You hold A♠ A♦ on J♥ T♥ 7♣. Name three types of hands with good equity against you.', a: 'Flush draws (two hearts), straight draws (KQ, Q9, 86) and combo draws (K♥Q♥, Q♥9♥). Sets, two pair and made straights such as 98 are already ahead.' },
       { q: 'On K♠ 7♦ 2♣ with K♦ Q♣, why is checking sometimes fine?', a: 'Most hands behind you have two or three outs at best. A free card rarely costs you the pot, and checking keeps bluffs and weaker hands in for later streets.' },
     ],
   },

@@ -69,7 +69,7 @@ export const ADAPTATION_D: Record<string, LessonDrills> = {
       'One showdown shows what a player can do, not what they usually do.',
     ],
     problems: [
-      { q: 'A player has folded to 4 of 5 river bets (80%). How confident should you be?', a: 'Not very. With 5 observations, the true rate could easily be anywhere from about 40% to almost 100%.' },
+      { q: 'A player has folded to 4 of 5 river bets (80%). How confident should you be?', a: 'Not very. With 5 observations, the true rate could easily be anywhere from about 30% to almost 100%.' },
       { q: 'Which read can you trust sooner: “plays 40% of hands” or “bluffs rivers often”?', a: '“Plays 40% of hands” — there is a chance to observe it every hand.' },
     ],
   },

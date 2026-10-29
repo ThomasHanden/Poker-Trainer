@@ -294,7 +294,7 @@ export const POSTFLOP: Lesson[] = [
       steps: [
         'You c-bet A♠ Q♠ on J♦ 7♣ 3♠ and get called. Turn K♦: an overcard that hits your range and gives you a gutshot — barrel.',
         'Turn 6♣ (a blank): your ace-high has some equity but no improvement; mixing in some checks is reasonable.',
-        'Turn 8♦ completing straights for 9-T and T-9: a worse card for your range; check more.',
+        'Turn 8♦ completes the straight for T9 and gives many 9x and Tx hands straight draws: a worse card for your range; check more.',
       ],
     },
     mistakes: ['Barrelling every turn after a flop c-bet.', 'Giving up with strong draws on good turn cards.'],

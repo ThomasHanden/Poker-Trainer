@@ -191,7 +191,7 @@ export const MATH: Lesson[] = [
     level: 'intermediate',
     format: 'both',
     plain: [
-      'Your equity against one specific hand (say, AK vs QQ ≈ 46%) is a useful reference, but you are almost never facing one known hand.',
+      'Your equity against one specific hand (say, AKs vs QQ ≈ 46%) is a useful reference, but you are almost never facing one known hand.',
       'Equity against a range averages your equity against every hand in it, weighted by how likely each is (and with card removal: combos that use your cards are impossible).',
       'This app computes range equity exactly on the turn and river (by enumerating every runout and every opponent combo) and by Monte Carlo simulation on the flop and preflop, showing the sample count and margin of error.',
     ],
@@ -227,7 +227,7 @@ export const MATH: Lesson[] = [
     example: {
       title: 'Counting value vs bluffs',
       steps: [
-        'River board K♠ 8♦ 3♣ 2♥ 5♠. Opponent’s value: sets (KK 3 combos, 88 3, 33 3), AK (12). Total 21.',
+        'River board K♠ 8♦ 3♣ 2♥ 5♠. Suppose the opponent’s value bets are sets of kings, eights and threes (3 combos each) and AK (12): 21 combos.',
         'Their bluffs: missed spade draws such as Q♠J♠, Q♠T♠ and J♠T♠ (3 combos) plus other missed draws and air.',
         'Your hand’s blockers change these numbers (holding a king removes KK and AK combos).',
       ],

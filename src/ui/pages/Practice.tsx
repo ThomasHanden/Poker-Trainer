@@ -377,11 +377,6 @@ export function PracticePage() {
             <button className="btn" onClick={() => setShowSettings(false)}>
               Done
             </button>
-            {!sess && (
-              <button className="btn primary" onClick={() => begin()} disabled={phase === 'loading'}>
-                Deal a hand with these settings
-              </button>
-            )}
           </div>
         </div>
       )}
