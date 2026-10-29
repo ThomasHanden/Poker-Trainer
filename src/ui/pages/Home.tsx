@@ -86,7 +86,7 @@ export function HomePage() {
         </section>
 
         <aside className="scoreboard" aria-labelledby="sb-title">
-          <h2 id="sb-title">Leaderboard</h2>
+          <h2 id="sb-title">Your stats</h2>
           <dl className="sb-stats">
             <div>
               <dt>Today</dt>
@@ -145,7 +145,7 @@ export function HomePage() {
               </>
             )}
           </p>
-          <p className="note">The leaderboard shows your runs on this device.</p>
+          <p className="note">Your best runs on this device.</p>
         </aside>
       </div>
     </div>

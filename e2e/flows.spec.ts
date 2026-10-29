@@ -112,7 +112,7 @@ test('full hands mode deals a complete hand from preflop', async ({ page }) => {
   expect(await page.locator('.board .pcard:not(.empty)').count()).toBe(0);
 });
 
-test('daily puzzles can be completed and show on the leaderboard', async ({ page }) => {
+test('daily puzzles can be completed and show in your stats', async ({ page }) => {
   await page.goto('/#/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
