@@ -76,7 +76,7 @@ export function buildFullHand(settings: PracticeSettings, seed: number): Scenari
   const before = st.history.filter((h) => !h.type.startsWith('post') && h.player !== hero);
   const raisers = before.filter((h) => h.type === 'raise' || h.type === 'bet').length;
   const callers = before.filter((h) => h.type === 'call').length;
-  const facing = raisers === 0 ? (callers ? `${callers} limper${callers > 1 ? 's' : ''}` : 'folded to you') : raisers === 1 ? 'facing a raise' : 'facing a re-raise';
+  const facing = raisers === 0 ? (callers ? `${callers} limper${callers > 1 ? 's' : ''}` : before.length ? 'folded to you' : 'first to act') : raisers === 1 ? 'facing a raise' : 'facing a re-raise';
   const pos = positions[hero];
   return {
     id: `full-hand@${VERSION}#${seed}`,

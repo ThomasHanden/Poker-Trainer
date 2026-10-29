@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { HandState, Street } from '../../engine/rules';
-import { buildTimeline } from '../../engine/timeline';
+import { buildTimeline, TimelineStep } from '../../engine/timeline';
 import { DecisionEvaluation, GRADE_LABEL } from '../../evaluation/evaluate';
 import { ProfileId } from '../../opponents/profiles';
 import { Table, HistoryList, actionText, fmtBB } from './Table';
@@ -77,19 +77,8 @@ export function HandReplay({
   const streetOf = (n: number): Street => (n >= 5 ? 'river' : n === 4 ? 'turn' : n === 3 ? 'flop' : 'preflop');
   const streetStart = (s: Street) => steps.findIndex((x) => x.state.board.length >= BOARD[s]);
   const spotlight = rec ? { seat: rec.player, label: cap(actionText(rec, bb, rec.player === hero)).replace(/ \(all-in\)$/, ' · all-in') } : undefined;
-  const dealt = rec && i > 0 && steps[i - 1].state.board.length < st.board.length;
 
-  const winner = (net: Record<number, number>) => who(Number(Object.entries(net).sort((a, b) => b[1] - a[1])[0][0]));
-  let caption: string;
-  if (!rec) caption = `Blinds posted. ${who(st.toAct)} to act first.`;
-  else {
-    caption = `${who(rec.player)} ${actionText(rec, bb, rec.player === hero)}.`;
-    if (st.complete && st.result) {
-      const res = st.result;
-      caption += res.reason === 'fold' ? ` Hand over — ${winner(res.net)} wins the pot.` : ' Showdown.';
-      if (dealt && res.reason !== 'fold') caption = caption.replace(' Showdown.', ` Board runs out; showdown.`);
-    } else if (dealt) caption += ` ${cap(st.street)} dealt.`;
-  }
+  const caption = stepCaption(steps, i, hero);
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowRight') setI((x) => Math.min(last, x + 1));
@@ -160,4 +149,22 @@ export function HandReplay({
       </div>
     </section>
   );
+}
+
+/** Plain-words caption for one step of a timeline: who did what, and which card came. */
+export function stepCaption(steps: TimelineStep[], i: number, hero: number): string {
+  const st = steps[i].state;
+  const rec = steps[i].record;
+  const bb = st.config.bb;
+  const who = (p: number) => (p === hero ? 'You' : st.players[p].position);
+  const dealt = rec && i > 0 && steps[i - 1].state.board.length < st.board.length;
+  if (!rec) return `Blinds posted. ${who(st.toAct)} to act first.`;
+  let caption = `${who(rec.player)} ${actionText(rec, bb, rec.player === hero)}.`;
+  if (st.complete && st.result) {
+    const res = st.result;
+    const winner = Number(Object.entries(res.net).sort((a, b) => b[1] - a[1])[0][0]);
+    if (res.reason === 'fold') caption += ` Hand over — ${who(winner)} ${winner === hero ? 'win' : 'wins'} the pot.`;
+    else caption += dealt ? ' Board runs out; showdown.' : ' Showdown.';
+  } else if (dealt) caption += ` ${cap(st.street)} dealt.`;
+  return caption;
 }

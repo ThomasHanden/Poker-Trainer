@@ -12,8 +12,14 @@ import { HandReplay } from './HandReplay';
 import { useStore } from '../store';
 
 export const gradeClass = (g: Grade) => `grade g-${g}`;
-const ICON: Record<Grade, string> = { best: '✓', good: '✓', inaccuracy: '!', mistake: '✗', blunder: '✗', unscored: '?' };
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+const ICON: Record<Grade, string> = {
+  best: '✓',
+  good: '✓',
+  inaccuracy: '!',
+  mistake: '✗',
+  blunder: '✗',
+  unscored: '?',
+};
 
 export function GradeBadge({ grade, points }: { grade: Grade; points?: number | null }) {
   return (
@@ -47,7 +53,7 @@ function firstSentence(t: string): string {
   return (m ? m[0] : t).trim();
 }
 
-function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; onShow: () => void }) {
+function DecisionCard({ d, id }: { d: DecisionEvaluation; id: string }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('situation');
   const pref = preferredText(d);
@@ -58,52 +64,53 @@ function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; on
   const reason = d.why.find((w) => !isFact(w)) ?? d.why[0];
   const short = reason ? firstSentence(reason) : verdict(d);
   // preflop, SPR and multiway equity against players who have not acted are more confusing than useful
+  // right answers collapse to one line; only the decisions to learn from get the side-by-side boxes
+  const compact = mark === 'ok' && d.sizing?.verdict !== 'off';
   const facts = d.math.filter((m) => m.value.length <= 22 && (d.street !== 'preflop' || /price|break-even|pot odds/i.test(m.label))).slice(0, 3);
   return (
-    <article className={`dcard ${d.isKey ? 'key' : ''}`} id={id}>
+    <article className={`dcard ${d.isKey ? 'key' : ''} ${compact ? 'compact' : ''}`} id={id}>
       <header className="dcard-head">
         <span className="street-tag">{d.street}</span>
+        {compact && (
+          <span className="dcard-played">
+            {d.actionLabel} <span aria-hidden="true">✓</span>
+          </span>
+        )}
         <GradeBadge grade={d.grade} points={d.points} />
         {d.assisted && <span className="tag assisted">assisted</span>}
       </header>
-      <div className="dcard-answer">
-        <div className="da-row best">
-          <span className="da-l">Best play</span>
-          <span className="da-v">{pref ?? 'No clear favorite'}</span>
-        </div>
-        <div className={`da-row you ${mark}`}>
-          <span className="da-l">You {mark === 'ok' ? '— correct' : mark === 'close' ? '— close' : '— missed it'}</span>
-          <span className="da-v">
-            {d.actionLabel} <span aria-hidden="true">{mark === 'ok' ? '✓' : mark === 'close' ? '≈' : '✗'}</span>
-          </span>
-        </div>
-      </div>
-      <p className="dcard-short">{short}</p>
-      {facts.length > 0 && (
-        <div className="dcard-facts">
-          {facts.map((m, i) => (
-            <span key={i} className="pchip">
-              {m.label}: <strong>{m.value}</strong>
+      {!compact && (
+        <div className="dcard-answer">
+          <div className="da-row best">
+            <span className="da-l">Best play</span>
+            <span className="da-v">{pref ?? 'No clear favorite'}</span>
+          </div>
+          <div className={`da-row you ${mark}`}>
+            <span className="da-l">You {mark === 'ok' ? '— correct' : mark === 'close' ? '— close' : '— missed it'}</span>
+            <span className="da-v">
+              {d.actionLabel} <span aria-hidden="true">{mark === 'ok' ? '✓' : mark === 'close' ? '≈' : '✗'}</span>
             </span>
-          ))}
+          </div>
         </div>
       )}
-      {d.sizing && d.sizing.verdict === 'off' && <p className="dcard-sizing">Size: {d.sizing.note}</p>}
-      <div className="dcard-links">
-        <button className="btn small dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? 'Hide in-depth explanation' : 'See in-depth explanation'}
+      <p className="dcard-short">
+        {short}{' '}
+        <button className="linklike dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? 'Less' : 'Why? Full explanation'}
         </button>
-        <button className="btn small ghost table-link" onClick={onShow}>
-          <svg aria-hidden="true" width="18" height="12" viewBox="0 0 18 12">
-            <rect x="1" y="1" width="16" height="10" rx="5" fill="currentColor" opacity="0.18" />
-            <rect x="1" y="1" width="16" height="10" rx="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-          </svg>
-          See it on the table
-        </button>
-      </div>
+      </p>
       {open && (
         <div className="dcard-full">
           <p className="dcard-verdict">{verdict(d)}</p>
+          {facts.length > 0 && (
+            <div className="dcard-facts">
+              {facts.map((m, i) => (
+                <span key={i} className="pchip">
+                  {m.label}: <strong>{m.value}</strong>
+                </span>
+              ))}
+            </div>
+          )}
           {d.why.length > 1 && (
             <ul className="dcard-why">
               {d.why.map((w, i) => (
@@ -254,14 +261,17 @@ export function ReviewView({
 }) {
   const t = getTemplate(scenario.templateId);
   const [reveal, setReveal] = useState(false);
-  const [jumpTo, setJumpTo] = useState<{ decision: number; nonce: number }>();
+  const [replayOpen, setReplayOpen] = useState(false);
   const { data } = useStore();
   const hero = scenario.heroIndex;
   const bb = finalState.config.bb;
   const res = finalState.result;
   const villains = finalState.players.filter((p) => p.index !== hero && p.hole.length === 2);
   const hidden = Object.entries(scenario.trueProfiles).filter(([i, p]) => scenario.shownProfiles[Number(i)] !== p);
-  const jump = (i: number) => document.getElementById(`dec-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const right = evaluation.decisions.filter((d) => d.grade === 'best' || d.grade === 'good').length;
+  const n = evaluation.decisions.length;
+  const headline = !n ? 'Hand review' : right === n ? (n === 1 ? 'You got it right' : `All ${n} decisions right`) : n === 1 ? 'One to learn from' : `${right} of ${n} decisions right`;
+  const lesson = evaluation.lessons.map((id) => LESSON_INDEX[id] && { id, title: LESSON_INDEX[id].title }).filter(Boolean) as { id: string; title: string }[];
   return (
     <div className="review" data-testid="review">
       <section className="rsum">
@@ -279,42 +289,38 @@ export function ReviewView({
             )}
           </div>
           <div className="rsum-main">
-            <h2>Hand review</h2>
-            <p className="rsum-takeaway">{evaluation.takeaway}</p>
-            <div className="timeline" aria-label="Your decisions">
-              {evaluation.decisions.map((d, i) => (
-                <button key={i} className={`tchip g-${d.grade}`} onClick={() => jump(i)} title={GRADE_LABEL[d.grade]}>
-                  <span className="tchip-st">{cap(d.street)}</span> {d.actionLabel.replace(/ \(\d+% pot\)/, '')} <span aria-hidden="true">{ICON[d.grade]}</span>
-                </button>
-              ))}
-            </div>
+            <h2>{headline}</h2>
+            {evaluation.takeaway && <p className="rsum-takeaway">{firstSentence(evaluation.takeaway)}</p>}
+            {res && (
+              <p className="rsum-result">
+                {res.reason === 'fold' ? '' : 'Showdown: '}
+                {res.showdownPlayers.map((p) => (
+                  <span key={p} className="sd">
+                    {p === hero ? 'You' : finalState.players[p].position} <CardRow cards={finalState.players[p].hole} size="sm" />
+                  </span>
+                ))}
+                You {res.net[hero] >= 0 ? 'won' : 'lost'} {fmtBB(Math.abs(res.net[hero]), bb)}. <span className="note">The result doesn’t change your score.</span>
+                {res.reason === 'fold' && villains.length > 0 && (
+                  <button className="linklike" onClick={() => setReveal((r) => !r)}>
+                    {reveal ? 'Hide' : 'Show'} their cards
+                  </button>
+                )}
+                {reveal &&
+                  villains.map((v) => (
+                    <span key={v.index} className="sd">
+                      {' '}
+                      {v.position} <CardRow cards={v.hole} size="sm" />
+                    </span>
+                  ))}
+              </p>
+            )}
           </div>
         </div>
-        {res && (
-          <p className="rsum-result">
-            {res.reason === 'fold' ? 'Hand ended when a player folded.' : 'Showdown: '}
-            {res.showdownPlayers.map((p) => (
-              <span key={p} className="sd">
-                {p === hero ? 'You' : finalState.players[p].position} <CardRow cards={finalState.players[p].hole} size="sm" />
-              </span>
-            ))}
-            You {res.net[hero] >= 0 ? 'won' : 'lost'} {fmtBB(Math.abs(res.net[hero]), bb)} — <em>the result doesn’t affect your score.</em>
-            {res.reason === 'fold' && villains.length > 0 && (
-              <button className="linklike" onClick={() => setReveal((r) => !r)}>
-                {reveal ? 'Hide' : 'Show'} opponent’s cards
-              </button>
-            )}
-            {reveal &&
-              villains.map((v) => (
-                <span key={v.index} className="sd">
-                  {' '}
-                  {v.position} <CardRow cards={v.hole} size="sm" />
-                </span>
-              ))}
-          </p>
-        )}
         {hidden.length > 0 && (
-          <p className="note">Hidden tendencies (expert): {hidden.map(([i, p]) => `${finalState.players[Number(i)].position} was a ${PROFILES[p].name}`).join('; ')}. You were assessed against the “Unknown” baseline you could see.</p>
+          <p className="note">
+            Hidden tendencies (expert): {hidden.map(([i, p]) => `${finalState.players[Number(i)].position} was a ${PROFILES[p].name}`).join('; ')}. You were assessed against the “Unknown” baseline you
+            could see.
+          </p>
         )}
         <div className="review-actions">
           {onNext && (
@@ -340,32 +346,39 @@ export function ReviewView({
         </div>
       </section>
 
-      <HandReplay finalState={finalState} hero={hero} profiles={scenario.shownProfiles} fourColor={data.prefs.fourColor} decisions={evaluation.decisions} jumpTo={jumpTo} />
-
-      <section className="rdecisions">
+      <section className="rdecisions" aria-label="Your decisions">
         {evaluation.decisions.map((d, i) => (
-          <DecisionCard key={i} d={d} id={`dec-${i}`} onShow={() => setJumpTo({ decision: i, nonce: Date.now() })} />
+          <DecisionCard key={i} d={d} id={`dec-${i}`} />
         ))}
       </section>
 
+      <details className="replay-wrap" onToggle={(e) => setReplayOpen((e.target as HTMLDetailsElement).open)}>
+        <summary data-testid="open-replay">Watch the hand again</summary>
+        {replayOpen && <HandReplay finalState={finalState} hero={hero} profiles={scenario.shownProfiles} fourColor={data.prefs.fourColor} decisions={evaluation.decisions} />}
+      </details>
+
       <section className="rfoot">
-        <div className="lesson-links">
-          <span className="rfoot-l">Study:</span>
-          {evaluation.lessons.map((id) =>
-            LESSON_INDEX[id] ? (
-              <Link key={id} to={`/learn/${id}`} className="pchip link">
-                {LESSON_INDEX[id].title}
-              </Link>
-            ) : null,
-          )}
-        </div>
+        {lesson.length > 0 && (
+          <p className="lesson-links">
+            <span className="rfoot-l">Study next:</span>
+            {lesson.map((l, k) => (
+              <span key={l.id}>
+                {k > 0 && ' · '}
+                <Link to={`/learn/${l.id}`}>{l.title}</Link>
+              </span>
+            ))}
+          </p>
+        )}
         <details className="assumptions">
-          <summary>Assumptions and evaluation method</summary>
+          <summary>How this was graded</summary>
           <ul>
             {scenario.assumptions.map((a, i) => (
               <li key={i}>{a}</li>
             ))}
-            <li>Scores are instructional assessments from transparent heuristics, charts, exact math and simulations against the opponent model — not solver-verified optimal play. The hand’s result never affects the score.</li>
+            <li>
+              Scores are instructional assessments from transparent heuristics, charts, exact math and simulations against the opponent model — not solver-verified optimal play. The hand’s result
+              never affects the score.
+            </li>
             {t && <li>Key-decision method: {t.evaluation.method}.</li>}
             <li>
               Scenario <code>{scenario.id}</code> · template v{scenario.templateVersion} · scoring v{evaluation.scoringVersion} · confidence {evaluation.confidence}

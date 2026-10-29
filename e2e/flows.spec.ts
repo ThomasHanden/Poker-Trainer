@@ -3,6 +3,8 @@ import { test, expect, Page } from '@playwright/test';
 async function playToEnd(page: Page) {
   for (let i = 0; i < 20; i++) {
     if (await page.locator('[data-testid=review]').count()) return;
+    const skip = page.getByTestId('skip-playback');
+    if (await skip.count()) await skip.click().catch(() => {});
     const check = page.locator('.btn.act.check');
     const call = page.locator('.btn.act.call');
     const fold = page.locator('.btn.act.fold');
@@ -25,6 +27,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
 
   // 2-3. make legal decisions until the hand ends, then read the review
   await playToEnd(page);
+  await page.getByTestId('open-replay').click();
   await expect(page.locator('.replay .felt')).toBeVisible();
   await page.getByRole('button', { name: 'Back to start' }).click();
   await expect(page.locator('.replay-caption')).toContainText('Blinds posted');
@@ -105,6 +108,10 @@ test('main pages have no horizontal overflow', async ({ page }) => {
 test('full hands mode deals a complete hand from preflop', async ({ page }) => {
   await page.goto('/#/practice');
   await page.getByTestId('mode-full').click();
+  await expect(page.getByTestId('mode-full')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('new-scenario').click();
+  // the action plays out on the table before the first decision
+  await expect(page.getByTestId('playback')).toBeVisible();
   await expect(page.locator('.action-bar')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.ph-title')).toContainText('Full hand');
   await expect(page.getByTestId('mode-full')).toHaveAttribute('aria-checked', 'true');
