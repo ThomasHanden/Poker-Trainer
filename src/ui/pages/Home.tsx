@@ -36,7 +36,7 @@ export function HomePage() {
         <Link to="/practice" className="feature">
           <span className="feature-icon" aria-hidden="true">♠</span>
           <h2>Practice</h2>
-          <p>{TEMPLATES.length} scenario types, preflop to river, cash and tournament.</p>
+          <p>Unlimited hands — every deal is new — across {TEMPLATES.length} scenario types, preflop to river, cash and tournament.</p>
         </Link>
         <Link to="/learn" className="feature">
           <span className="feature-icon" aria-hidden="true">♦</span>

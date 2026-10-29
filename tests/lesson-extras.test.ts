@@ -9,6 +9,8 @@ describe('deeper lesson material', () => {
       expect(l.apply?.length, l.id).toBeGreaterThanOrEqual(3);
       expect(l.terms?.length, l.id).toBeGreaterThanOrEqual(3);
       expect(l.quiz.length, l.id).toBeGreaterThanOrEqual(2);
+      expect(l.takeaways?.length, l.id).toBeGreaterThanOrEqual(3);
+      expect(l.problems?.length, l.id).toBeGreaterThanOrEqual(2);
     }
   });
   it('extras only refer to real lessons, and extra quiz answers are valid', () => {

@@ -3406,3 +3406,541 @@ button.grow-row:hover,
 .checklist li {
   margin: 6px 0;
 }
+
+/* ---------- decision card: answer first ---------- */
+.dcard-answer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.da-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.da-row.best {
+  background: var(--good-bg);
+  border-color: color-mix(in srgb, var(--good) 35%, transparent);
+}
+.da-row.you.off {
+  background: var(--bad-bg);
+  border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+}
+.da-l {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.da-v {
+  font-weight: 650;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.da-row.best .da-v {
+  color: var(--good);
+}
+.da-row.you.off .da-v {
+  color: var(--bad);
+}
+.dcard-short {
+  margin: 4px 0 8px;
+  line-height: 1.5;
+}
+.dcard-links .dcard-toggle {
+  margin-top: 0;
+}
+.dcard-links {
+  align-items: center;
+  flex-wrap: wrap;
+}
+@media (max-width: 420px) {
+  .dcard-answer {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- practice: session + fast mode ---------- */
+.ph-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+label.fast-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.session-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  font-size: 0.86rem;
+  color: var(--text-2);
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.session-strip strong {
+  color: var(--text);
+}
+.session-strip .linklike {
+  margin-left: auto;
+  font-size: 0.84rem;
+}
+.fast-result {
+  border: 1px solid color-mix(in srgb, var(--good) 35%, var(--border));
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin: 12px 0;
+  scroll-margin-top: 80px;
+}
+.fr-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.fr-score {
+  font-size: 2.2rem;
+  font-weight: 750;
+  color: var(--good);
+  min-width: 2.2em;
+}
+.fr-top p {
+  margin: 2px 0 0;
+}
+.fr-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin: 12px 0;
+}
+.fr-bar span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--good);
+  transform-origin: left;
+  animation: fr-count 2.2s linear forwards;
+}
+@keyframes fr-count {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (max-width: 680px) {
+  .ph-side {
+    align-items: stretch;
+  }
+  label.fast-toggle {
+    justify-content: center;
+  }
+  .session-strip .linklike {
+    margin-left: 0;
+  }
+}
+.da-row.you.ok {
+  background: var(--good-bg);
+}
+.da-row.you.close {
+  background: var(--warn-bg);
+  border-color: color-mix(in srgb, var(--warn) 25%, transparent);
+}
+.dcard-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.dcard-facts .pchip {
+  font-size: 0.8rem;
+}
+.dcard-facts .pchip {
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  height: auto;
+  min-height: 26px;
+}
+@media (max-width: 680px) {
+  .replay-controls {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .replay-controls .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 4px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+}
+
+/* ---------- table: portrait layout for phones and small tablets ---------- */
+@media (max-width: 820px) {
+  .felt {
+    aspect-ratio: 1 / 1.75;
+    margin: 46px 40px 50px;
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+      inset 0 8px 22px rgba(0, 0, 0, 0.35),
+      0 0 0 2px #3a3a3a,
+      0 0 0 16px #1c1c1d,
+      0 0 0 17px #2b2b2c,
+      0 14px 30px rgba(0, 0, 0, 0.25);
+  }
+  .felt-line {
+    inset: 6%;
+  }
+  .table-center {
+    width: 86%;
+    gap: 8px;
+  }
+  .board .card-row {
+    gap: 4px;
+  }
+  .plate {
+    min-width: 58px;
+    padding: 2px 8px 3px;
+    border-radius: 10px;
+  }
+  .plate-prof {
+    display: none;
+  }
+  .plate-pos {
+    font-size: 0.6rem;
+  }
+  .plate-stack {
+    font-size: 0.78rem;
+  }
+  .seat.low {
+    transform: translate(-50%, calc(-100% + 17px));
+  }
+  .seat.high {
+    transform: translate(-50%, -17px);
+  }
+  .seat-cards.backs,
+  .pot-sub {
+    display: none;
+  }
+  .seat-cards.big .pcard.lg {
+    width: 36px;
+    height: 50px;
+    font-size: 1rem;
+  }
+
+  .bet-chip {
+    font-size: 0.68rem;
+    padding: 1px 7px 1px 3px;
+  }
+  .dealer-btn {
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+  }
+  .pcard.md {
+    width: 32px;
+    height: 46px;
+    font-size: 0.95rem;
+  }
+  .pcard.lg {
+    width: 42px;
+    height: 58px;
+    font-size: 1.1rem;
+  }
+  .pcard.sm {
+    width: 20px;
+    height: 28px;
+    font-size: 0.68rem;
+  }
+  .felt {
+    container-type: inline-size;
+    max-width: 460px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .table-wrap {
+    padding: 0 40px;
+  }
+  .table-wrap .felt {
+    margin: 46px auto 50px;
+  }
+  /* board cards scale with the table so they clear the side seats */
+  .board .pcard.md {
+    width: min(34px, 11.5cqw);
+    height: min(48px, 16cqw);
+    font-size: min(0.95rem, 4.6cqw);
+  }
+  .board .card-row {
+    gap: min(4px, 1.2cqw);
+  }
+  .seat-showdown {
+    white-space: normal;
+    max-width: 66px;
+    text-align: center;
+    line-height: 1.2;
+    border-radius: 8px;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+  }
+  .seat-action.spot {
+    font-size: 0.62rem;
+    max-width: 80px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+    border-radius: 8px;
+  }
+}
+/* dealer button lives on its seat's plate */
+.plate {
+  position: relative;
+}
+.plate .dealer-btn {
+  position: absolute;
+  top: -8px;
+  right: -9px;
+  transform: none;
+  width: 18px;
+  height: 18px;
+  font-size: 0.6rem;
+  z-index: 3;
+}
+
+/* ---------- small-screen fixes from the layout audit ---------- */
+.ranges-grid > *,
+.side > * {
+  min-width: 0;
+}
+.filters select,
+.side select,
+.equity-calc select {
+  max-width: 100%;
+  min-width: 0;
+}
+@media (max-width: 680px) {
+  .ranges-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .matrix {
+    min-width: 0;
+  }
+  .matrix-wrap {
+    padding: 4px;
+  }
+  .grid2,
+  .grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .filters label,
+  .filters .grow {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .filters .btn.swap {
+    flex: 0 0 auto;
+    margin: 0 auto;
+  }
+  /* segmented controls wrap instead of squashing their labels */
+  .seg {
+    flex-wrap: wrap;
+  }
+  .seg button {
+    flex: 1 1 auto;
+    min-width: max-content;
+    padding: 0 10px;
+  }
+  .btn {
+    white-space: normal;
+    height: auto;
+    min-height: 36px;
+  }
+  .btn.small {
+    min-height: 32px;
+  }
+  .dcard-full table.math,
+  .dcard-full table.alts,
+  .price-table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .lesson-links .pchip,
+  .rfoot .pchip,
+  .ph-chips .pchip {
+    white-space: normal;
+    height: auto;
+    min-height: 26px;
+    max-width: 100%;
+  }
+  .brushes,
+  .qt-row,
+  .row {
+    flex-wrap: wrap;
+  }
+  .grow-row {
+    grid-template-columns: minmax(0, 1fr) 56px 34px;
+    gap: 2px 8px;
+  }
+  .gr-name .note {
+    display: block;
+  }
+}
+@media (max-width: 360px) {
+  .matrix .cell {
+    font-size: 7.5px;
+  }
+}
+@media (max-width: 400px) {
+  .replay-controls .rc-t {
+    display: none;
+  }
+}
+.plate .dealer-btn.on-left,
+.plate .dealer-btn.on-right {
+  top: 50%;
+  transform: translateY(-50%);
+}
+.plate .dealer-btn.on-right {
+  right: -11px;
+  left: auto;
+}
+.plate .dealer-btn.on-left {
+  left: -11px;
+  right: auto;
+}
+/* seats never shrink to fit near the table edge */
+.seat {
+  width: max-content;
+}
+@media (min-width: 560px) and (max-width: 820px) {
+  .felt {
+    max-width: 380px;
+  }
+}
+.seat-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.seat-tags:empty {
+  display: none;
+}
+/* lower seats: labels hang below the plate (onto the rail) so the seat never grows toward the board */
+.seat.low .seat-tags {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 3px;
+  z-index: 3;
+}
+.felt {
+  margin-bottom: 78px;
+}
+@media (max-width: 820px) {
+  .table-wrap .felt {
+    margin-bottom: 66px;
+  }
+}
+@media (max-width: 400px) {
+  .felt.crowded .seat:not(.hero) .seat-showdown {
+    display: none;
+  }
+  .felt.crowded .bet-chip {
+    font-size: 0.62rem;
+    padding: 0 6px 0 2px;
+  }
+  .felt.crowded .chip-dot {
+    width: 10px;
+    height: 10px;
+  }
+}
+@media (max-width: 400px) {
+  .felt.crowded .seat-action {
+    font-size: 0.56rem;
+    max-width: 58px;
+    padding: 0 5px;
+  }
+}
+@media (max-width: 400px) {
+  .felt.crowded .seat:not(.hero) .pcard.sm {
+    width: 16px;
+    height: 23px;
+    font-size: 0.58rem;
+  }
+}
+@media (max-width: 820px) {
+  .seat-cards.big .pcard.lg {
+    width: min(36px, 16cqw);
+    height: min(50px, 22.5cqw);
+    font-size: min(1rem, 7cqw);
+  }
+}
+@media (max-width: 400px) {
+  .replay {
+    padding: 10px 6px 12px;
+  }
+  .replay .table-wrap {
+    padding: 0 34px;
+  }
+}
+
+/* ---------- lesson: takeaways and problems ---------- */
+.takeaways {
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--surface);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 6px 18px 8px;
+}
+.takeaways h2 {
+  font-size: 1.05rem;
+}
+.takeaways li {
+  margin: 4px 0;
+}
+.problems ol {
+  padding-left: 1.3em;
+}
+.problems li {
+  margin: 0 0 14px;
+}
+.prob-q {
+  margin: 0 0 6px;
+  font-weight: 550;
+}
+.problems details {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 6px 12px;
+}
+.problems summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+.problems details p {
+  margin: 8px 0 4px;
+}

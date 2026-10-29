@@ -9,12 +9,14 @@ import { ADAPTATION } from './adaptation';
 import { TOURNAMENT } from './tournament';
 import { DISCIPLINE } from './discipline';
 import { EXTRAS } from './extra';
+import { DRILLS } from './extra2';
 
 const BASE: Lesson[] = [...FOUNDATIONS, ...PREFLOP, ...POSTFLOP, ...SIZING, ...MATH, ...RANGES, ...ADAPTATION, ...TOURNAMENT, ...DISCIPLINE];
 export const LESSONS: Lesson[] = BASE.map((l) => {
   const x = EXTRAS[l.id];
-  if (!x) return l;
-  return { ...l, deeper: x.deeper, apply: x.apply, examples: x.examples, terms: x.terms, quiz: [...l.quiz, ...(x.quiz ?? [])] };
+  const d = DRILLS[l.id];
+  const withExtra = x ? { ...l, deeper: x.deeper, apply: x.apply, examples: x.examples, terms: x.terms, quiz: [...l.quiz, ...(x.quiz ?? [])] } : l;
+  return d ? { ...withExtra, takeaways: d.takeaways, problems: d.problems } : withExtra;
 });
 export const LESSON_INDEX: Record<string, Lesson> = Object.fromEntries(LESSONS.map((l) => [l.id, l]));
 export const lessonsInSection = (s: SectionId) => LESSONS.filter((l) => l.section === s);

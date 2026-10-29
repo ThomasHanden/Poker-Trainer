@@ -20,6 +20,31 @@ import { Term } from '../components/Term';
 type Phase = 'idle' | 'loading' | 'playing' | 'evaluating' | 'done' | 'error';
 const NO_ASSIST: Assistance = { hint: false, potOdds: false, equity: false, feedback: false };
 
+interface SessionStats {
+  hands: number;
+  scored: number;
+  scoreSum: number;
+  streak: number;
+  bestStreak: number;
+}
+const SESSION_KEY = 'felt-school:session';
+const EMPTY_SESSION: SessionStats = { hands: 0, scored: 0, scoreSum: 0, streak: 0, bestStreak: 0 };
+function loadSession(): SessionStats {
+  try {
+    return { ...EMPTY_SESSION, ...JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? '{}') };
+  } catch {
+    return EMPTY_SESSION;
+  }
+}
+function saveSession(s: SessionStats) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  } catch {
+    /* private mode */
+  }
+}
+const isClean = (ev: ScenarioEvaluation) => ev.decisions.length > 0 && ev.decisions.every((d) => d.grade === 'best' || d.grade === 'good');
+
 export function PracticePage() {
   const { data, update } = useStore();
   const [params, setParams] = useSearchParams();
@@ -34,6 +59,10 @@ export function PracticePage() {
   const [recordId, setRecordId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(true);
   const [showKeys, setShowKeys] = useState(false);
+  const [stats, setStats] = useState<SessionStats>(loadSession);
+  const [fastShown, setFastShown] = useState(false);
+  const [fastPaused, setFastPaused] = useState(false);
+  const fastMode = !!data.prefs.fastMode;
   const decisionStart = useRef(Date.now());
   const autoSeedUsed = useRef(false);
   const settings = data.settings;
@@ -107,6 +136,21 @@ export function PracticePage() {
     try {
       const ev = await run<ScenarioEvaluation>({ kind: 'evaluate', scenario: s.scenario, decisions: s.decisions });
       setEvaluation(ev);
+      setStats((old) => {
+        const clean = isClean(ev);
+        const n: SessionStats = {
+          hands: old.hands + 1,
+          scored: old.scored + (ev.score !== null ? 1 : 0),
+          scoreSum: old.scoreSum + (ev.score ?? 0),
+          streak: clean ? old.streak + 1 : 0,
+          bestStreak: Math.max(old.bestStreak, clean ? old.streak + 1 : 0),
+        };
+        saveSession(n);
+        return n;
+      });
+      const fast = !!data.prefs.fastMode && isClean(ev);
+      setFastShown(fast);
+      setFastPaused(false);
       const sc = s.scenario;
       const t = getTemplate(sc.templateId);
       const rec: HandRecord = {
@@ -146,7 +190,7 @@ export function PracticePage() {
       update((d) => ({ ...d, history: [...d.history, rec] }));
       setRecordId(rec.id);
       setPhase('done');
-      requestAnimationFrame(() => document.querySelector('.rsum')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      requestAnimationFrame(() => document.querySelector(fast ? '.fast-result' : '.rsum')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (e) {
       setError({ msg: `Evaluation failed: ${(e as Error).message}` });
       setPhase('error');
@@ -194,6 +238,13 @@ export function PracticePage() {
     }
     setHelpLoading(false);
   };
+
+  // fast mode: deal the next hand automatically after a clean hand
+  useEffect(() => {
+    if (phase !== 'done' || !fastShown || fastPaused) return;
+    const t = setTimeout(() => begin(), 2200);
+    return () => clearTimeout(t);
+  }, [phase, fastShown, fastPaused, begin]);
 
   // page-level shortcuts
   useEffect(() => {
@@ -262,10 +313,35 @@ export function PracticePage() {
             </button>
           </div>
         </div>
-        <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
-          {phase === 'loading' ? 'Dealing…' : sess ? 'Next hand' : 'New scenario'}
-        </button>
+        <div className="ph-side">
+          <button className="btn primary big" onClick={() => begin()} disabled={phase === 'loading' || phase === 'evaluating'} data-testid="new-scenario">
+            {phase === 'loading' ? 'Dealing…' : sess ? 'Next hand' : 'Start practicing'}
+          </button>
+          <label className="fast-toggle" title="After a hand where every decision was good, show a short result and deal the next hand automatically. Mistakes always stop for a full review.">
+            <input type="checkbox" checked={fastMode} onChange={(e) => update((d) => ({ ...d, prefs: { ...d.prefs, fastMode: e.target.checked } }))} /> Fast mode
+          </label>
+        </div>
       </header>
+      {stats.hands > 0 && (
+        <div className="session-strip" aria-label="This session">
+          <span>
+            <strong>{stats.hands}</strong> {stats.hands === 1 ? 'hand' : 'hands'} this session
+          </span>
+          {stats.scored > 0 && (
+            <span>
+              Average <strong>{Math.round(stats.scoreSum / stats.scored)}</strong>
+            </span>
+          )}
+          <span>
+            Streak <strong>{stats.streak}</strong>
+            {stats.bestStreak > stats.streak ? <span className="note"> (best {stats.bestStreak})</span> : null}
+          </span>
+          <span className="note">Unlimited hands — every deal is new.</span>
+          <button className="linklike" onClick={() => { setStats(EMPTY_SESSION); saveSession(EMPTY_SESSION); }}>
+            Reset
+          </button>
+        </div>
+      )}
       {(showSettings || !sess) && <SettingsPanel settings={settings} onChange={setSettings} />}
       {error && (
         <div className="error-box" role="alert">
@@ -347,7 +423,32 @@ export function PracticePage() {
           </details>
         </div>
       )}
-      {phase === 'done' && evaluation && sess && sc && (
+      {phase === 'done' && evaluation && sess && sc && fastShown && (
+        <section className="fast-result" aria-live="polite">
+          <div className="fr-top">
+            <span className="fr-score">{evaluation.score ?? '—'}</span>
+            <div>
+              <strong>Good hand.</strong> {evaluation.decisions.map((d) => `${d.street[0].toUpperCase() + d.street.slice(1)}: ${d.actionLabel.replace(/ \(\d+% pot\)/, '')}`).join(' · ')}
+              <p className="note">{fastPaused ? 'Paused.' : 'Next hand in a moment…'}</p>
+            </div>
+          </div>
+          {!fastPaused && <div className="fr-bar" aria-hidden="true"><span /></div>}
+          <div className="review-actions">
+            <button className="btn primary" onClick={() => begin()}>
+              Next hand now
+            </button>
+            <button className="btn" onClick={() => { setFastPaused(true); setFastShown(false); }}>
+              Show full review
+            </button>
+            {!fastPaused && (
+              <button className="btn ghost" onClick={() => setFastPaused(true)}>
+                Pause
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+      {phase === 'done' && evaluation && sess && sc && !fastShown && (
         <ReviewView
           scenario={sc}
           finalState={sess.state}

@@ -35,6 +35,16 @@ export interface Lesson {
   examples?: { title: string; steps: string[] }[];
   /** short definitions of the terms the lesson relies on */
   terms?: [string, string][];
+  /** the few points to remember */
+  takeaways?: string[];
+  /** practice problems with worked answers */
+  problems?: { q: string; a: string }[];
+}
+
+/** Summary points and practice problems merged into a lesson by id (lessons/extra2/*). */
+export interface LessonDrills {
+  takeaways: string[];
+  problems: { q: string; a: string }[];
 }
 
 /** Extra study material merged into a lesson by id (kept in lessons/extra/*). */

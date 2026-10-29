@@ -41,33 +41,56 @@ function verdict(d: DecisionEvaluation): string {
 
 type Tab = 'situation' | 'ranges' | 'options' | 'opponents' | 'sources';
 
+/** First sentence of a longer explanation, used as the short answer. */
+function firstSentence(t: string): string {
+  const m = t.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : t).trim();
+}
+
 function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; onShow: () => void }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('situation');
-  const reasons = d.why.slice(0, 3);
+  const pref = preferredText(d);
+  const chosenPreferred = d.alternatives.some((a) => a.key === d.actionKey && a.rating === 'preferred');
+  const mark = chosenPreferred || d.grade === 'best' ? 'ok' : d.grade === 'good' || d.grade === 'unscored' ? 'close' : 'off';
+  // the first reasons are usually facts (price, equity); the short answer uses the first piece of reasoning
+  const isFact = (w: string) => /^(You must call|Your equity against)/.test(w);
+  const reason = d.why.find((w) => !isFact(w)) ?? d.why[0];
+  const short = reason ? firstSentence(reason) : verdict(d);
+  const facts = d.math.filter((m) => m.value.length <= 22).slice(0, 3);
   return (
     <article className={`dcard ${d.isKey ? 'key' : ''}`} id={id}>
       <header className="dcard-head">
         <span className="street-tag">{d.street}</span>
-        <span className="dcard-act">You: {d.actionLabel}</span>
         <GradeBadge grade={d.grade} points={d.points} />
         {d.assisted && <span className="tag assisted">assisted</span>}
       </header>
-      <p className="dcard-verdict">{verdict(d)}</p>
-      {d.sizing && d.sizing.verdict !== 'preferred' && (
-        <p className="dcard-sizing">
-          Sizing ({d.sizing.chosen}): {d.sizing.verdict === 'acceptable' ? 'acceptable' : 'outside the recommended range'}. {d.sizing.note}
-        </p>
+      <div className="dcard-answer">
+        <div className="da-row best">
+          <span className="da-l">Best play</span>
+          <span className="da-v">{pref ?? 'No clear favorite'}</span>
+        </div>
+        <div className={`da-row you ${mark}`}>
+          <span className="da-l">You {mark === 'ok' ? '— correct' : mark === 'close' ? '— close' : '— missed it'}</span>
+          <span className="da-v">
+            {d.actionLabel} <span aria-hidden="true">{mark === 'ok' ? '✓' : mark === 'close' ? '≈' : '✗'}</span>
+          </span>
+        </div>
+      </div>
+      <p className="dcard-short">{short}</p>
+      {facts.length > 0 && (
+        <div className="dcard-facts">
+          {facts.map((m, i) => (
+            <span key={i} className="pchip">
+              {m.label}: <strong>{m.value}</strong>
+            </span>
+          ))}
+        </div>
       )}
-      <ul className="dcard-why">
-        {reasons.map((w, i) => (
-          <li key={i}>{w}</li>
-        ))}
-      </ul>
-      {d.conflict && <p className="dcard-conflict">⚖ {d.conflict}</p>}
+      {d.sizing && d.sizing.verdict === 'off' && <p className="dcard-sizing">Size: {d.sizing.note}</p>}
       <div className="dcard-links">
-        <button className="linklike dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? 'Hide full analysis' : 'Full analysis'}
+        <button className="btn small dcard-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? 'Hide in-depth explanation' : 'See in-depth explanation'}
         </button>
         <button className="linklike" onClick={onShow}>
           See it on the table
@@ -75,6 +98,20 @@ function DecisionCard({ d, id, onShow }: { d: DecisionEvaluation; id: string; on
       </div>
       {open && (
         <div className="dcard-full">
+          <p className="dcard-verdict">{verdict(d)}</p>
+          {d.why.length > 1 && (
+            <ul className="dcard-why">
+              {d.why.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          )}
+          {d.sizing && d.sizing.verdict !== 'preferred' && (
+            <p className="dcard-sizing">
+              Sizing ({d.sizing.chosen}): {d.sizing.verdict === 'acceptable' ? 'acceptable' : 'outside the recommended range'}. {d.sizing.note}
+            </p>
+          )}
+          {d.conflict && <p className="dcard-conflict">⚖ {d.conflict}</p>}
           <div className="tabs small" role="tablist">
             {(
               [

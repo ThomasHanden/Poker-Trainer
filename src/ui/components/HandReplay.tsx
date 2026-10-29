@@ -150,11 +150,12 @@ export function HandReplay({
 
       <div className="replay-controls">
         <button className="btn small" onClick={() => { setPlaying(false); setI(0); }} disabled={i === 0} aria-label="Back to start">⏮</button>
-        <button className="btn small" onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Previous action">◀ Back</button>
-        <button className="btn small primary" data-testid="replay-play" onClick={() => { if (i >= last) setI(0); setPlaying((p) => !p); }}>
-          {playing ? '❚❚ Pause' : i >= last ? '↻ Replay' : '▶ Play'}
+        <button className="btn small" onClick={() => { setPlaying(false); setI((x) => Math.max(0, x - 1)); }} disabled={i === 0} aria-label="Previous action">◀<span className="rc-t"> Back</span></button>
+        <button className="btn small primary" data-testid="replay-play" aria-label={playing ? "Pause" : i >= last ? "Replay from the start" : "Play"} onClick={() => { if (i >= last) setI(0); setPlaying((p) => !p); }}>
+          {playing ? '❚❚' : i >= last ? '↻' : '▶'}
+          <span className="rc-t">{playing ? ' Pause' : i >= last ? ' Replay' : ' Play'}</span>
         </button>
-        <button className="btn small" data-testid="replay-next" onClick={() => { setPlaying(false); setI((x) => Math.min(last, x + 1)); }} disabled={i >= last} aria-label="Next action">Next ▶</button>
+        <button className="btn small" data-testid="replay-next" onClick={() => { setPlaying(false); setI((x) => Math.min(last, x + 1)); }} disabled={i >= last} aria-label="Next action"><span className="rc-t">Next </span>▶</button>
         <button className="btn small" onClick={() => { setPlaying(false); setI(last); }} disabled={i >= last} aria-label="Jump to end">⏭</button>
       </div>
     </section>

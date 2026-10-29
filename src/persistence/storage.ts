@@ -71,7 +71,7 @@ export interface AppData {
   lessons: Record<string, LessonProgress>;
   ranges: SavedRange[];
   recent: { fingerprints: string[]; templates: string[] };
-  prefs: { fourColor: boolean; showShortcuts: boolean };
+  prefs: { fourColor: boolean; showShortcuts: boolean; fastMode?: boolean };
 }
 
 export function emptyData(): AppData {
@@ -82,7 +82,7 @@ export function emptyData(): AppData {
     lessons: {},
     ranges: [],
     recent: { fingerprints: [], templates: [] },
-    prefs: { fourColor: false, showShortcuts: true },
+    prefs: { fourColor: false, showShortcuts: true, fastMode: false },
   };
 }
 

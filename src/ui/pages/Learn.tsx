@@ -132,14 +132,16 @@ export function LessonPage() {
   const practiceHref = l.practice.templates?.length ? `/practice?template=${l.practice.templates[0]}` : l.practice.concepts?.length ? `/practice?concept=${l.practice.concepts[0]}` : '/practice?start=1';
   const section = SECTIONS.find((s) => s.id === l.section)!;
   const toc: [string, string][] = [
+    ...(l.takeaways?.length ? [['s-takeaways', 'Takeaways'] as [string, string]] : []),
     ['s-idea', 'The idea'],
     ...(l.terms?.length ? [['s-terms', 'Key terms'] as [string, string]] : []),
     ...(l.deeper?.length ? [['s-deeper', 'Going deeper'] as [string, string]] : []),
     ['s-examples', (l.examples?.length ?? 0) > 0 ? 'Worked examples' : 'Example'],
     ...(l.apply?.length ? [['s-apply', 'Checklist'] as [string, string]] : []),
+    ...(l.problems?.length ? [['s-problems', 'Try it yourself'] as [string, string]] : []),
     ['s-quiz', `Quiz (${l.quiz.length})`],
   ];
-  const words = [...l.plain, ...(l.deeper ?? []).flatMap((d) => d.body), ...l.why, ...l.example.steps, ...(l.examples ?? []).flatMap((e) => e.steps), ...l.mistakes, ...(l.apply ?? [])].join(' ').split(/\s+/).length;
+  const words = [...l.plain, ...(l.deeper ?? []).flatMap((d) => d.body), ...l.why, ...l.example.steps, ...(l.examples ?? []).flatMap((e) => e.steps), ...l.mistakes, ...(l.apply ?? []), ...(l.takeaways ?? []), ...(l.terms ?? []).map((t) => t.join(' ')), ...(l.problems ?? []).map((p) => `${p.q} ${p.a}`), ...l.quiz.map((q) => `${q.q} ${q.options.join(' ')} ${q.explain}`)].join(' ').split(/\s+/).length;
   return (
     <article className="page lesson">
       <p>
@@ -148,7 +150,7 @@ export function LessonPage() {
       <h1>{l.title}</h1>
       <p className="lead">{l.summary}</p>
       <p className="note">
-        Level: {l.level} · Applies to: {l.format === 'both' ? 'cash games and tournaments' : l.format === 'cash' ? 'cash games' : 'tournaments'} · about {Math.max(2, Math.round(words / 200))} min read
+        Level: {l.level} · Applies to: {l.format === 'both' ? 'cash games and tournaments' : l.format === 'cash' ? 'cash games' : 'tournaments'} · about {Math.max(2, Math.round(words / 180))} min read
         {prog?.completed ? ' · ✓ completed' : ''}
       </p>
       <nav className="lesson-toc" aria-label="On this page">
@@ -159,6 +161,16 @@ export function LessonPage() {
           </a>
         ))}
       </nav>
+      {l.takeaways && l.takeaways.length > 0 && (
+        <section className="takeaways" id="s-takeaways" aria-label="Key takeaways">
+          <h2>Key takeaways</h2>
+          <ul>
+            {l.takeaways.map((t, i) => (
+              <li key={i}>{t}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section id="s-idea">
         <h2>The idea</h2>
         {l.plain.map((p, i) => (
@@ -254,6 +266,23 @@ export function LessonPage() {
           ))}
         </ul>
       </section>
+      {l.problems && l.problems.length > 0 && (
+        <section className="problems" id="s-problems">
+          <h2>Try it yourself</h2>
+          <p className="note">Work each one out, then open the answer.</p>
+          <ol>
+            {l.problems.map((p, i) => (
+              <li key={i}>
+                <p className="prob-q">{p.q}</p>
+                <details>
+                  <summary>Show answer</summary>
+                  <p>{p.a}</p>
+                </details>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <section className="quiz" id="s-quiz">
         <h2>Knowledge check</h2>
         {l.quiz.map((q, i) => (

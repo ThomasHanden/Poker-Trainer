@@ -68,7 +68,7 @@ function stadiumPoint(t: number, w: number, h: number, scale = 1): { x: number; 
 
 /** Matches the CSS breakpoint that switches the table to a portrait layout. */
 function useNarrow(): boolean {
-  const q = '(max-width: 680px)';
+  const q = '(max-width: 820px)';
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
   useEffect(() => {
     const m = window.matchMedia(q);
@@ -77,6 +77,14 @@ function useNarrow(): boolean {
     return () => m.removeEventListener('change', on);
   }, []);
   return narrow;
+}
+
+/** Chips on a smaller copy of the table outline (evenly spaced like the seats), nudged off the board. */
+function innerChip(p: { x: number; y: number }): { x: number; y: number } {
+  // the pot label and board occupy roughly 32%–58% of the height in the middle
+  if (p.y > 30 && p.y < 50) return { x: p.x, y: 29 };
+  if (p.y >= 50 && p.y < 60) return { x: p.x, y: 60 };
+  return p;
 }
 
 // felt proportions (must match .felt aspect-ratio in styles.css)
@@ -111,24 +119,31 @@ export function Table({
   const box = narrow ? PORTRAIT : LANDSCAPE;
   const geo = (i: number) => {
     const t = ((i - hero + n) % n) / n;
-    const seat = stadiumPoint(t, box.w, box.h, 1);
+    const raw = stadiumPoint(t, box.w, box.h, 1);
+    // portrait: push the side seats out onto the rail so they clear the board
+    const seat = narrow ? { x: 50 + (raw.x - 50) * 1.08, y: raw.y } : raw;
     // bets sit between the seat and the middle, clear of the board and of the hole cards
     const chip = narrow
-      ? { x: 50 + (seat.x - 50) * 0.72, y: 50 + (seat.y - 50) * 0.62 + (Math.abs(seat.y - 50) < 15 ? 10 : 0) }
+      ? i === hero
+        ? { x: 50, y: 73 } // above the hero's cards
+        : raw.x < 12 || raw.x > 88
+          ? innerChip({ x: raw.x < 50 ? 28 : 72, y: raw.y + (raw.y > 50 ? -7 : 7) }) // side seats: straight in from the plate
+          : raw.y > 65
+            ? (({ x, y }) => ({ x, y: Math.min(y, 75) }))(stadiumPoint(t, box.w, box.h, 0.7)) // bottom-curve seats: clear of the hero's chip and cards
+            : innerChip(stadiumPoint(t, box.w, box.h, 0.56))
       : i === hero
         ? { x: 63, y: 84 } // beside the hero's (large) hole cards
         : { x: 50 + (seat.x - 50) * 0.5, y: 50 + (seat.y - 50) * 0.5 };
-    const btn = stadiumPoint(t + (narrow ? 0.05 : 0.04), box.w, box.h, narrow ? 0.86 : 0.76);
     return {
       seat: { left: `${seat.x}%`, top: `${seat.y}%` },
       chip: { left: `${chip.x}%`, top: `${chip.y}%` },
-      button: { left: `${btn.x}%`, top: `${btn.y}%` },
       low: seat.y > 60, // lower part of the table: cards sit above the plate
+      outer: raw.x < 45 ? 'left' : 'right', // side of the plate facing the rail
     };
   };
   return (
     <div className="table-wrap" aria-label="Poker table">
-      <div className="felt">
+      <div className={`felt ${n >= 8 ? 'crowded' : ''}`}>
         <div className="felt-line" aria-hidden="true" />
         <div className="table-center">
           <div className="pot-pill" aria-live="polite">
@@ -168,6 +183,11 @@ export function Table({
               >
                 {g.low && cards}
                 <div className="plate">
+                  {i === state.buttonIndex && (
+                    <span className={`dealer-btn on-${g.outer}`} title="Dealer button" aria-label="Dealer button">
+                      D
+                    </span>
+                  )}
                   <span className="plate-pos">
                     {p.position}
                     {p.isHero ? ' · You' : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
@@ -175,23 +195,20 @@ export function Table({
                   <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
                 </div>
                 {!g.low && cards}
-                {spotlight ? (
-                  spotlight.seat === i && <div className="seat-action spot">{spotlight.label}</div>
-                ) : (
-                  act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
-                )}
-                {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
+                <div className="seat-tags">
+                  {spotlight ? (
+                    spotlight.seat === i && <div className="seat-action spot">{spotlight.label}</div>
+                  ) : (
+                    act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
+                  )}
+                  {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
+                </div>
               </div>
               {p.streetCommitted > 0 && !state.complete && (
                 <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmtBB(p.streetCommitted, bb)}`}>
                   <span className="chip-dot" aria-hidden="true" />
                   {!narrow && act && (act.type === 'bet' || act.type === 'raise') ? (p.allIn ? 'All-in ' : act.type === 'raise' ? 'Raise to ' : 'Bet ') : ''}
                   {fmtBB(p.streetCommitted, bb)}
-                </div>
-              )}
-              {i === state.buttonIndex && (
-                <div className="dealer-btn" style={g.button} title="Dealer button">
-                  D
                 </div>
               )}
             </div>
