@@ -4,7 +4,9 @@ import { useStore } from '../store';
 import { Table, DecisionFacts, HistoryList, fmtBB, dealMs } from '../components/Table';
 import { ActionBar } from '../components/ActionBar';
 import { PARTY_HOST, tableInfoUrl, useLiveTable } from '../useLiveTable';
-import { MAX_SEATS, NAME_MAX, START_STACK, SB, BB, STAKES, PUBLIC_TABLES, tableLabel, type TableSummary } from '../../multiplayer/table';
+import { MAX_SEATS, NAME_MAX, START_STACK, SB, BB, STAKES, PUBLIC_TABLES, TURN_MS, tableLabel, type TableSummary } from '../../multiplayer/table';
+import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
+import { describeScore } from '../../engine/evaluator';
 
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alikes (i/l/1, o/0)
 const LOBBY_POLL_MS = 10_000;
@@ -147,6 +149,32 @@ export function PlayLobbyPage() {
   );
 }
 
+/** Who won each pot and with what, e.g. "Bob wins 12bb with two pair, kings and fours". */
+function resultLines(h: HandState, me: number): string[] {
+  const r = h.result!;
+  const who = (i: number) => (i === me ? 'You' : h.players[i].name);
+  const wins = (i: number) => (i === me ? 'win' : 'wins');
+  if (r.reason === 'fold') {
+    const w = r.pots[0].winners[0];
+    const total = r.pots.reduce((a, pot) => a + pot.amount, 0);
+    return [`${who(w)} ${wins(w)} ${fmtBB(total, BB)}. Everyone else folded.`];
+  }
+  // a pot only one player could win is an uncalled bet coming back, not a win
+  const pots = r.pots.filter((pot) => pot.eligible.length > 1);
+  return pots.map((pot, k) => {
+    const label = pots.length > 1 ? (k === 0 ? 'Main pot: ' : `Side pot${pots.length > 2 ? ` ${k}` : ''}: `) : '';
+    const hand = pot.score !== undefined ? ` with ${describeScore(pot.score).toLowerCase()}` : '';
+    if (pot.winners.length > 1) {
+      const names = pot.winners.map((i) => (i === me ? 'you' : h.players[i].name));
+      return `${label}${fmtBB(pot.amount, BB)} split between ${names.join(' and ')}${hand}.`;
+    }
+    const w = pot.winners[0];
+    return `${label}${who(w)} ${wins(w)} ${fmtBB(pot.amount, BB)}${hand}.`;
+  });
+}
+
+type PreAction = 'checkfold' | 'callany';
+
 /** Seconds left until a server time, updated twice a second. */
 function useSecondsUntil(at: number | null, offset: number): number | null {
   const [, setTick] = useState(0);
@@ -181,6 +209,12 @@ export function PlayTablePage() {
   // one action per turn: re-enable when the server sends the next state
   useEffect(() => setSent(false), [h?.history.length, view?.handNo]);
 
+  // pre-actions: chosen while waiting, played as soon as it is your turn; cleared each street
+  const [pre, setPre] = useState<PreAction | null>(null);
+  useEffect(() => setPre(null), [h?.street, view?.handNo]);
+  const myPlayer = h && me >= 0 ? h.players[me] : null;
+  const canPre = live && !!myPlayer && !myPlayer.folded && !myPlayer.allIn && !myTurn;
+
   // let the cards go out before showing the action buttons
   const [dealing, setDealing] = useState(false);
   const players = h?.players.length ?? 0;
@@ -191,6 +225,17 @@ export function PlayTablePage() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view?.handNo]);
+
+  useEffect(() => {
+    if (!myTurn || dealing || sent || !pre || !h) return;
+    const la = legalActions(h);
+    if (!la) return;
+    const a: PlayerAction = la.canCheck ? { type: 'check' } : { type: pre === 'checkfold' ? 'fold' : 'call' };
+    setPre(null);
+    setSent(true);
+    act(a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTurn, dealing, sent, pre]);
 
   const invite = `${location.origin}${location.pathname}#/play/${room}`;
   const copy = async () => {
@@ -219,6 +264,8 @@ export function PlayTablePage() {
 
   const toActName = live ? h!.players[h!.toAct]?.name : '';
   const winners = h?.complete && h.result ? h.players.filter((p) => (h.result!.net[p.index] ?? 0) > 0) : [];
+  const results = h?.complete && h.result ? resultLines(h, me) : [];
+  const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
   return (
     <div className="page practice live">
@@ -325,7 +372,17 @@ export function PlayTablePage() {
         </section>
       ) : (
         <div className="practice-body">
-          <Table state={h!} hero={me >= 0 ? me : 0} profiles={{}} fourColor={data.prefs.fourColor} showNames handKey={view.handNo} />
+          <Table
+            state={h!}
+            hero={me >= 0 ? me : 0}
+            profiles={{}}
+            fourColor={data.prefs.fourColor}
+            showNames
+            handKey={view.handNo}
+            live
+            turnEndsAt={view.turnEndsAt === null || dealing ? null : view.turnEndsAt - offset}
+            turnMs={TURN_MS}
+          />
           <p className="live-status" aria-live="polite">
             {live && dealing
               ? 'Dealing…'
@@ -333,11 +390,31 @@ export function PlayTablePage() {
               ? myTurn
                 ? `Your turn · ${turnLeft ?? ''}s`
                 : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
-              : winners.length
-                ? winners.map((p) => `${p.index === me ? 'You win' : `${p.name} wins`} the ${fmtBB(h!.result!.payouts[p.index], BB)} pot`).join(' · ')
+              : results.length
+                ? results.map((line) => (
+                    <span key={line} className="live-result">
+                      {line}
+                    </span>
+                  ))
                 : 'Hand over'}
-            {!live && dealIn !== null && ` · Next hand in ${dealIn}s`}
+            {!live && dealIn !== null && <span className="live-next">Next hand in {dealIn}s</span>}
           </p>
+          {busted && <p className="note live-bust">You ran out of chips. You will get a fresh {START_STACK / BB}bb stack next hand.</p>}
+          {canPre && (
+            <div className="live-pre" role="group" aria-label="Act in advance">
+              <span className="note">While you wait:</span>
+              {(
+                [
+                  ['checkfold', 'Check / Fold'],
+                  ['callany', 'Call any'],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} className={`btn small ${pre === k ? 'primary' : ''}`} aria-pressed={pre === k} onClick={() => setPre(pre === k ? null : k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {myTurn && !dealing && (
             <section className="decision-panel" aria-label="Your decision">
               <DecisionFacts state={h!} hero={me} />

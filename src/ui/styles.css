@@ -6377,3 +6377,91 @@ label > span:first-child:not(.select-value) {
     animation: none;
   }
 }
+
+/* ============================================================
+   Live tables: turn timer, action labels, winners
+   ============================================================ */
+.turn-bar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: #f5c451;
+  transform-origin: left center;
+  animation: turn-drain linear both;
+}
+@keyframes turn-drain {
+  from {
+    transform: scaleX(var(--from, 1));
+  }
+  66% {
+    background: #f5c451;
+  }
+  to {
+    transform: scaleX(0);
+    background: #e2643a;
+  }
+}
+.seat-action.a-call,
+.seat-action.a-check {
+  background: rgba(255, 255, 255, 0.92);
+}
+.seat-action.a-raise,
+.seat-action.a-bet {
+  background: #fde5d9;
+  color: #8a3413;
+}
+.seat-action.seat-win {
+  background: #f5c451;
+  color: #2b1d00;
+  animation: spot-in 0.25s ease-out 0.45s both;
+}
+.seat.winner .plate {
+  border-color: #f5c451;
+  box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.45), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+/* the pot slides from the middle of the table to the winner */
+.bet-chip.pot-win {
+  animation: pot-to-winner 0.55s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+@keyframes pot-to-winner {
+  from {
+    left: 50%;
+    top: 40%;
+    scale: 1.15;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-bar {
+    animation: none;
+    transform: scaleX(var(--from, 1));
+  }
+  .bet-chip.pot-win,
+  .seat-action.seat-win {
+    animation: none;
+  }
+}
+.live-status .live-result,
+.live-status .live-next {
+  display: block;
+}
+.live-status .live-next {
+  font-weight: 400;
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.live-pre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.live-bust {
+  text-align: center;
+  margin: -6px 0 12px;
+}

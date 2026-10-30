@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 import { HandState, potSize, ActionRecord, effectiveStack } from '../../engine/rules';
 import { PlayingCard, CardRow, DEAL_GAP, DEAL_ANIM } from './Card';
 import { PROFILES, ProfileId } from '../../opponents/profiles';
@@ -35,6 +35,25 @@ function lastStreetAction(s: HandState, player: number): ActionRecord | undefine
     if (h.player === player && !h.type.startsWith('post')) return h;
   }
   return undefined;
+}
+
+/** Live seat label for a player's latest action this street; bets and raises already say so on the chip, except on narrow tables. */
+function liveActionLabel(a: ActionRecord, narrow: boolean): string | null {
+  if (a.allIn) return 'All-in';
+  switch (a.type) {
+    case 'fold':
+      return 'Fold';
+    case 'check':
+      return 'Check';
+    case 'call':
+      return 'Call';
+    case 'bet':
+      return narrow ? 'Bet' : null;
+    case 'raise':
+      return narrow ? 'Raise' : null;
+    default:
+      return null;
+  }
 }
 
 /** Point on a stadium (pill) outline, by fraction of the perimeter, starting at the bottom center and going clockwise on screen. Returns percentages of the box. */
@@ -104,6 +123,9 @@ export function Table({
   spotlight,
   showNames = false,
   handKey,
+  live = false,
+  turnEndsAt = null,
+  turnMs,
 }: {
   state: HandState;
   hero: number;
@@ -116,6 +138,11 @@ export function Table({
   showNames?: boolean;
   /** changes with each new hand so the hole cards are dealt again; defaults to the hole cards themselves */
   handKey?: string | number;
+  /** live tables: label every action on the seats, show who won and slide the pot to them */
+  live?: boolean;
+  /** live tables: when the current turn runs out (local clock, ms) and the full turn length, for the timer bar */
+  turnEndsAt?: number | null;
+  turnMs?: number;
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -126,6 +153,17 @@ export function Table({
   const deal = handKey ?? state.players.map((p) => p.hole.join('.')).join('|');
   // hole cards go out one at a time, starting left of the button, two rounds
   const dealDelay = (i: number, round: number) => `${(round * n + ((i - state.buttonIndex - 1 + n) % n)) * DEAL_GAP}s`;
+  // live: who won what, for the winner highlight and the pot sliding over
+  const won = live && state.complete && state.result ? state.result.payouts : null;
+  const winners = new Set(live && state.complete && state.result ? state.players.filter((p) => (state.result!.net[p.index] ?? 0) > 0).map((p) => p.index) : []);
+  // timer bar: restart for each new turn, starting from however much time is left
+  const turnKey = `${deal}-${state.history.length}-${state.toAct}`;
+  const timer = useMemo(() => {
+    if (!live || !turnEndsAt || !turnMs || state.complete) return null;
+    const left = Math.max(0, turnEndsAt - Date.now());
+    return { left, from: Math.min(1, left / turnMs) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnKey, turnEndsAt, turnMs, live]);
   // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
   const box = narrow ? PORTRAIT : LANDSCAPE;
@@ -158,7 +196,8 @@ export function Table({
       <div className={`felt ${n >= 8 ? 'crowded' : ''}`}>
         <div className="felt-line" aria-hidden="true" />
         <div className="table-center">
-          <div className="pot-pill" aria-live="polite">
+          {/* live: once the pot has gone to the winner, the middle is empty */}
+          <div className="pot-pill" aria-live="polite" style={won ? { visibility: 'hidden' } : undefined}>
             <Term id="pot">Pot</Term> <strong data-testid="pot">{fmtBB(totalPot, bb)}</strong>
           </div>
           <div className="board" aria-label="Community cards">
@@ -198,7 +237,7 @@ export function Table({
           return (
             <div key={i}>
               <div
-                className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''} ${g.low ? 'low' : 'high'}`}
+                className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''} ${g.low ? 'low' : 'high'} ${winners.has(i) ? 'winner' : ''}`}
                 style={g.seat}
                 aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmtBB(p.stack, bb)}`}
               >
@@ -214,17 +253,29 @@ export function Table({
                     {p.isHero ? ' · You' : showNames ? <span className="plate-name"> · {p.name}</span> : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
                   </span>
                   <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
+                  {isTurn && timer && (
+                    <span key={turnKey} className="turn-bar" style={{ '--from': timer.from, animationDuration: `${timer.left}ms` } as CSSProperties} aria-hidden="true" />
+                  )}
                 </div>
                 {!g.low && cards}
                 <div className="seat-tags">
                   {spotlight ? (
                     spotlight.seat === i && <div className="seat-action spot">{spotlight.label}</div>
+                  ) : live ? (
+                    !state.complete && act && liveActionLabel(act, narrow) && <div className={`seat-action a-${act.type}`}>{liveActionLabel(act, narrow)}</div>
                   ) : (
                     act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
                   )}
+                  {winners.has(i) && won && <div className="seat-action seat-win">Wins {fmtBB(won[i], bb)}</div>}
                   {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
                 </div>
               </div>
+              {winners.has(i) && won && (
+                <div className="bet-chip pot-win" style={g.chip} aria-hidden="true">
+                  <span className="chip-dot" />
+                  {fmtBB(won[i], bb)}
+                </div>
+              )}
               {p.streetCommitted > 0 && !state.complete && (
                 <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmtBB(p.streetCommitted, bb)}`}>
                   <span className="chip-dot" aria-hidden="true" />
