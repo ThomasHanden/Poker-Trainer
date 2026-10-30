@@ -50,6 +50,7 @@ export function HomePage() {
   const scored = data.history.filter((h) => h.score !== null);
   const avg = scored.length ? Math.round(scored.reduce((a, h) => a + (h.score ?? 0), 0) / scored.length) : null;
   const board = [...runs].sort((a, b) => b.points - a.points || a.ms - b.ms).slice(0, 8);
+  const dailyBest = runs.filter((r) => r.mode === 'daily').reduce((m, r) => Math.max(m, r.points), 0);
   const survivalBest = runs.filter((r) => r.mode === 'survival').reduce((m, r) => Math.max(m, r.points), 0);
   const st = streak(runs);
 
@@ -90,7 +91,7 @@ export function HomePage() {
           <dl className="sb-stats">
             <div>
               <dt>Daily five</dt>
-              <dd>{dailyRun ? dailyRun.points : '—'}</dd>
+              <dd>{dailyBest || '—'}</dd>
             </div>
             <div>
               <dt>Streak</dt>
