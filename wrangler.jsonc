@@ -1,0 +1,12 @@
+// Cloudflare config for the live table server (party/server.ts).
+// Local: npm run party:dev   Deploy: npm run party:deploy
+{
+  "name": "felt-tables",
+  "main": "party/server.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": {
+    "bindings": [{ "name": "PokerTable", "class_name": "PokerTable" }]
+  },
+  // the free plan only allows SQLite-backed Durable Objects
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PokerTable"] }]
+}

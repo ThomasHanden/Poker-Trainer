@@ -7,6 +7,7 @@ import { RangesPage } from './pages/Ranges';
 import { ReviewListPage, ReviewDetailPage } from './pages/Review';
 import { ProgressPage } from './pages/Progress';
 import { HomePage } from './pages/Home';
+import { PlayLobbyPage, PlayTablePage } from './pages/Play';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -40,6 +41,7 @@ function Shell() {
     ['/ranges', 'Ranges'],
     ['/review', 'Review'],
     ['/progress', 'Progress'],
+    ['/play', 'Play live'],
   ];
   return (
     <>
@@ -77,6 +79,8 @@ function Shell() {
             <Route path="/review" element={<ReviewListPage />} />
             <Route path="/review/:id" element={<ReviewDetailPage />} />
             <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/play" element={<PlayLobbyPage />} />
+            <Route path="/play/:room" element={<PlayTablePage />} />
             <Route path="*" element={<div className="page"><h1>Not found</h1><Link to="/">Home</Link></div>} />
           </Routes>
         </ErrorBoundary>

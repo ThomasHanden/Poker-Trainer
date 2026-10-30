@@ -13,21 +13,30 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "gen:equity": "vite-node scripts/gen-preflop-equity.ts",
-    "validate:content": "vitest run tests/content.test.ts tests/scenarios.test.ts"
+    "validate:content": "vitest run tests/content.test.ts tests/scenarios.test.ts",
+    "party:dev": "wrangler dev",
+    "party:deploy": "wrangler deploy"
   },
   "dependencies": {
+    "partysocket": "1.3.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "6.26.2"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261030.1",
     "@playwright/test": "1.64.1",
     "@types/node": "^22.9.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.3",
+    "partyserver": "0.5.10",
     "typescript": "5.6.3",
     "vite": "5.4.10",
-    "vitest": "2.1.4"
+    "vitest": "2.1.4",
+    "wrangler": "4.156.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261023.1": true
   }
 }

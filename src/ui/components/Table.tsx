@@ -99,6 +99,7 @@ export function Table({
   fourColor,
   revealAll = false,
   spotlight,
+  showNames = false,
 }: {
   state: HandState;
   hero: number;
@@ -107,6 +108,8 @@ export function Table({
   revealAll?: boolean;
   /** replay: the seat that just acted, highlighted with a label of its action */
   spotlight?: { seat: number; label: string };
+  /** live tables: show each player's name after their position */
+  showNames?: boolean;
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -190,7 +193,7 @@ export function Table({
                   )}
                   <span className="plate-pos">
                     {p.position}
-                    {p.isHero ? ' · You' : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
+                    {p.isHero ? ' · You' : showNames ? <span className="plate-name"> · {p.name}</span> : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
                   </span>
                   <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
                 </div>
@@ -256,7 +259,7 @@ export function DecisionFacts({ state, hero }: { state: HandState; hero: number 
   );
 }
 
-export function HistoryList({ state, hero }: { state: HandState; hero: number }) {
+export function HistoryList({ state, hero, showNames = false }: { state: HandState; hero: number; showNames?: boolean }) {
   const bb = state.config.bb;
   const streets = ['preflop', 'flop', 'turn', 'river'] as const;
   const boardAt = { preflop: 0, flop: 3, turn: 4, river: 5 };
@@ -273,7 +276,7 @@ export function HistoryList({ state, hero }: { state: HandState; hero: number })
             </div>
             <ol>
               {acts.map((h, k) => {
-                const who = h.player === hero ? 'You' : state.players[h.player].position;
+                const who = h.player === hero ? 'You' : showNames ? `${state.players[h.player].name} (${state.players[h.player].position})` : state.players[h.player].position;
                 let txt = '';
                 switch (h.type) {
                   case 'post-sb':
