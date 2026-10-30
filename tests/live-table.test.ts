@@ -288,7 +288,7 @@ describe('public tables', () => {
   it('are named for the lobby', () => {
     expect(isPublicTable('public-2')).toBe(true);
     expect(isPublicTable('k7m2qp')).toBe(false);
-    expect(tableLabel('public-2')).toBe('Public table 2');
-    expect(tableLabel('k7m2qp')).toBe('Table k7m2qp');
+    expect(tableLabel('public-2')).toBe('1/2 NLH #2');
+    expect(tableLabel('k7m2qp')).toBe('1/2 NLH · k7m2qp');
   });
 });

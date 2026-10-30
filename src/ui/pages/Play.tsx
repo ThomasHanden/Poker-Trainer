@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { Table, DecisionFacts, HistoryList, fmtBB } from '../components/Table';
 import { ActionBar } from '../components/ActionBar';
 import { PARTY_HOST, tableInfoUrl, useLiveTable } from '../useLiveTable';
-import { MAX_SEATS, NAME_MAX, START_STACK, BB, PUBLIC_TABLES, tableLabel, type TableSummary } from '../../multiplayer/table';
+import { MAX_SEATS, NAME_MAX, START_STACK, SB, BB, STAKES, PUBLIC_TABLES, tableLabel, type TableSummary } from '../../multiplayer/table';
 
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alikes (i/l/1, o/0)
 const LOBBY_POLL_MS = 10_000;
@@ -94,7 +94,7 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money poker against real people. Everyone starts with {START_STACK / BB}bb, blinds 0.5/1, and busted players get a fresh stack.
+            Free play-money poker against real people. Every table is {STAKES} (No-Limit Hold’em, blinds {SB}/{BB}): everyone starts with {START_STACK} chips, which is {START_STACK / BB} big blinds, and busted players get a fresh stack.
           </p>
         </div>
       </header>

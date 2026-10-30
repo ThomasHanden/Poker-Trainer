@@ -22,7 +22,8 @@ export const MAX_TIMEOUTS = 2;
 /** Always-open tables anyone can join from the lobby; hands deal themselves. */
 export const PUBLIC_TABLES = ['public-1', 'public-2', 'public-3', 'public-4'];
 export const isPublicTable = (room: string) => PUBLIC_TABLES.includes(room);
-export const tableLabel = (room: string) => (isPublicTable(room) ? `Public table ${room.slice('public-'.length)}` : `Table ${room}`);
+export const STAKES = `${SB}/${BB} NLH`;
+export const tableLabel = (room: string) => (isPublicTable(room) ? `${STAKES} #${room.slice('public-'.length)}` : `${STAKES} · ${room}`);
 
 export type ClientMessage =
   | { type: 'sit'; name: string }
