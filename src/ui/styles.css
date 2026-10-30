@@ -6286,3 +6286,51 @@ label > span:first-child:not(.select-value) {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.live-public {
+  margin: 8px 0 24px;
+}
+.live-tables {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.live-tables li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.lt-name {
+  font-weight: 600;
+  min-width: 9.5em;
+}
+.live-card .lt-count {
+  flex: 1;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.live-subhead {
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+}
+.live-card h3 {
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+@media (max-width: 480px) {
+  .live-tables li {
+    flex-wrap: wrap;
+    gap: 2px 12px;
+  }
+  .lt-name {
+    min-width: 0;
+  }
+  .live-card .lt-count {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .live-tables .btn {
+    margin-left: auto;
+  }
+}

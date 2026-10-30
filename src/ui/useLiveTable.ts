@@ -9,6 +9,12 @@ export const PARTY_HOST: string | undefined = import.meta.env.VITE_PARTY_HOST ||
 
 export type LiveStatus = 'connecting' | 'open' | 'closed';
 
+/** Plain HTTP address for a table's lobby summary (partysocket picks ws/wss the same way). */
+export function tableInfoUrl(room: string): string {
+  const local = /^(localhost|127\.0\.0\.1)[:/]/.test(PARTY_HOST ?? '');
+  return `${local ? 'http' : 'https'}://${PARTY_HOST}/parties/poker-table/${encodeURIComponent(room)}`;
+}
+
 /** One id per browser tab, kept across reloads so a refresh keeps your seat. */
 function tabId(): string {
   try {

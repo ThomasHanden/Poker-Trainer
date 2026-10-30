@@ -3,13 +3,24 @@
 // The game rules live in src/multiplayer/table.ts; this file only moves messages and runs the timer.
 
 import { Server, routePartykitRequest, type Connection, type WSMessage } from 'partyserver';
-import { LiveTable } from '../src/multiplayer/table';
+import { LiveTable, isPublicTable } from '../src/multiplayer/table';
 
 type Env = { PokerTable: DurableObjectNamespace<PokerTable> };
 
 export class PokerTable extends Server<Env> {
   table = new LiveTable();
   timer: ReturnType<typeof setTimeout> | null = null;
+
+  onStart() {
+    this.table = new LiveTable({ autoDeal: isPublicTable(this.name) });
+  }
+
+  /** Plain GET: how full the table is, for the lobby. */
+  onRequest() {
+    return Response.json(this.table.summary(), {
+      headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+    });
+  }
 
   onConnect(conn: Connection) {
     this.table.setOnline(conn.id, true);
@@ -36,10 +47,11 @@ export class PokerTable extends Server<Env> {
     this.update();
   }
 
-  /** Send everyone their own view and set the timer for the next turn timeout or deal. */
+  /** Send everyone their own view and set the timer for whatever the table does next. */
   update() {
     for (const c of this.getConnections()) c.send(JSON.stringify(this.table.viewFor(c.id)));
-    clearTimeout(this.timer);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     const at = this.table.nextDeadline();
     if (at === null) return;
     this.timer = setTimeout(() => {

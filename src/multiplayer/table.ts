@@ -3,7 +3,7 @@
 // can be unit tested; the server only passes messages in and sends views out.
 
 import { fullDeck } from '../engine/cards';
-import { applyAction, buttonIndexFor, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
+import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
 
 export const SB = 1;
 export const BB = 2;
@@ -14,6 +14,15 @@ export const TURN_MS = 30_000;
 /** Turn time for a player who has disconnected or left mid-hand. */
 export const AWAY_TURN_MS = 3_000;
 export const NEXT_HAND_MS = 6_000;
+/** How long a seat is held for a player who dropped between hands (long enough for a reload). */
+export const RECONNECT_MS = 20_000;
+/** Timed-out turns in a row before a player is stood up. */
+export const MAX_TIMEOUTS = 2;
+
+/** Always-open tables anyone can join from the lobby; hands deal themselves. */
+export const PUBLIC_TABLES = ['public-1', 'public-2', 'public-3', 'public-4'];
+export const isPublicTable = (room: string) => PUBLIC_TABLES.includes(room);
+export const tableLabel = (room: string) => (isPublicTable(room) ? `Public table ${room.slice('public-'.length)}` : `Table ${room}`);
 
 export type ClientMessage =
   | { type: 'sit'; name: string }
@@ -25,7 +34,10 @@ export interface SeatView {
   id: string;
   name: string;
   stack: number;
+  /** disconnected */
   away: boolean;
+  /** standing up when the current hand ends */
+  leaving: boolean;
   /** dealt into the current hand */
   playing: boolean;
 }
@@ -35,6 +47,8 @@ export interface TableView {
   you: string;
   seats: SeatView[];
   maxSeats: number;
+  /** hands deal themselves (public tables); otherwise someone presses Deal for the first hand */
+  autoDeal: boolean;
   /** the current (or last finished) hand, with the deck and other players' cards removed */
   hand: HandState | null;
   /** the viewer's index in hand.players, or -1 when not in the hand */
@@ -48,12 +62,21 @@ export interface TableView {
 
 export type ServerMessage = TableView | { type: 'error'; message: string };
 
+/** What the lobby shows for a table. */
+export interface TableSummary {
+  players: number;
+  maxSeats: number;
+  playing: boolean;
+}
+
 interface Seat {
   id: string;
   name: string;
   stack: number;
-  /** asked to leave mid-hand; removed once the hand ends */
   leaving: boolean;
+  /** when the player's connection dropped, or null while connected */
+  offlineSince: number | null;
+  timeouts: number;
 }
 
 const ACTION_TYPES = ['fold', 'check', 'call', 'bet', 'raise', 'allin'];
@@ -83,6 +106,12 @@ function shuffle<T>(a: T[]): T[] {
   return a;
 }
 
+export interface LiveTableOptions {
+  autoDeal?: boolean;
+  clock?: () => number;
+  shuffleDeck?: <T>(a: T[]) => T[];
+}
+
 export class LiveTable {
   seats: Seat[] = []; // clockwise
   hand: HandState | null = null;
@@ -91,14 +120,17 @@ export class LiveTable {
   handNo = 0;
   turnEndsAt: number | null = null;
   nextHandAt: number | null = null;
+  readonly autoDeal: boolean;
   private button = 0; // index into seats
   private settled = 0; // handNo of the last hand whose result was paid out
-  private online = new Set<string>();
+  private clock: () => number;
+  private shuffleDeck: <T>(a: T[]) => T[];
 
-  constructor(
-    private clock: () => number = Date.now,
-    private shuffleDeck: <T>(a: T[]) => T[] = shuffle,
-  ) {}
+  constructor(opts: LiveTableOptions = {}) {
+    this.autoDeal = opts.autoDeal ?? false;
+    this.clock = opts.clock ?? Date.now;
+    this.shuffleDeck = opts.shuffleDeck ?? shuffle;
+  }
 
   inHand(): boolean {
     return !!this.hand && !this.hand.complete;
@@ -118,7 +150,11 @@ export class LiveTable {
         return this.start();
       case 'action': {
         const a = cleanAction(m.action);
-        return a ? this.act(id, a) : 'Bad action';
+        if (!a) return 'Bad action';
+        const err = this.act(id, a);
+        const seat = this.seatOf(id);
+        if (!err && seat) seat.timeouts = 0;
+        return err;
       }
       default:
         return 'Unknown message';
@@ -126,40 +162,49 @@ export class LiveTable {
   }
 
   setOnline(id: string, on: boolean) {
-    if (on) this.online.add(id);
-    else this.online.delete(id);
-    if (!on) this.hurryIfToAct(id);
+    const seat = this.seatOf(id);
+    if (!seat) return;
+    if (on) {
+      seat.offlineSince = null;
+    } else {
+      seat.offlineSince ??= this.clock();
+      this.hurryIfToAct(id);
+    }
+    this.refreshNextHand();
+  }
+
+  summary(): TableSummary {
+    return { players: this.seats.length, maxSeats: MAX_SEATS, playing: this.inHand() };
   }
 
   sit(id: string, name: string): string | null {
-    const seat = this.seats.find((s) => s.id === id);
+    const seat = this.seatOf(id);
     if (seat) {
       seat.name = name;
       seat.leaving = false;
-      return null;
+      seat.offlineSince = null;
+    } else {
+      if (this.seats.length >= MAX_SEATS) return 'The table is full';
+      this.seats.push({ id, name, stack: START_STACK, leaving: false, offlineSince: null, timeouts: 0 });
     }
-    if (this.seats.length >= MAX_SEATS) return 'The table is full';
-    this.seats.push({ id, name, stack: START_STACK, leaving: false });
-    if (!this.inHand() && this.nextHandAt === null && this.hand && this.readyCount() >= 2) this.nextHandAt = this.clock() + NEXT_HAND_MS;
+    this.refreshNextHand();
     return null;
   }
 
   leave(id: string) {
-    const seat = this.seats.find((s) => s.id === id);
+    const seat = this.seatOf(id);
     if (!seat) return;
-    if (this.inHand() && this.order.includes(id)) {
-      seat.leaving = true;
-      this.hurryIfToAct(id);
-    } else {
-      this.removeSeat(id);
-    }
+    const k = this.order.indexOf(id);
+    seat.leaving = true;
+    if (this.inHand() && k >= 0) this.forfeitSeat(id);
+    // an all-in player's hand plays on to showdown; they stand up when it ends
+    if (!(this.inHand() && k >= 0 && !this.hand!.players[k].folded)) this.removeSeat(id);
   }
 
   start(): string | null {
     if (this.inHand()) return 'A hand is already being played';
     this.nextHandAt = null;
-    // Seats whose players closed the page between hands are cleared here, so a quick reload keeps the seat.
-    for (const s of [...this.seats]) if (s.leaving || !this.online.has(s.id)) this.removeSeat(s.id);
+    for (const s of [...this.seats]) if (s.leaving || s.offlineSince !== null) this.removeSeat(s.id);
     const n = this.seats.length;
     if (n < 2) return 'You need at least two players';
     // players[] runs UTG ... BTN, SB, BB (clockwise); rotate the seats so the button seat lands on BTN.
@@ -194,26 +239,36 @@ export class LiveTable {
 
   /** The next time tick() has work to do, or null. */
   nextDeadline(): number | null {
-    return this.inHand() ? this.turnEndsAt : this.nextHandAt;
+    if (this.inHand()) return this.turnEndsAt;
+    const times = [this.nextHandAt, ...this.seats.map((s) => (s.offlineSince === null ? null : s.offlineSince + RECONNECT_MS))];
+    const due = times.filter((t): t is number => t !== null);
+    return due.length ? Math.min(...due) : null;
   }
 
-  /** Run whatever is due: an expired turn or the next deal. Returns true if anything changed. */
+  /** Run whatever is due: an expired turn, a dropped player's seat, or the next deal. Returns true if anything changed. */
   tick(): boolean {
     const now = this.clock();
     const h = this.hand;
     if (h && !h.complete) {
       if (this.turnEndsAt === null || now < this.turnEndsAt) return false;
       const id = this.order[h.toAct];
-      const la = legalActions(h);
-      const gone = !this.online.has(id) || this.seatOf(id)?.leaving;
-      // check when free (fold instead if they have left), otherwise fold
-      const tries: PlayerAction['type'][] = la?.canCheck && !gone ? ['check', 'fold'] : ['fold', 'check'];
-      if (tries.every((type) => this.act(id, { type }) !== null)) this.turnEndsAt = null; // should not happen; avoid a timer loop
+      const seat = this.seatOf(id);
+      if (seat && !seat.leaving && seat.offlineSince === null && ++seat.timeouts >= MAX_TIMEOUTS) seat.leaving = true;
+      this.autoAct(id);
       return true;
     }
-    if (this.nextHandAt === null || now < this.nextHandAt) return false;
-    this.start();
-    return true;
+    let changed = false;
+    for (const s of [...this.seats]) {
+      if (s.offlineSince !== null && now >= s.offlineSince + RECONNECT_MS) {
+        this.removeSeat(s.id);
+        changed = true;
+      }
+    }
+    if (this.nextHandAt !== null && now >= this.nextHandAt) {
+      this.start();
+      changed = true;
+    }
+    return changed;
   }
 
   /** What one player is allowed to see. Never includes the deck or other players' cards. */
@@ -227,10 +282,12 @@ export class LiveTable {
         id: s.id,
         name: s.name,
         stack: s.stack,
-        away: !this.online.has(s.id) || s.leaving,
+        away: s.offlineSince !== null,
+        leaving: s.leaving,
         playing: this.inHand() && this.order.includes(s.id),
       })),
       maxSeats: MAX_SEATS,
+      autoDeal: this.autoDeal,
       hand: h && {
         ...h,
         deck: [],
@@ -248,14 +305,32 @@ export class LiveTable {
     };
   }
 
+  /** Act for a player who is out of time: check when free, otherwise fold. Players who have gone are folded. */
+  private autoAct(id: string) {
+    const seat = this.seatOf(id);
+    if ((!seat || seat.leaving || seat.offlineSince !== null) && this.forfeitSeat(id)) return;
+    const la = legalActions(this.hand!);
+    const tries: PlayerAction['type'][] = la?.canCheck ? ['check', 'fold'] : ['fold', 'check'];
+    if (tries.every((type) => this.act(id, { type }) !== null)) this.turnEndsAt = null; // should not happen; avoid a timer loop
+  }
+
+  /** Fold a departed player's hand, in or out of turn. Returns false if it could not be folded (all-in). */
+  private forfeitSeat(id: string): boolean {
+    const next = forfeit(this.hand!, this.order.indexOf(id));
+    if (next === this.hand) return false;
+    this.hand = next;
+    this.afterChange();
+    return true;
+  }
+
   private afterChange() {
     const h = this.hand!;
     if (h.complete) {
       if (this.settled !== this.handNo) this.finishHand();
       return;
     }
-    const id = this.order[h.toAct];
-    const away = !this.online.has(id) || this.seatOf(id)?.leaving;
+    const seat = this.seatOf(this.order[h.toAct]);
+    const away = !seat || seat.leaving || seat.offlineSince !== null;
     this.turnEndsAt = this.clock() + (away ? AWAY_TURN_MS : TURN_MS);
   }
 
@@ -269,7 +344,15 @@ export class LiveTable {
     });
     if (this.seats.length) this.button = (this.button + 1) % this.seats.length;
     for (const s of this.seats.filter((x) => x.leaving)) this.removeSeat(s.id);
-    this.nextHandAt = this.readyCount() >= 2 ? this.clock() + NEXT_HAND_MS : null;
+    this.refreshNextHand();
+  }
+
+  /** Schedule or cancel the next deal to match who is at the table. */
+  private refreshNextHand() {
+    if (this.inHand()) return;
+    const ready = this.seats.filter((s) => !s.leaving && s.offlineSince === null).length;
+    if (ready < 2) this.nextHandAt = null;
+    else if (this.nextHandAt === null && (this.hand || this.autoDeal)) this.nextHandAt = this.clock() + NEXT_HAND_MS;
   }
 
   private hurryIfToAct(id: string) {
@@ -286,11 +369,7 @@ export class LiveTable {
     // keep the button on the same player when someone before it leaves
     if (k < this.button) this.button--;
     if (this.button >= this.seats.length) this.button = 0;
-    if (this.readyCount() < 2 && !this.inHand()) this.nextHandAt = null;
-  }
-
-  private readyCount(): number {
-    return this.seats.filter((s) => !s.leaving && this.online.has(s.id)).length;
+    this.refreshNextHand();
   }
 
   private seatOf(id: string): Seat | undefined {

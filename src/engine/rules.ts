@@ -459,6 +459,33 @@ export function applyAction(prev: HandState, action: PlayerAction, scripted = fa
   return s;
 }
 
+/**
+ * Fold a player who has left a live table, in or out of turn and even when checking is free.
+ * All-in players are left alone: their hand stays live to showdown.
+ */
+export function forfeit(prev: HandState, player: number): HandState {
+  const q = prev.players[player];
+  if (prev.complete || q.folded || q.allIn) return prev;
+  const s = cloneState(prev);
+  const p = s.players[player];
+  s.history.push({
+    street: s.street,
+    player,
+    type: 'fold',
+    amount: 0,
+    to: p.streetCommitted,
+    allIn: false,
+    potBefore: potSize(s),
+    toCallBefore: Math.max(0, Math.min(s.currentBet - p.streetCommitted, p.stack)),
+  });
+  p.folded = true;
+  p.hasActed = true;
+  // whoever was to act may now have nothing left to decide
+  s.toAct = s.toAct === player ? nextToAct(s, player) : nextToAct(s, s.toAct, true);
+  finishRoundIfNeeded(s);
+  return s;
+}
+
 function finishRoundIfNeeded(s: HandState) {
   if (s.complete) return;
   const live = livePlayers(s);
