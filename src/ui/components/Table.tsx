@@ -4,6 +4,7 @@ import { PlayingCard, CardRow, DEAL_GAP, DEAL_ANIM } from './Card';
 import { PROFILES, ProfileId } from '../../opponents/profiles';
 import { Term } from './Term';
 import { describeHolding } from '../../engine/board';
+import { describeScore, evaluate } from '../../engine/evaluator';
 
 export const fmtBB = (chips: number, bb: number) => {
   const v = chips / bb;
@@ -156,6 +157,8 @@ export function Table({
   // live: who won what, for the winner highlight and the pot sliding over
   const won = live && state.complete && state.result ? state.result.payouts : null;
   const winners = new Set(live && state.complete && state.result ? state.players.filter((p) => (state.result!.net[p.index] ?? 0) > 0).map((p) => p.index) : []);
+  // live tables name the exact hand ("Three Jacks"), matching the result line; practice describes it for teaching
+  const shownHand = (hole: HandState['board']) => (live ? describeScore(evaluate([...hole, ...state.board])) : describeHolding(hole, state.board));
   // timer bar: restart for each new turn, starting from however much time is left
   const turnKey = `${deal}-${state.history.length}-${state.toAct}`;
   const timer = useMemo(() => {
@@ -193,7 +196,7 @@ export function Table({
   };
   return (
     <div className="table-wrap" aria-label="Poker table">
-      <div className={`felt ${n >= 8 ? 'crowded' : ''}`}>
+      <div className={`felt ${n >= 8 ? 'crowded' : ''} ${live ? 'live' : ''}`}>
         <div className="felt-line" aria-hidden="true" />
         <div className="table-center">
           {/* live: once the pot has gone to the winner, the middle is empty */}
@@ -266,8 +269,15 @@ export function Table({
                   ) : (
                     act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
                   )}
-                  {winners.has(i) && won && <div className="seat-action seat-win">Wins {fmtBB(won[i], bb)}</div>}
-                  {showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{describeHolding(p.hole, state.board)}</div>}
+                  {winners.has(i) && won ? (
+                    // one badge: what they won, and with what at a showdown
+                    <div className="seat-win">
+                      <strong>Wins {fmtBB(won[i], bb)}</strong>
+                      {showdown.has(i) && state.board.length === 5 && <span>{shownHand(p.hole)}</span>}
+                    </div>
+                  ) : (
+                    showdown.has(i) && state.board.length === 5 && <div className="seat-showdown">{shownHand(p.hole)}</div>
+                  )}
                 </div>
               </div>
               {winners.has(i) && won && (
