@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { HandState, potSize, ActionRecord, effectiveStack } from '../../engine/rules';
-import { PlayingCard, CardRow } from './Card';
+import { PlayingCard, CardRow, DEAL_GAP, DEAL_ANIM } from './Card';
 import { PROFILES, ProfileId } from '../../opponents/profiles';
 import { Term } from './Term';
 import { describeHolding } from '../../engine/board';
@@ -87,6 +87,9 @@ function innerChip(p: { x: number; y: number }): { x: number; y: number } {
   return p;
 }
 
+/** How long dealing the hole cards takes for a table of n players (ms). */
+export const dealMs = (n: number) => Math.round(((2 * n - 1) * DEAL_GAP + DEAL_ANIM) * 1000);
+
 // felt proportions (must match .felt aspect-ratio in styles.css)
 const LANDSCAPE = { w: 2.1, h: 1 };
 const PORTRAIT = { w: 1, h: 1.75 };
@@ -100,6 +103,7 @@ export function Table({
   revealAll = false,
   spotlight,
   showNames = false,
+  handKey,
 }: {
   state: HandState;
   hero: number;
@@ -110,6 +114,8 @@ export function Table({
   spotlight?: { seat: number; label: string };
   /** live tables: show each player's name after their position */
   showNames?: boolean;
+  /** changes with each new hand so the hole cards are dealt again; defaults to the hole cards themselves */
+  handKey?: string | number;
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -117,6 +123,9 @@ export function Table({
   const totalPot = potSize(state);
   const streetBets = state.players.reduce((a, p) => a + p.streetCommitted, 0);
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
+  const deal = handKey ?? state.players.map((p) => p.hole.join('.')).join('|');
+  // hole cards go out one at a time, starting left of the button, two rounds
+  const dealDelay = (i: number, round: number) => `${(round * n + ((i - state.buttonIndex - 1 + n) % n)) * DEAL_GAP}s`;
   // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
   const box = narrow ? PORTRAIT : LANDSCAPE;
@@ -153,7 +162,7 @@ export function Table({
             <Term id="pot">Pot</Term> <strong data-testid="pot">{fmtBB(totalPot, bb)}</strong>
           </div>
           <div className="board" aria-label="Community cards">
-            <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} />
+            <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} deal />
           </div>
           <div className="pot-sub">
             {streetBets > 0 && potBefore > 0 && !state.complete ? `${fmtBB(potBefore, bb)} in the middle + ${fmtBB(streetBets, bb)} bet this street` : '\u00a0'}
@@ -170,13 +179,22 @@ export function Table({
           const isTurn = spotlight ? spotlight.seat === i : state.toAct === i && !state.complete;
           const show = p.isHero || showdown.has(i) || revealAll;
           const prof = profiles[i];
-          const cards =
-            p.folded ? null : p.hole.length === 2 && show ? (
-              <div className={`seat-cards ${p.isHero ? 'big' : ''}`}>
-                <PlayingCard card={p.hole[0]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
-                <PlayingCard card={p.hole[1]} size={p.isHero ? 'lg' : 'sm'} fourColor={fourColor} />
-              </div>
-            ) : null;
+          const faceUp = p.hole.length === 2 && show;
+          // dealt face up (yours) or face down, then flipped when shown at showdown
+          const anim = faceUp && !p.isHero ? 'reveal' : 'deal';
+          const cards = p.folded ? null : (
+            <div key={`${deal}-${faceUp ? 'up' : 'down'}`} className={`seat-cards ${p.isHero ? 'big' : ''} ${faceUp ? '' : 'backs'} ${anim}`}>
+              {[0, 1].map((r) => (
+                <PlayingCard
+                  key={r}
+                  card={faceUp ? p.hole[r] : undefined}
+                  size={p.isHero ? 'lg' : 'sm'}
+                  fourColor={fourColor}
+                  style={anim === 'deal' ? { animationDelay: dealDelay(i, r) } : undefined}
+                />
+              ))}
+            </div>
+          );
           return (
             <div key={i}>
               <div

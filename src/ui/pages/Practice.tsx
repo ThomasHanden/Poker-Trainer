@@ -8,7 +8,7 @@ import { PlaySession, startSession, heroAct } from '../../scenarios/play';
 import { PlayerAction, legalActions, winnablePot } from '../../engine/rules';
 import { buildTimeline, TimelineStep } from '../../engine/timeline';
 import { ScenarioEvaluation, LiveHelp, Assistance, DecisionEvaluation } from '../../evaluation/evaluate';
-import { Table, DecisionFacts, actionText, fmtBB } from '../components/Table';
+import { Table, DecisionFacts, actionText, fmtBB, dealMs } from '../components/Table';
 import { stepCaption } from '../components/HandReplay';
 import { ActionBar } from '../components/ActionBar';
 import { SettingsPanel, settingsSummary } from '../components/SettingsPanel';
@@ -199,7 +199,10 @@ export function PracticePage() {
   useEffect(() => {
     if (!pb) return;
     const last = pb.steps.length - 1;
-    const t = setTimeout(() => setPb(pb.i >= last ? null : { ...pb, i: pb.i + 1 }), stepDelay(pb.steps, pb.i) * SPEED[speed]);
+    const step = pb.steps[pb.i];
+    // the first step is the deal: wait for the cards to finish going out before the action starts
+    const wait = step.record ? stepDelay(pb.steps, pb.i) * SPEED[speed] : Math.max(stepDelay(pb.steps, pb.i) * SPEED[speed], dealMs(step.state.players.length) + 400);
+    const t = setTimeout(() => setPb(pb.i >= last ? null : { ...pb, i: pb.i + 1 }), wait);
     return () => clearTimeout(t);
   }, [pb, speed]);
 

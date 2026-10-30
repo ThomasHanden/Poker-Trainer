@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
-import { Table, DecisionFacts, HistoryList, fmtBB } from '../components/Table';
+import { Table, DecisionFacts, HistoryList, fmtBB, dealMs } from '../components/Table';
 import { ActionBar } from '../components/ActionBar';
 import { PARTY_HOST, tableInfoUrl, useLiveTable } from '../useLiveTable';
 import { MAX_SEATS, NAME_MAX, START_STACK, SB, BB, STAKES, PUBLIC_TABLES, tableLabel, type TableSummary } from '../../multiplayer/table';
@@ -181,6 +181,17 @@ export function PlayTablePage() {
   // one action per turn: re-enable when the server sends the next state
   useEffect(() => setSent(false), [h?.history.length, view?.handNo]);
 
+  // let the cards go out before showing the action buttons
+  const [dealing, setDealing] = useState(false);
+  const players = h?.players.length ?? 0;
+  useEffect(() => {
+    if (!view?.handNo || !players) return;
+    setDealing(true);
+    const t = setTimeout(() => setDealing(false), dealMs(players));
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view?.handNo]);
+
   const invite = `${location.origin}${location.pathname}#/play/${room}`;
   const copy = async () => {
     try {
@@ -314,9 +325,11 @@ export function PlayTablePage() {
         </section>
       ) : (
         <div className="practice-body">
-          <Table state={h!} hero={me >= 0 ? me : 0} profiles={{}} fourColor={data.prefs.fourColor} showNames />
+          <Table state={h!} hero={me >= 0 ? me : 0} profiles={{}} fourColor={data.prefs.fourColor} showNames handKey={view.handNo} />
           <p className="live-status" aria-live="polite">
-            {live
+            {live && dealing
+              ? 'Dealing…'
+              : live
               ? myTurn
                 ? `Your turn · ${turnLeft ?? ''}s`
                 : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
@@ -325,7 +338,7 @@ export function PlayTablePage() {
                 : 'Hand over'}
             {!live && dealIn !== null && ` · Next hand in ${dealIn}s`}
           </p>
-          {myTurn && (
+          {myTurn && !dealing && (
             <section className="decision-panel" aria-label="Your decision">
               <DecisionFacts state={h!} hero={me} />
               <ActionBar
