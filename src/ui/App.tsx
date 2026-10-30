@@ -1,5 +1,6 @@
-import { HashRouter, NavLink, Route, Routes, Link } from 'react-router-dom';
+import { HashRouter, NavLink, Route, Routes, Link, useLocation } from 'react-router-dom';
 import { Component, ReactNode, useState } from 'react';
+import { Analytics, type BeforeSendEvent } from '@vercel/analytics/react';
 import { StoreProvider, useStore } from './store';
 import { PracticePage } from './pages/Practice';
 import { LearnPage, LessonPage } from './pages/Learn';
@@ -8,6 +9,7 @@ import { ReviewListPage, ReviewDetailPage } from './pages/Review';
 import { ProgressPage } from './pages/Progress';
 import { HomePage } from './pages/Home';
 import { PlayLobbyPage, PlayTablePage } from './pages/Play';
+import { isPublicTable } from '../multiplayer/table';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -93,11 +95,34 @@ function Shell() {
   );
 }
 
+/** Page path for analytics; private table codes are grouped so each table is not its own page. */
+function analyticsPath(pathname: string): string {
+  const table = pathname.match(/^\/play\/([^/]+)/)?.[1];
+  return table && !isPublicTable(table) ? '/play/[private]' : pathname;
+}
+
+/** Report the hash route (#/practice) as the page, since Vercel Analytics only sees real paths. */
+function withHashRoute(event: BeforeSendEvent): BeforeSendEvent {
+  const url = new URL(event.url);
+  if (url.hash.startsWith('#/')) {
+    url.pathname = analyticsPath(url.hash.slice(1).split('?')[0]);
+    url.hash = '';
+  }
+  return { ...event, url: url.toString() };
+}
+
+/** Vercel Analytics ignores hash changes, so send a page view on each route change ourselves. */
+function PageAnalytics() {
+  const path = analyticsPath(useLocation().pathname);
+  return <Analytics route={path} path={path} beforeSend={withHashRoute} />;
+}
+
 export function App() {
   return (
     <StoreProvider>
       <HashRouter>
         <Shell />
+        <PageAnalytics />
       </HashRouter>
     </StoreProvider>
   );
