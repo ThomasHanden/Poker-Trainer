@@ -268,7 +268,7 @@ export function PlayTablePage() {
   const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
   return (
-    <div className="page practice live">
+    <div className={`page practice live ${(myTurn && !dealing) || canPre ? 'has-dock' : ''}`}>
       <header className="practice-head">
         <div className="ph-main">
           <h1 className="ph-title">{tableLabel(room)}</h1>
@@ -290,7 +290,14 @@ export function PlayTablePage() {
         </div>
         <div className="ph-side live-invite">
           <button className="btn" onClick={copy}>
-            {copied ? 'Link copied' : 'Copy invite link'}
+            {copied ? (
+              'Copied'
+            ) : (
+              <>
+                <span className="long">Copy invite link</span>
+                <span className="short">Invite</span>
+              </>
+            )}
           </button>
           <button
             className="btn ghost"
@@ -299,7 +306,17 @@ export function PlayTablePage() {
               nav('/play');
             }}
           >
-            {mySeat ? 'Leave table' : 'Back to lobby'}
+            {mySeat ? (
+              <>
+                <span className="long">Leave table</span>
+                <span className="short">Leave</span>
+              </>
+            ) : (
+              <>
+                <span className="long">Back to lobby</span>
+                <span className="short">Lobby</span>
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -401,7 +418,7 @@ export function PlayTablePage() {
           </p>
           {busted && <p className="note live-bust">You ran out of chips. You will get a fresh {START_STACK / BB}bb stack next hand.</p>}
           {canPre && (
-            <div className="live-pre" role="group" aria-label="Act in advance">
+            <div className="live-pre live-dock" role="group" aria-label="Act in advance">
               <span className="note">While you wait:</span>
               {(
                 [
@@ -416,7 +433,7 @@ export function PlayTablePage() {
             </div>
           )}
           {myTurn && !dealing && (
-            <section className="decision-panel" aria-label="Your decision">
+            <section className="decision-panel live-dock" aria-label="Your decision">
               <DecisionFacts state={h!} hero={me} />
               <ActionBar
                 state={h!}

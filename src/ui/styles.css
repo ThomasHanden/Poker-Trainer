@@ -6499,3 +6499,98 @@ label > span:first-child:not(.select-value) {
   text-align: center;
   margin: -6px 0 12px;
 }
+
+/* ============================================================
+   Live tables on phones: the whole table and your buttons fit on one screen
+   ============================================================ */
+@media (max-width: 820px) {
+  /* must match PORTRAIT_LIVE in Table.tsx */
+  .felt.live {
+    aspect-ratio: 1 / 1.45;
+  }
+}
+@media (max-width: 680px) {
+  .page.live {
+    padding-top: 8px;
+  }
+  /* header: title and buttons on one row; names and stacks are already on the table */
+  .page.live .practice-head {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 8px;
+    margin-bottom: 4px;
+  }
+  .page.live .ph-title {
+    font-size: 1.1rem;
+    margin: 0;
+  }
+  .page.live .ph-chips .pchip:not(:first-child) {
+    display: none;
+  }
+  .page.live .live-invite {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .page.live .live-invite .btn {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+  /* table: as big as the screen allows after the header, status line and buttons */
+  .page.live .felt.live {
+    /* screen width less the page gutters and the rail, or the height left after the header, status and buttons */
+    width: min(calc(100vw - 112px), calc((100svh - 330px) / 1.45));
+    min-width: 200px;
+    margin: 42px auto 58px;
+  }
+  .page.live .live-status {
+    margin: 0 0 8px;
+  }
+  /* your buttons (or the act-in-advance choices) stay pinned to the bottom of the screen */
+  .page.live .live-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    margin: 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
+  }
+  /* the pot is on the table and the amount to call is on the Call button */
+  .page.live .live-dock .facts,
+  .page.live .live-dock .keys {
+    display: none;
+  }
+  /* all your options on one row, so the buttons take as little of the screen as possible */
+  .page.live .live-dock .action-buttons {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .page.live .live-dock .action-buttons .btn.act.raise:nth-child(3) {
+    grid-column: auto;
+  }
+  .page.live .live-dock .btn.act {
+    height: 48px;
+    min-width: 0;
+    padding: 0 6px;
+  }
+  .page.live .live-invite .short {
+    display: inline;
+  }
+  .page.live .live-invite .long {
+    display: none;
+  }
+  .page.live.has-dock {
+    padding-bottom: 96px;
+  }
+}
+.live-invite .short {
+  display: none;
+}

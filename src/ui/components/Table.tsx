@@ -113,6 +113,8 @@ export const dealMs = (n: number) => Math.round(((2 * n - 1) * DEAL_GAP + DEAL_A
 // felt proportions (must match .felt aspect-ratio in styles.css)
 const LANDSCAPE = { w: 2.1, h: 1 };
 const PORTRAIT = { w: 1, h: 1.75 };
+// live tables seat at most six, so on phones they use a shorter felt that fits beside the action buttons
+const PORTRAIT_LIVE = { w: 1, h: 1.45 };
 
 
 export function Table({
@@ -169,7 +171,7 @@ export function Table({
   }, [turnKey, turnEndsAt, turnMs, live]);
   // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
-  const box = narrow ? PORTRAIT : LANDSCAPE;
+  const box = narrow ? (live ? PORTRAIT_LIVE : PORTRAIT) : LANDSCAPE;
   const geo = (i: number) => {
     const t = ((i - hero + n) % n) / n;
     const raw = stadiumPoint(t, box.w, box.h, 1);
