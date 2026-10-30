@@ -351,7 +351,10 @@ export function PlayTablePage() {
               />
             </section>
           )}
-          <HistoryList state={h!} hero={me} showNames />
+          <details className="more live-history">
+            <summary>Hand history</summary>
+            <HistoryList state={h!} hero={me} showNames />
+          </details>
         </div>
       )}
     </div>
