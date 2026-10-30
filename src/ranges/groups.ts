@@ -36,17 +36,18 @@ export function groupClasses(id: string): HandClass[] {
 export interface GroupShare {
   group: HandGroup;
   played: number; // weighted combos in the range
-  total: number; // combos in the family
+  total: number; // combos in the family (that can be in the spot, when `reach` is given)
 }
 
-export function groupBreakdown(r: Range): GroupShare[] {
+/** Share of each family played. With `reach`, only the combos that can be in the spot count. */
+export function groupBreakdown(r: Range, reach?: Range): GroupShare[] {
   return HAND_GROUPS.map((group) => {
     let played = 0;
     let total = 0;
     for (const h of ALL_CLASSES) {
       if (!group.test(h)) continue;
       const n = comboCount(h);
-      total += n;
+      total += n * (reach ? reach[h] ?? 0 : 1);
       played += n * Math.min(1, r[h] ?? 0);
     }
     return { group, played, total };

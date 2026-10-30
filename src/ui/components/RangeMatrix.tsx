@@ -5,7 +5,9 @@ export interface CellView {
   raise?: number; // 0..1
   call?: number;
   weight?: number; // for single-color ranges
-  tone?: 'a' | 'b' | 'both' | 'value' | 'bluff' | 'ref' | 'miss' | 'extra' | 'new' | 'dropped' | 'none';
+  tone?: 'a' | 'b' | 'both' | 'value' | 'bluff' | 'ref' | 'miss' | 'extra' | 'mixed' | 'new' | 'dropped' | 'none';
+  /** the hand cannot be in this spot (e.g. never opened, so it never faces a 3-bet) */
+  out?: boolean;
   /** fade the cell (used to highlight a hand family or a difference) */
   dim?: boolean;
   blocked?: number; // fraction of combos blocked by dead cards
@@ -16,7 +18,7 @@ export interface CellView {
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 function background(v: CellView): string {
-  if (v.tone && v.tone !== 'none') return '';
+  if (v.out || (v.tone && v.tone !== 'none')) return '';
   const r = v.raise ?? 0;
   const c = v.call ?? 0;
   if (v.weight !== undefined) {
@@ -84,14 +86,14 @@ export function RangeMatrix({
               const c0 = v.call ?? 0;
               const desc =
                 v.label ??
-                (v.weight !== undefined ? `${pct(v.weight)} included` : r0 + c0 > 0 ? `${r0 ? `raise ${pct(r0)}` : ''}${r0 && c0 ? ', ' : ''}${c0 ? `call ${pct(c0)}` : ''}` : 'fold');
+                (v.out ? 'not in the range here' : v.weight !== undefined ? `${pct(v.weight)} included` : r0 + c0 > 0 ? `${r0 ? `raise ${pct(r0)}` : ''}${r0 && c0 ? ', ' : ''}${c0 ? `call ${pct(c0)}` : ''}` : 'fold');
               return (
                 <button
                   type="button"
                   role="gridcell"
                   key={h}
                   data-hand={h}
-                  className={`cell ${r === c ? 'pair' : r < c ? 'suited' : 'offsuit'} ${v.tone ? `t-${v.tone}` : ''} ${selected === h ? 'sel' : ''} ${v.disabled ? 'dis' : ''} ${v.dim ? 'dimmed' : ''}`}
+                  className={`cell ${r === c ? 'pair' : r < c ? 'suited' : 'offsuit'} ${v.tone ? `t-${v.tone}` : ''} ${v.out ? 'out' : ''} ${selected === h ? 'sel' : ''} ${v.disabled ? 'dis' : ''} ${v.dim ? 'dimmed' : ''}`}
                   style={{ backgroundImage: background(v) || undefined, opacity: v.blocked ? Math.max(0.25, 1 - v.blocked) : undefined }}
                   aria-label={`${h}: ${desc}${v.blocked ? `, ${pct(v.blocked)} of combos blocked` : ''}, ${comboCount(h)} combos`}
                   aria-pressed={v.weight !== undefined ? v.weight > 0 : undefined}
@@ -114,7 +116,7 @@ export function RangeMatrix({
                   <span className="cell-h">{h}</span>
                   {showNumbers && (
                     <span className="cell-n">
-                      {v.weight !== undefined ? (v.weight > 0 ? Math.round(v.weight * 100) : '') : r0 + c0 > 0 ? `${r0 ? `R${Math.round(r0 * 100)}` : ''}${c0 ? ` C${Math.round(c0 * 100)}` : ''}` : ''}
+                      {v.out ? '' : v.weight !== undefined ? (v.weight > 0 ? Math.round(v.weight * 100) : '') : r0 + c0 > 0 ? `${r0 ? `R${Math.round(r0 * 100)}` : ''}${c0 ? ` C${Math.round(c0 * 100)}` : ''}` : ''}
                     </span>
                   )}
                 </button>
@@ -127,13 +129,14 @@ export function RangeMatrix({
   );
 }
 
-export function MatrixLegend({ kind }: { kind: 'chart' | 'weight' | 'compare' | 'drill' }) {
+export function MatrixLegend({ kind, labels }: { kind: 'chart' | 'weight' | 'compare' | 'drill'; labels?: { raise?: string | null; call?: string | null; out?: string | null } }) {
   const items: [string, string][] =
     kind === 'chart'
       ? [
-          ['raise', 'Raise / 3-bet / shove'],
-          ['call', 'Call'],
+          ...(labels?.raise !== null ? [['raise', labels?.raise ?? 'Raise / 3-bet / shove'] as [string, string]] : []),
+          ...(labels?.call !== null ? [['call', labels?.call ?? 'Call'] as [string, string]] : []),
           ['fold', 'Fold'],
+          ...(labels?.out ? [['out', labels.out] as [string, string]] : []),
         ]
       : kind === 'weight'
         ? [['fill', 'Included (fill height = weight)']]

@@ -129,6 +129,10 @@ export function defendChartFor(s: HandState, actor: number, opener: number, mult
   const late = ['CO', 'BTN', 'SB'].includes(op);
   if (s.players.length === 2) return getChart('cash6-BB-vs-BTN');
   if (multiway && (me === 'BB' || me === 'SB')) return getChart('cash6-BB-squeeze-vs-CO-BTN');
+  // full-ring early seats (UTG+1, MP, LJ) use the 6-max UTG chart, the closest in strength
+  const six = (p: string) => (['UTG1', 'MP', 'LJ'].includes(p) ? 'UTG' : p);
+  const exact = getChart(`cash6-${six(me)}-vs-${six(op)}`);
+  if (exact) return exact;
   if (me === 'BB') return getChart(op === 'BTN' || op === 'SB' ? 'cash6-BB-vs-BTN' : op === 'CO' ? 'cash6-BB-vs-CO' : 'cash6-BB-vs-UTG');
   if (me === 'SB') return getChart('cash6-SB-vs-BTN');
   if (late) return getChart('cash6-BTN-vs-CO');

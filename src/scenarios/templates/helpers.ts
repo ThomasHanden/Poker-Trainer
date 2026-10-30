@@ -154,40 +154,88 @@ export function mixWeight(ctx: BuildContext, clear: (h: Card[], b: Card[]) => bo
 
 // ---------------- Preflop explanation of a hand's place in a range ----------------
 
-export function explainPreflopHand(h: HandClass, f: { raise: number; call: number; fold: number }, chart?: Chart): string[] {
-  const out: string[] = [];
-  const eq = equityVsRandom()[h];
+const choose3 = (n: number) => (n * (n - 1) * (n - 2)) / 6;
+
+/** Number of different five-card straights that contain both ranks (matrix indices, 0 = ace). */
+function straightsContaining(a: number, b: number): number {
+  // rank values 14 (A) .. 2; the ace also plays low in the wheel
+  const va = 14 - a;
+  const vb = 14 - b;
+  let n = 0;
+  for (let top = 5; top <= 14; top++) {
+    const inStraight = (v: number) => (v <= top && v >= top - 4) || (v === 14 && top === 5);
+    if (inStraight(va) && inStraight(vb)) n++;
+  }
+  return n;
+}
+
+/** Hands that dominate an unpaired hand: they share one card and have a higher other card. */
+function dominators(h: HandClass): string[] {
   const hi = MATRIX_RANKS.indexOf(h[0]);
   const lo = MATRIX_RANKS.indexOf(h[1]);
-  const gap = lo - hi;
-  out.push(`${describeClass(h)} has about ${(eq * 100).toFixed(0)}% all-in equity against a random hand (raw strength), and ranks #${rankIndex(h) + 1} of 169 in this app’s playability ordering.`);
+  const out: string[] = [];
+  for (let z = 0; z < lo; z++) if (z !== hi) out.push(z < hi ? MATRIX_RANKS[z] + h[0] : h[0] + MATRIX_RANKS[z]); // keep the high card, better kicker
+  for (let z = 0; z < hi; z++) out.push(MATRIX_RANKS[z] + h[1]); // keep the low card, beat the high card
+  return out;
+}
+
+export function explainPreflopHand(h: HandClass, f: { raise: number; call: number; fold: number }, chart?: Chart): string[] {
+  const out: string[] = [];
+  const eqs = equityVsRandom();
+  const eq = eqs[h];
+  const hi = MATRIX_RANKS.indexOf(h[0]);
+  const lo = MATRIX_RANKS.indexOf(h[1]);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  out.push(`${describeClass(h)} has about ${pct(eq)} all-in equity against a random hand (raw strength), and ranks #${rankIndex(h) + 1} of 169 in this app’s playability ordering.`);
   if (isPair(h)) {
-    out.push(
-      hi <= 3
-        ? 'Big pairs are ahead of almost every range and want to build the pot.'
-        : 'A pocket pair flops a set or better about 12% of the time (roughly 1 in 8.5). Small pairs depend on that, so they need stacks deep enough to get paid when they hit (implied odds), and they struggle to continue on boards with overcards.',
-    );
+    // exact flop odds: 50 unseen cards, 2 left of our rank, 4 of each higher rank
+    const set = 1 - choose3(48) / choose3(50);
+    const over = 1 - choose3(50 - 4 * hi) / choose3(50);
+    if (hi === 0) out.push('Aces are the best starting hand and want to build the pot.');
+    else if (hi <= 3) out.push(`Big pairs are ahead of almost every range and want to build the pot. At least one overcard still flops ${pct(over)} of the time.`);
+    else if (hi <= 6)
+      out.push(`Medium pairs are usually ahead preflop, but at least one overcard flops ${pct(over)} of the time, which makes them awkward after the flop. They also flop a set or better ${(set * 100).toFixed(1)}% of the time (about 1 in ${(1 / set).toFixed(1)}).`);
+    else
+      out.push(`A pocket pair flops a set or better ${(set * 100).toFixed(1)}% of the time (about 1 in ${(1 / set).toFixed(1)}). Small pairs depend on that, so they need deep enough stacks to get paid when they hit (implied odds), and they struggle on boards with overcards (${pct(over)} of flops have at least one).`);
   } else {
-    if (isSuited(h)) out.push('Being suited adds roughly 2–3% raw equity and, more importantly, flush draws and backdoor draws that let you continue on more flops (better equity realization).');
-    else out.push('Offsuit hands make flushes far less often and flop fewer draws, so they realize less of their equity — especially out of position.');
-    if (gap === 1) out.push('Connected cards make the most straights; they can continue on many boards with draws.');
-    else if (gap === 2 || gap === 3) out.push(`A ${gap - 1}-gap reduces straight possibilities compared to a connector.`);
+    const suited = isSuited(h);
+    if (suited) {
+      const gain = eqs[h] - eqs[h.slice(0, 2) + 'o'];
+      out.push(`Being suited adds about ${(gain * 100).toFixed(1)} points of all-in equity over ${h.slice(0, 2)}o and, more importantly, flush draws and backdoor draws that let you continue on more flops (better equity realization).`);
+    } else out.push('Offsuit hands make flushes far less often and flop fewer draws, so they realize less of their equity — especially out of position.');
+    const straights = straightsContaining(hi, lo);
+    if (straights >= 2) out.push(`${h[0]} and ${h[1]} fit into ${straights} different straights${straights === 4 ? ' — the most any two cards can' : ''}, so the hand flops more straight draws than a hand with a bigger gap.`);
     if (h[0] === 'A') {
-      out.push(
-        lo >= 9
-          ? 'An ace blocks some of the opponent’s strongest hands (AA, AK, AQ), and a suited wheel ace (A5s–A2s) also makes straights — a reason these are popular 3-bet bluffs.'
-          : 'Aces with weak offsuit kickers are often dominated: when you both have an ace, the bigger kicker wins, and you lose big pots with “top pair, bad kicker”.',
-      );
+      if (lo === 1) out.push('AK is the strongest unpaired hand: it dominates every other ace and king (same card, better kicker) and blocks half of the AA and KK combos.');
+      else if (lo <= 4) out.push(`A strong ace: it dominates weaker aces, but ${dominators(h).filter((x) => x[0] === 'A').join(', ')} dominate${dominators(h).filter((x) => x[0] === 'A').length === 1 ? 's' : ''} it.`);
+      else if (lo <= 8)
+        out.push(
+          suited
+            ? 'Suited aces make the nut flush and play better than their offsuit versions, but the kicker is weak when you pair the ace.'
+            : 'Aces with weak offsuit kickers are often dominated: when you both have an ace, the bigger kicker wins, and you lose big pots with “top pair, bad kicker”.',
+        );
+      else
+        out.push(
+          suited
+            ? 'A suited wheel ace (A5s–A2s) blocks AA and AK, makes the nut flush and can make a straight (A-2-3-4-5) — a reason these are popular 3-bet bluffs.'
+            : 'A small offsuit ace blocks AA and AK, but when you pair the ace your kicker is usually beaten.',
+        );
+    } else if (hi <= 4 && lo <= 4 && !suited) {
+      const d = dominators(h);
+      out.push(`Offsuit broadway hands do well against wide ranges but are dominated by the strong hands in a tight range (${h} is dominated by ${d.join(', ')}).`);
     }
-    if (hi <= 4 && lo <= 4 && !isSuited(h)) out.push('Offsuit broadway hands are good against wide ranges but are dominated by the strong hands in a tight range (e.g. KJo vs AK, KQ, AJ).');
   }
   const freqText = (x: number) => `${Math.round(x * 100)}%`;
   if (chart) {
-    const parts: string[] = [];
-    if (f.raise > 0) parts.push(`${chart.raiseLabel.toLowerCase()} ${freqText(f.raise)}`);
-    if (f.call > 0) parts.push(`${(chart.callLabel ?? 'call').toLowerCase()} ${freqText(f.call)}`);
-    if (f.fold > 0) parts.push(`fold ${freqText(f.fold)}`);
-    out.push(`Chart frequencies (${chart.confidence === 'computed' ? 'computed model' : 'illustrative baseline'}): ${parts.join(', ')}.`);
+    if (chart.reach && !(chart.reach[h] > 0)) {
+      out.push(`${h} is not part of ${chart.reachLabel ?? 'the range that reaches this spot'}, so you never hold it here.`);
+    } else {
+      const parts: string[] = [];
+      if (f.raise > 0) parts.push(`${chart.raiseLabel.toLowerCase()} ${freqText(f.raise)}`);
+      if (f.call > 0) parts.push(`${(chart.callLabel ?? 'call').toLowerCase()} ${freqText(f.call)}`);
+      if (f.fold > 0) parts.push(`fold ${freqText(f.fold)}`);
+      out.push(`Chart frequencies (${chart.confidence === 'computed' ? 'computed model' : 'illustrative baseline'}): ${parts.join(', ')}.`);
+    }
   }
   return out;
 }

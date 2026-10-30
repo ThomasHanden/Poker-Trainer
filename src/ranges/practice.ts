@@ -58,7 +58,8 @@ export function buildDrill(kind: DrillKind, seed: number): Drill {
 
 function openDrill(seed: number): MatrixDrill {
   const rng = createRng(seed);
-  const charts = ALL_CHARTS.filter((c) => c.group === 'open');
+  // skip full-ring seats that reuse a 6-max chart, so each distinct chart is equally likely
+  const charts = ALL_CHARTS.filter((c) => c.group === 'open' && !(c.tableSize === 9 && ['LJ', 'HJ', 'CO', 'BTN', 'SB'].includes(c.position)));
   const c = rng.pick(charts);
   const select = ALL_CLASSES.filter((h) => (c.raise[h] ?? 0) >= 0.5);
   const mixed = ALL_CLASSES.filter((h) => (c.raise[h] ?? 0) >= 0.25 && (c.raise[h] ?? 0) <= 0.75);
@@ -97,8 +98,11 @@ function continueDrillOnce(seed: number): MatrixDrill {
   const board = ctx.board;
   const villain = ctx.villains[0].combos;
   const req = ctx.requiredEquity;
-  // hero's candidate range: the BB defending range (hands that reach this river)
+  // hero's candidates: hands from the BB calling range that made at least a pair with a hole card
+  // on the flop (the hands that call a flop c-bet without a draw), in a majority of their combos
   const def = getChart('cash6-BB-vs-BTN')!.call;
+  const flop = board.slice(0, 3);
+  const boardCat = flopCategory(flop);
   const candidates: HandClass[] = [];
   const details: Record<HandClass, string> = {};
   const select: HandClass[] = [];
@@ -106,6 +110,8 @@ function continueDrillOnce(seed: number): MatrixDrill {
     if ((def[h] ?? 0) < 0.3) continue;
     const combos = combosOf(h).filter(([a, b]) => !board.includes(a) && !board.includes(b));
     if (!combos.length) continue;
+    const pairedFlop = combos.filter((hc) => Math.floor(evaluate([...hc, ...flop]) / 16 ** 5) > boardCat).length;
+    if (pairedFlop * 2 < combos.length) continue;
     let eqSum = 0;
     let n = 0;
     for (const hc of combos) {
@@ -132,13 +138,14 @@ function continueDrillOnce(seed: number): MatrixDrill {
   return {
     kind: 'continue',
     title: 'River: which hands call a big bet?',
-    prompt: `Board ${cardsToString(board)}. You defended the big blind, called a flop bet, the turn went check-check, and the button bets ${(ctx.toCall / ctx.bb).toFixed(1)}bb into ${((ctx.pot - ctx.toCall) / ctx.bb).toFixed(1)}bb. You need ${(req * 100).toFixed(0)}% equity. Select the hands that should call.`,
+    prompt: `Board ${cardsToString(board)}. You defended the big blind, called a flop bet, the turn went check-check, and the button bets ${(ctx.toCall / ctx.bb).toFixed(1)}bb into ${((ctx.pot - ctx.toCall) / ctx.bb).toFixed(1)}bb. You need ${(req * 100).toFixed(0)}% equity. The grid shows the hands from your big-blind calling range that flopped a pair or better using a hole card (the ones that called the flop). Select the hands that should call.`,
     board,
     candidates,
     reference: { select },
     details,
     explanation: [
       'Equities are exact river enumerations against the simulated button’s betting range (the opponent model with an unknown/baseline profile), averaged over each hand class’s combos.',
+      'Simplification: hands that would have called the flop with only a draw are left out of the grid.',
       'Pot odds alone decide here because the river is the last street and the call closes the action.',
       'Against real opponents, adjust: fold more vs players who rarely bluff, call more vs aggressive players.',
     ],
@@ -304,6 +311,14 @@ function boardAdvantageDrill(seed: number): ChoiceDrill {
       'Measured here as the share of each range with top pair or better and with two pair or better (using the illustrative baseline charts).',
     ],
   };
+}
+
+/** Hand category of three board cards on their own: 0 high card, 1 pair, 3 trips. */
+export function flopCategory(flop: Card[]): number {
+  const counts = new Map<number, number>();
+  for (const c of flop) counts.set(rankOf(c), (counts.get(rankOf(c)) ?? 0) + 1);
+  const most = Math.max(...counts.values());
+  return most === 3 ? 3 : most === 2 ? 1 : 0;
 }
 
 /** Score a matrix selection against a reference set. */

@@ -222,12 +222,14 @@ function parseWeight(w: string | undefined): number {
 }
 
 /**
- * Parse a range string. Later tokens override earlier ones for the same class.
- * Specific combos (e.g. "AsKs") set a fractional class weight = included combos / class combos.
+ * Parse a range string. Tokens apply in order, so later tokens override earlier ones — down to
+ * single combos: "AKs,AsKs:0.5" keeps three AKs combos fully and AsKs half (weight 0.875).
+ * A class weight is the average weight of its combos.
  */
 export function parseRange(text: string): Range {
   const r = emptyRange();
-  const comboSets = new Map<HandClass, Map<string, number>>();
+  // per-combo weights for classes touched by a specific-combo token
+  const comboWeights = new Map<HandClass, number[]>();
   const tokens = text.split(/[,\n;]+/).map((t) => t.trim()).filter(Boolean);
   for (const tokRaw of tokens) {
     const [handPart, wPart] = tokRaw.split(':');
@@ -238,18 +240,18 @@ export function parseRange(text: string): Range {
       const c2 = makeCard(rIdx(hp[2]), 'cdhs'.indexOf(hp[3].toLowerCase()));
       if (c1 === c2) throw new Error(`Duplicate card in "${hp}"`);
       const cls = classOf(c1, c2);
-      const key = [Math.min(c1, c2), Math.max(c1, c2)].join('-');
-      if (!comboSets.has(cls)) comboSets.set(cls, new Map());
-      comboSets.get(cls)!.set(key, w);
+      const combos = combosOf(cls);
+      if (!comboWeights.has(cls)) comboWeights.set(cls, combos.map(() => r[cls]));
+      const i = combos.findIndex(([a, b]) => (a === c1 && b === c2) || (a === c2 && b === c1));
+      comboWeights.get(cls)![i] = w;
       continue;
     }
-    for (const h of classesForToken(hp)) r[h] = w;
+    for (const h of classesForToken(hp)) {
+      r[h] = w;
+      comboWeights.get(h)?.fill(w);
+    }
   }
-  for (const [cls, set] of comboSets) {
-    let sum = 0;
-    for (const v of set.values()) sum += v;
-    r[cls] = Math.min(1, sum / comboCount(cls));
-  }
+  for (const [cls, ws] of comboWeights) r[cls] = ws.reduce((a, b) => a + b, 0) / ws.length;
   return r;
 }
 

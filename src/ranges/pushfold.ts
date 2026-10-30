@@ -32,6 +32,10 @@ export function solvePushFold(stackBB: number, bbAnte = 0, iterations = 300): Pu
   // average strategies (fictitious play)
   const shoveAvg = new Array(n).fill(1);
   const callAvg = new Array(n).fill(0.5);
+  // Both players start the hand with S. The BB's ante is dead money, so the BB can match at most
+  // S - ante: the all-in pot is 2(S - ante) + ante and the SB keeps its unmatched `ante` chips.
+  const matched = S - bbAnte;
+  const allInPot = 2 * matched + bbAnte;
   const sbFoldEV = S - 0.5;
   const sbStealEV = S + 1 + bbAnte;
   const bbFoldEV = S - 1 - bbAnte;
@@ -48,7 +52,7 @@ export function solvePushFold(stackBB: number, bbAnte = 0, iterations = 300): Pu
         den += w;
       }
       const eq = den ? num / den : 0;
-      callBR[j] = eq * 2 * S > bbFoldEV ? 1 : 0;
+      callBR[j] = eq * allInPot > bbFoldEV ? 1 : 0;
     }
     // SB best response to callAvg
     const shoveBR = new Array(n).fill(0);
@@ -63,7 +67,7 @@ export function solvePushFold(stackBB: number, bbAnte = 0, iterations = 300): Pu
       }
       const pCall = pCallNum / totalC[i];
       const eqCalled = pCallNum ? eqNum / pCallNum : 0;
-      const ev = (1 - pCall) * sbStealEV + pCall * eqCalled * 2 * S;
+      const ev = (1 - pCall) * sbStealEV + pCall * (S - matched + eqCalled * allInPot);
       shoveBR[i] = ev > sbFoldEV ? 1 : 0;
     }
     const a = 1 / (t + 1);
@@ -92,7 +96,7 @@ function roundFreq(x: number): number {
 export const PUSHFOLD_STACKS = [6, 8, 10, 12, 15, 20];
 
 const assumptionsFor = (S: number, ante: number) => [
-  `Heads-up (or folded to the small blind), ${S}bb effective stacks${ante ? `, big-blind ante of ${ante}bb` : ', no antes'}.`,
+  `Heads-up (or folded to the small blind), ${S}bb stacks for both players at the start of the hand${ante ? `, big-blind ante of ${ante}bb (dead money: the pot starts at ${1.5 + ante}bb)` : ', no antes'}.`,
   'Small blind may only shove or fold; big blind may only call or fold.',
   'Chip EV only: no ICM, no payout pressure.',
   'Equities from this app’s Monte Carlo preflop table (class-averaged), solved by fictitious play. Mixed frequencies are rounded to quarters.',
