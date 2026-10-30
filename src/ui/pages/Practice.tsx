@@ -5,7 +5,7 @@ import { run } from '../../workers/client';
 import { GenerateResult } from '../../scenarios/generator';
 import { Scenario, PracticeSettings } from '../../scenarios/types';
 import { PlaySession, startSession, heroAct } from '../../scenarios/play';
-import { PlayerAction, legalActions } from '../../engine/rules';
+import { PlayerAction, legalActions, winnablePot } from '../../engine/rules';
 import { buildTimeline, TimelineStep } from '../../engine/timeline';
 import { ScenarioEvaluation, LiveHelp, Assistance, DecisionEvaluation } from '../../evaluation/evaluate';
 import { Table, DecisionFacts, actionText, fmtBB } from '../components/Table';
@@ -517,23 +517,25 @@ export function PracticePage() {
         <div className="ph-main">
           <h1 className="ph-title">{sc ? sc.title : 'Practice'}</h1>
           {sc && <p className="ph-sub">{sc.setupText}</p>}
-          <div className="ph-chips">
-            {settingsSummary(settings)
-              .split(' · ')
-              .map((c) => (
-                <span key={c} className="pchip">
-                  {c}
+          <div className="ph-meta">
+            <div className="ph-chips">
+              {settingsSummary(settings)
+                .split(' · ')
+                .map((c) => (
+                  <span key={c} className="pchip">
+                    {c}
+                  </span>
+                ))}
+              {opponents.map((o) => (
+                <span key={o} className="pchip muted">
+                  {o}
                 </span>
               ))}
-            {opponents.map((o) => (
-              <span key={o} className="pchip muted">
-                {o}
-              </span>
-            ))}
-            {sc?.icm && <span className="pchip muted">Payouts {sc.icm.payouts.join('/')}%</span>}
+              {sc?.icm && <span className="pchip muted">Payouts {sc.icm.payouts.join('/')}%</span>}
+            </div>
             {targetLabel && (
-              <span className="pchip target">
-                Target: {targetLabel}
+              <span className="pchip target ph-target">
+                Target: {targetLabel}{' '}
                 <button aria-label="Clear target" onClick={() => setParams({})}>
                   ×
                 </button>
@@ -680,8 +682,8 @@ export function PracticePage() {
                   )}
                   {assist.potOdds && la && la.toCall > 0 && (
                     <p className="hint">
-                      <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(la.pot, sc.state.config.bb)} → you need{' '}
-                      {((100 * la.toCall) / (la.pot + la.toCall)).toFixed(1)}% equity to break even.
+                      <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(winnablePot(sess.state, sc.heroIndex, la.toCall), sc.state.config.bb)} → you need{' '}
+                      {((100 * la.toCall) / (winnablePot(sess.state, sc.heroIndex, la.toCall) + la.toCall)).toFixed(1)}% equity to break even.
                     </p>
                   )}
                   {assist.equity && help?.equity && (

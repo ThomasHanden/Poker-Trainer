@@ -17,6 +17,7 @@ import {
   sbIndex,
   isInPositionOver,
   Street,
+  winnablePot,
 } from '../engine/rules';
 import { strengthPercentile, drawInfo, boardTexture } from '../engine/board';
 import { classOf, HandClass } from '../ranges/hands';
@@ -224,7 +225,7 @@ function preflopPolicy(view: PublicView, profile: OpponentProfile): ActionOption
   if (sit.facingAllIn || sit.raises >= 3) {
     // facing a shove or a 4-bet+: continue with premium hands, calling vs short shoves wider
     const toCall = la.toCall;
-    const pot = potSize(s);
+    const pot = winnablePot(s, actor, toCall);
     const required = toCall / (pot + toCall);
     const rank = preflopRanking().indexOf(h);
     if (sit.facingAllIn && effBB <= 25) {
@@ -369,7 +370,8 @@ function postflopPolicy(view: PublicView, profile: OpponentProfile): ActionOptio
   if (la.toCall > 0) {
     const betFrac = la.toCall / Math.max(1, pot - la.toCall);
     const facingRaise = s.history.filter((h) => h.street === s.street && (h.type === 'bet' || h.type === 'raise')).length >= 2;
-    const required = la.toCall / (pot + la.toCall);
+    const winnable = winnablePot(s, actor, la.toCall);
+    const required = la.toCall / (winnable + la.toCall);
     let T = 0.53 + 0.32 * (betFrac / (1 + betFrac)) + 0.04 * (street - 1) + (street === 3 ? 0.03 : 0) + (facingRaise ? 0.08 : 0) + 0.025 * multi + profile.callShift;
     if (pfBets >= 2) T += 0.02;
     // Never demand more than near-nut strength: even against huge bets, strong hands continue.
@@ -423,6 +425,12 @@ function postflopPolicy(view: PublicView, profile: OpponentProfile): ActionOptio
   }
   // Medium hands: mostly check for showdown value; occasional thin bet IP
   if (pct >= 0.6 && pct < V) betP = Math.max(betP * 0.7, ipVsAll ? 0.12 : 0.05);
+  // Out of position against the player with the initiative (the preflop raiser on the flop, or
+  // whoever bet the previous street), almost every hand checks to the aggressor instead of
+  // leading into them (“donk betting”); strong hands check-call or check-raise. Without this, the
+  // checking range would be stripped of its strong hands. Probes after a check-back are unaffected.
+  const initiative = street === 1 ? s.preflopAggressor : lastStreetAggressor;
+  if (initiative >= 0 && initiative !== actor && !s.players[initiative].folded && isInPositionOver(s, initiative, actor)) betP *= 0.08 + 0.12 * aggr;
   betP = clamp01(betP);
 
   if (betP > 0) {

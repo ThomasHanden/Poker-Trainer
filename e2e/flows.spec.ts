@@ -97,7 +97,7 @@ test('unsupported settings are explained, not generated', async ({ page }) => {
 });
 
 test('main pages have no horizontal overflow', async ({ page }) => {
-  for (const path of ['/#/', '/#/practice', '/#/learn', '/#/learn/pot-odds', '/#/ranges', '/#/review', '/#/progress', '/#/coverage', '/#/method']) {
+  for (const path of ['/#/', '/#/practice', '/#/learn', '/#/learn/pot-odds', '/#/ranges', '/#/ranges?tab=editor', '/#/ranges?tab=compare', '/#/ranges?tab=drills', '/#/ranges?tab=equity', '/#/review', '/#/progress']) {
     await page.goto(path);
     await page.waitForTimeout(300);
     const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);

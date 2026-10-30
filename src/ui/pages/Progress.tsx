@@ -5,6 +5,7 @@ import { HandRecord, exportData, importData, reset, DecisionSummary } from '../.
 import { CONCEPTS, ConceptId } from '../../content/concepts';
 import { LESSONS, LESSON_INDEX } from '../../content/lessons';
 import { SCORING_VERSION } from '../../evaluation/evaluate';
+import { todayKey } from '../../puzzles/daily';
 
 interface Agg {
   key: string;
@@ -56,7 +57,7 @@ export function ProgressPage() {
     const blob = new Blob([exportData(data)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `poker-trainer-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `poker-trainer-${todayKey()}.json`; // local date, not UTC
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -105,7 +106,7 @@ export function ProgressPage() {
             </div>
             <div className="tile">
               <span className="tile-n">{hist.filter((h) => h.bookmarked).length}</span>
-              <span className="tile-l">bookmarked hands</span>
+              <span className="tile-l">saved hands</span>
             </div>
           </section>
           {versions.size > 1 && <p className="banner warn">Your history contains hands scored with different scoring versions ({[...versions].join(', ')}; current {SCORING_VERSION}). Compare them with care.</p>}
@@ -164,9 +165,9 @@ export function ProgressPage() {
           <section className="grid2">
             <BarList title="By concept" rows={byConcept.map((a) => ({ ...a, label: CONCEPTS[a.key as ConceptId]?.name ?? a.key }))} />
             <div>
-              <BarList title="By street" rows={byStreet.map((a) => ({ ...a, label: a.key }))} />
-              <BarList title="By position (key decisions)" rows={byPos.map((a) => ({ ...a, label: a.key }))} />
-              <BarList title="By difficulty" rows={byDiff.map((a) => ({ ...a, label: a.key }))} note="Scores at different difficulties are not directly comparable: harder settings use more ambiguous spots and lower-confidence evaluations." />
+              <BarList title="By street" order={STREET_ORDER} rows={byStreet.map((a) => ({ ...a, label: cap(a.key) }))} />
+              <BarList title="By position (key decisions)" order={SEAT_ORDER} rows={byPos.map((a) => ({ ...a, label: a.key }))} />
+              <BarList title="By difficulty" order={DIFF_ORDER} rows={byDiff.map((a) => ({ ...a, label: cap(a.key) }))} note="Scores at different difficulties are not directly comparable: harder settings use more ambiguous spots and lower-confidence evaluations." />
             </div>
           </section>
         </>
@@ -200,8 +201,15 @@ export function ProgressPage() {
   );
 }
 
-function BarList({ title, rows, note }: { title: string; rows: (Agg & { label: string })[]; note?: string }) {
-  const sorted = [...rows].sort((a, b) => b.n - a.n);
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+// natural orders for categories that have one; other lists sort by sample size
+const STREET_ORDER = ['preflop', 'flop', 'turn', 'river'];
+const SEAT_ORDER = ['UTG', 'UTG1', 'MP', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+const DIFF_ORDER = ['beginner', 'intermediate', 'advanced', 'expert'];
+
+function BarList({ title, rows, note, order }: { title: string; rows: (Agg & { label: string })[]; note?: string; order?: string[] }) {
+  const rank = (k: string) => (order ? (order.indexOf(k) + 1 || order.length + 1) : 0);
+  const sorted = [...rows].sort((a, b) => rank(a.key) - rank(b.key) || b.n - a.n);
   return (
     <div className="barlist">
       <h3>{title}</h3>

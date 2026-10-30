@@ -58,7 +58,6 @@ export const ADAPTATION_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'A player plays many hands but rarely raises. Their type?', options: ['Nit', 'Calling station', 'LAG'], answer: 1, explain: 'Loose and passive.' },
       { q: 'Against a nit, which is a good adjustment?', options: ['Steal their blinds more', 'Bluff-catch their big bets', 'Value-bet very thin'], answer: 0, explain: 'They fold too often preflop.' },
       { q: 'Which stat gives information fastest?', options: ['Preflop stats like VPIP', 'River bluff frequency'], answer: 0, explain: 'Preflop decisions happen every hand.' },
     ],
@@ -340,7 +339,6 @@ export const ADAPTATION_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Without reads, the safest approach is…', options: ['Assume a reasonable baseline', 'Assume they always bluff', 'Assume they always have it'], answer: 0, explain: 'Baselines avoid big mistakes.' },
       { q: 'Leveling usually means…', options: ['Overthinking without evidence', 'Adjusting to a solid read'], answer: 0, explain: 'It replaces evidence with guesses about guesses.' },
     ],
   },

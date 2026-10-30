@@ -79,7 +79,7 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
       {
         title: 'Re-shove math',
         steps: [
-          'You have 18bb in the big blind. The button opens to 2.2bb; with blinds and a 1bb ante the pot is 4.7bb.',
+          'You have 18bb in the big blind, not counting the 1bb ante you posted. The button opens to 2.2bb; with blinds and the ante the pot is 4.7bb.',
           'You shove 18bb. If the button folds 65% of the time, you win 4.7bb immediately.',
           'When called (35%), you have about 45% against their calling range: the pot is then 18 + 18 + 0.5 + 1 = 37.5bb, so you win about 0.45 × 37.5bb and risk 17bb more.',
           'EV ≈ 0.65 × 4.7 + 0.35 × (0.45 × 37.5 − 17) ≈ 3.1 − 0.04 ≈ +3bb. The fold equity is what makes it profitable.',
@@ -178,7 +178,6 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'In which format is chip EV the best guide?', options: ['Winner-take-all', 'Satellite', 'Final table with big pay jumps'], answer: 0, explain: 'Prize value is almost proportional to chips.' },
-      { q: 'Near a pay jump, marginal calls should be…', options: ['Tighter', 'Looser'], answer: 0, explain: 'Busting costs more than winning chips gains.' },
     ],
   },
 
@@ -267,7 +266,6 @@ export const TOURNAMENT_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'With a very short stack at the table, medium stacks should usually…', options: ['Tighten their calls', 'Call more'], answer: 0, explain: 'They can move up if the short stack busts.' },
       { q: 'Heads-up at the end of a tournament, play is closest to…', options: ['Chip EV', 'Extreme ICM'], answer: 0, explain: 'Only one pay jump remains.' },
     ],
   },

@@ -222,7 +222,6 @@ export const MATH_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Pot 10bb, you bluff 10bb, they fold 60%. EV?', options: ['+2bb', '+6bb', '−2bb'], answer: 0, explain: '0.6 × 10 − 0.4 × 10 = 2bb.' },
       { q: 'What is the EV of folding (from now on)?', options: ['0', 'Minus what you put in', 'Depends'], answer: 0, explain: 'Chips already in are sunk.' },
     ],
   },
@@ -359,7 +358,6 @@ export const MATH_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'How many combos of KQo exist without card removal?', options: ['4', '12', '16'], answer: 1, explain: 'Offsuit non-pair: 12.' },
-      { q: 'One king is on the board. How many combos of KK remain?', options: ['6', '3', '1'], answer: 1, explain: 'Three kings left: 3 choose 2 = 3.' },
     ],
   },
 
@@ -403,7 +401,6 @@ export const MATH_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'For a half-pot river bet, what bluff share makes a bluff-catcher indifferent?', options: ['20%', '25%', '33%'], answer: 1, explain: '0.5 / (1 + 1) = 25%.' },
       { q: 'Why can flop betting ranges contain more “bluffs”?', options: ['Bluffs on the flop usually have equity', 'Flop bets are always called', 'They cannot'], answer: 0, explain: 'Draws win often when called.' },
     ],
   },

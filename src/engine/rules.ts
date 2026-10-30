@@ -35,6 +35,8 @@ export interface PlayerState {
   startStack: number;
   streetCommitted: number;
   totalCommitted: number; // includes antes and blinds
+  /** antes: dead money that goes in the main pot but does not count toward matching bets */
+  deadCommitted?: number;
   folded: boolean;
   allIn: boolean;
   hole: Card[];
@@ -149,8 +151,25 @@ export function buttonIndexFor(n: number): number {
   return n === 2 ? 0 : n - 3;
 }
 
+/** Chips a player has put in that count toward matching bets (everything except antes). */
+export function liveCommitted(p: PlayerState): number {
+  return p.totalCommitted - (p.deadCommitted ?? 0);
+}
+
 export function potSize(s: HandState): number {
   return s.players.reduce((a, p) => a + p.totalCommitted, 0);
+}
+
+/**
+ * The part of the pot a player can actually win if they call `toCall` now (before adding the call):
+ * chips from bigger stacks above the caller's all-in level are not winnable. Equals potSize when
+ * the player covers every bet.
+ */
+export function winnablePot(s: HandState, idx: number, toCall: number): number {
+  const level = liveCommitted(s.players[idx]) + toCall;
+  let pot = 0;
+  for (const p of s.players) pot += (p.deadCommitted ?? 0) + (p.index === idx ? liveCommitted(p) : Math.min(liveCommitted(p), level));
+  return pot;
 }
 
 /** Chips in play: stacks plus chips committed (after settlement the pot has been paid out to stacks). */
@@ -184,6 +203,7 @@ export function newHand(o: NewHandOptions): HandState {
     startStack: st,
     streetCommitted: 0,
     totalCommitted: 0,
+    deadCommitted: 0,
     folded: false,
     allIn: false,
     hole: o.holes[i] ?? [],
@@ -240,12 +260,14 @@ function postBlinds(s: HandState) {
     for (const p of s.players) {
       const pb = potSize(s);
       const a = commit(s, p, config.ante, false);
+      p.deadCommitted = (p.deadCommitted ?? 0) + a;
       rec(p.index, 'post-ante', a, pb);
     }
   } else if (config.anteType === 'bb' && config.ante > 0) {
     const p = s.players[bbIndex(n)];
     const pb = potSize(s);
     const a = commit(s, p, config.ante, false);
+    p.deadCommitted = (p.deadCommitted ?? 0) + a;
     rec(p.index, 'post-ante', a, pb);
   }
   const sb = s.players[sbIndex(n)];
@@ -489,15 +511,22 @@ function seatOrderFromButton(s: HandState): number[] {
   return Array.from({ length: n }, (_, k) => (s.buttonIndex + 1 + k) % n);
 }
 
+/**
+ * Pots by contribution level. Antes are dead money: they go into the main pot, which every player
+ * still in the hand can win, and do not count toward matching bets (TDA rules). So a big blind who
+ * is all-in cannot win more of a bigger stack's bet than its blind plus calls.
+ */
 export function computePots(s: HandState): { amount: number; eligible: number[] }[] {
-  const contributions = s.players.map((p) => p.totalCommitted);
+  const contributions = s.players.map(liveCommitted);
   const levels = [...new Set(contributions.filter((c) => c > 0))].sort((a, b) => a - b);
   const pots: { amount: number; eligible: number[] }[] = [];
+  const dead = s.players.reduce((a, p) => a + (p.deadCommitted ?? 0), 0);
+  if (dead > 0) pots.push({ amount: dead, eligible: s.players.filter((p) => !p.folded).map((p) => p.index) });
   let prev = 0;
   for (const level of levels) {
     let amount = 0;
     for (const c of contributions) amount += Math.max(0, Math.min(c, level) - prev);
-    const eligible = s.players.filter((p) => !p.folded && p.totalCommitted >= level).map((p) => p.index);
+    const eligible = s.players.filter((p) => !p.folded && liveCommitted(p) >= level).map((p) => p.index);
     if (amount > 0) {
       if (eligible.length === 0 && pots.length > 0) pots[pots.length - 1].amount += amount;
       else pots.push({ amount, eligible });

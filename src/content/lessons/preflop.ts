@@ -174,9 +174,9 @@ export const PREFLOP: Lesson[] = [
     example: {
       title: 'Price vs playability',
       steps: [
-        'BTN opens 2.5bb. You hold 7♥ 5♥ in the BB. Price: 1.5 / 5.5 = 27%. Its equity vs a button range is around 35–40%, and it makes straights and flushes: call.',
+        'BTN opens 2.5bb. You hold 7♥ 5♥ in the BB. Price: 1.5 / 5.5 = 27%. Its equity vs a button range is around 35–40%, and it makes straights and flushes: the baseline mostly calls (and 3-bets it some of the time).',
         'You hold J♣ 3♦. Similar raw equity, but it rarely makes anything strong and is often dominated: the baseline folds it.',
-        'Against a UTG open, the chart still defends 7♥5♥, but many offsuit broadways become folds (QTo always, KJo more often than not) because UTG’s range dominates them.',
+        'Against a UTG open, the chart still defends 7♥5♥, but weaker offsuit hands become folds (A9o, K9o and Q9o always, QTo more often than not) because UTG’s range dominates them.',
       ],
     },
     mistakes: ['Folding too often because “I’m out of position”.', 'Calling every hand because “I’m getting a price”.', 'Never 3-betting from the BB, which lets openers steal freely.'],

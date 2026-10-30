@@ -11,6 +11,7 @@ import {
   PlayerAction,
   isInPositionOver,
   effectiveStack,
+  winnablePot,
 } from '../engine/rules';
 import { boardTexture, madeHand, drawInfo, strengthPercentile, MadeClass } from '../engine/board';
 import { evaluate } from '../engine/evaluator';
@@ -40,8 +41,9 @@ export function buildDecisionContext(sc: Scenario, full: HandState, isKey: boole
   const me = s.players[hero];
   const hole = me.hole;
   const board = s.board;
-  const pot = potSize(s);
   const toCall = la.toCall;
+  // facing a bet you cannot fully cover, only the part of the pot you can match is winnable
+  const pot = toCall > 0 ? winnablePot(s, hero, toCall) : potSize(s);
   const dead = [...hole, ...board];
   const profiles = opts.profilesOverride ?? sc.shownProfiles;
   const liveV = s.players.filter((p) => !p.folded && p.index !== hero);

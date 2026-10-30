@@ -178,7 +178,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
         steps: [
           'You open the cutoff with about 29% of hands (about 385 combos).',
           'If you continue only with QQ+, AK (34 combos), you fold about 91% of the time.',
-          'Adding calls with TT–JJ, AQs, AJs, KQs, JTs, T9s and some 4-bet bluffs (about 60 more combos) brings the fold rate down to roughly 75%. That is harder to exploit with light 3-bets.',
+          'Adding calls with TT–JJ, AQo, AQs, AJs, KQs, JTs and T9s (44 combos) plus a few 4-bet bluffs such as A5s–A4s (8 combos) brings the fold rate down to about 78%. That is harder to exploit with light 3-bets.',
         ],
       },
     ],
@@ -364,7 +364,6 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'Pot 7bb, you squeeze to 15bb from the big blind (14bb more). Break-even fold rate?', options: ['About 50%', 'About 67%', 'About 80%'], answer: 1, explain: '14 / (14 + 7) ≈ 67%.' },
-      { q: 'Why is the flat-caller’s range often weak against a squeeze?', options: ['It is capped', 'They have fewer chips', 'They act first'], answer: 0, explain: 'They would 3-bet many of their best hands.' },
     ],
   },
 
@@ -449,7 +448,7 @@ export const PREFLOP_X: Record<string, LessonExtra> = {
         steps: [
           'A single-raised pot reaches the flop with 5.5bb and ends at 12bb. At 5% rake with a 3bb cap, the winner pays 0.6bb.',
           'If you call in the big blind and win this pot 40% of the time, you pay about 0.24bb per hand in rake. For a borderline call, that can be the whole edge.',
-          'A 3-bet pot that ends at 60bb would pay 3bb at 5% but is capped at 3bb, so it pays a smaller share.',
+          'A 3-bet pot that ends at 100bb would pay 5bb at 5% but is capped at 3bb, so it pays only 3%.',
         ],
       },
     ],

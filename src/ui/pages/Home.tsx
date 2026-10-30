@@ -145,7 +145,7 @@ export function HomePage() {
               </>
             )}
           </p>
-          <p className="note">Your best runs on this device.</p>
+          <p className="note">Bests, runs and practice stats are saved in this browser only.</p>
         </aside>
       </div>
     </div>

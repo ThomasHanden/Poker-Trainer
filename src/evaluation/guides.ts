@@ -81,6 +81,9 @@ export function facingBetGuidance(ctx: DecisionContext, opts: { allowImplied?: b
   const strong = (ctx.percentile ?? 0) >= 0.95 || eq >= 0.72;
   const ratings: Guidance['ratings'] = {};
   const reasons: string[] = [];
+  const river = ctx.street === 'river';
+  // equity and price are both percentages, so their difference is in percentage points
+  const pts = (x: number) => `${Math.round(Math.abs(x) * 100)} percentage point${Math.round(Math.abs(x) * 100) === 1 ? '' : 's'}`;
   reasons.push(`You must call ${bbStr(ctx.toCall, ctx.bb)} to win a pot of ${bbStr(ctx.pot, ctx.bb)}, so a call breaks even with ${pctStr(req, 1)} equity if no more money goes in (pot odds).`);
   reasons.push(equityLine(ctx));
   if (!Number.isFinite(eq)) {
@@ -89,19 +92,23 @@ export function facingBetGuidance(ctx: DecisionContext, opts: { allowImplied?: b
   if (margin >= 0.06) {
     ratings.call = 'preferred';
     ratings.fold = margin >= 0.12 ? 'mistake' : 'discouraged';
-    reasons.push(`Your equity exceeds the price by ${pctStr(margin, 0)}, so folding gives up a clearly profitable continue.`);
+    reasons.push(`Your equity exceeds the price by ${pts(margin)}, so folding gives up a clearly profitable continue.`);
   } else if (margin >= -0.03) {
     ratings.call = 'mixed';
     ratings.fold = 'mixed';
-    reasons.push('This is close: equity is roughly equal to the price. Position, how well your hand plays on later streets, and the opponent’s tendencies decide it.');
+    reasons.push(
+      river
+        ? 'This is close: equity is roughly equal to the price. Your read on how often this opponent bluffs here decides it.'
+        : 'This is close: equity is roughly equal to the price. Position, how well your hand plays on later streets, and the opponent’s tendencies decide it.',
+    );
   } else if (implied && margin >= -0.12) {
     ratings.call = 'mixed';
     ratings.fold = 'mixed';
-    reasons.push(`Your immediate equity is ${pctStr(-margin, 0)} short of the price, but with SPR ${ctx.spr.toFixed(1)} you can win more when the draw completes (implied odds). That only works if your opponent will pay off — and if your draw is to the nuts or near-nuts.`);
+    reasons.push(`Your immediate equity is ${pts(margin)} short of the price, but with SPR ${ctx.spr.toFixed(1)} you can win more when the draw completes (implied odds). That only works if your opponent will pay off — and if your draw is to the nuts or near-nuts.`);
   } else {
     ratings.fold = 'preferred';
     ratings.call = margin < -0.15 ? 'mistake' : 'discouraged';
-    reasons.push(`You are ${pctStr(-margin, 0)} short of the required equity and ${implied ? 'implied odds are not enough to close a gap that large' : 'there is little to win on later streets to make up for it'}.`);
+    reasons.push(`You are ${pts(margin)} short of the required equity and ${river ? 'no cards are left to come, so nothing later can make up for it' : implied ? 'implied odds are not enough to close a gap that large' : 'there is little to win on later streets to make up for it'}.`);
   }
   if (ctx.la.canRaise) {
     if (strong) {
@@ -195,7 +202,11 @@ export function bettingGuidance(ctx: DecisionContext, opts: BetOpts = {}): Guida
   if (eq >= vt + 0.15) {
     ratings.bet = 'preferred';
     ratings.check = 'mixed';
-    reasons.push('You are well ahead of the modeled range, so betting gets value from worse hands and denies equity to draws. Checking can still be reasonable to keep bluffs in or to protect your checking range.');
+    reasons.push(
+      ctx.street === 'river'
+        ? 'You are well ahead of the modeled range, so betting gets value from worse hands that call. Checking can still be reasonable to induce bluffs or to protect your checking range.'
+        : 'You are well ahead of the modeled range, so betting gets value from worse hands and denies equity to draws. Checking can still be reasonable to keep bluffs in or to protect your checking range.',
+    );
     sizing = sizingForTexture(ctx, ctx.street === 'river' ? 'polar' : 'value');
   } else if (eq >= vt) {
     ratings.bet = 'preferred';

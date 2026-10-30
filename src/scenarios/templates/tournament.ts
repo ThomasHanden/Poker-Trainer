@@ -278,14 +278,18 @@ function icmOutcomes(ctx: DecisionContext, villainIdx: number) {
   const v = s.players[villainIdx];
   const heroTotal = hero.stack + hero.totalCommitted;
   const vTotal = v.stack + v.totalCommitted;
-  const matched = Math.min(heroTotal, vTotal);
-  const dead = s.players.filter((p) => p.index !== ctx.hero && p.index !== villainIdx).reduce((a, p) => a + p.totalCommitted, 0);
-  const others = (fn: (i: number) => number) => s.players.map((p) => fn(p.index));
+  // antes are dead money: they go to the winner but do not count toward matching the all-in
+  const heroLive = heroTotal - (hero.deadCommitted ?? 0);
+  const vLive = vTotal - (v.deadCommitted ?? 0);
+  const matched = Math.min(heroLive, vLive);
+  const others = s.players.filter((p) => p.index !== ctx.hero && p.index !== villainIdx).reduce((a, p) => a + p.totalCommitted, 0);
+  const dead = others + (hero.deadCommitted ?? 0) + (v.deadCommitted ?? 0);
+  const each = (fn: (i: number) => number) => s.players.map((p) => fn(p.index));
   const base = (i: number) => s.players[i].stack;
-  const fold = others((i) => (i === ctx.hero ? hero.stack : i === villainIdx ? vTotal + hero.totalCommitted + dead : base(i)));
-  const win = others((i) => (i === ctx.hero ? heroTotal + matched + dead : i === villainIdx ? vTotal - matched : base(i)));
-  const lose = others((i) => (i === ctx.hero ? heroTotal - matched : i === villainIdx ? vTotal + matched + dead : base(i)));
-  const steal = others((i) => (i === ctx.hero ? heroTotal + v.totalCommitted + dead : i === villainIdx ? v.stack : base(i)));
+  const fold = each((i) => (i === ctx.hero ? hero.stack : i === villainIdx ? vTotal + hero.totalCommitted + others : base(i)));
+  const win = each((i) => (i === ctx.hero ? heroLive + matched + dead : i === villainIdx ? vLive - matched : base(i)));
+  const lose = each((i) => (i === ctx.hero ? heroLive - matched : i === villainIdx ? vLive + matched + dead : base(i)));
+  const steal = each((i) => (i === ctx.hero ? heroTotal + v.totalCommitted + others : i === villainIdx ? v.stack : base(i)));
   return { fold, win, lose, steal };
 }
 
@@ -422,7 +426,7 @@ function icmGuide(kind: 'call' | 'shove') {
         { label: 'Prize equity: fold / call', value: `${eFold.toFixed(2)}% / ${eCall.toFixed(2)}% of the prize pool`, kind: 'exact' },
       );
       reasons.push(
-        `In chips you would need ${pctStr(reqChip, 1)} equity, but in prize equity (ICM) you need ${pctStr(reqIcm, 1)}. The extra ${pctStr(reqIcm - reqChip, 1)} is the risk premium: busting costs you your guaranteed share of the payouts, while doubling up adds less prize equity than the chips suggest.`,
+        `In chips you would need ${pctStr(reqChip, 1)} equity, but in prize equity (ICM) you need ${pctStr(reqIcm, 1)}. The extra ${((reqIcm - reqChip) * 100).toFixed(1)} percentage points are the risk premium: busting costs you your guaranteed share of the payouts, while doubling up adds less prize equity than the chips suggest.`,
         `Your equity against the modeled shoving range is ${pctStr(eq, 1)}, so calling is ${eCall > eFold ? 'better' : 'worse'} than folding by ${Math.abs(eCall - eFold).toFixed(2)}% of the prize pool.`,
         'Shorter stacks at the table matter: while they are at risk of busting first, folding has extra value for you.',
       );

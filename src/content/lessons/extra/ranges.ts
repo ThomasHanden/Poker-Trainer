@@ -87,7 +87,6 @@ export const RANGES_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'AJo at 25%: how many weighted combos?', options: ['1', '3', '12'], answer: 1, explain: '12 × 0.25 = 3.' },
       { q: 'Why use weights for opponents?', options: ['To express uncertainty and mixing', 'To make ranges bigger', 'They are not useful'], answer: 0, explain: 'Weights capture “sometimes”.' },
     ],
   },
@@ -179,7 +178,6 @@ export const RANGES_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'On a three-heart river, which hand is the best bluff?', options: ['A♥ with nothing else', 'A hand with no hearts', 'A small heart'], answer: 0, explain: 'The A♥ blocks the nut flush.' },
-      { q: 'When bluff-catching, you prefer to block…', options: ['Their value hands', 'Their bluffs'], answer: 0, explain: 'That raises the share of bluffs you face.' },
     ],
   },
 
@@ -269,7 +267,6 @@ export const RANGES_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Which flop most favors a big-blind defending range against a UTG open?', options: ['A♠ K♦ 4♣', '7♥ 6♥ 5♣', 'K♠ Q♦ 2♣'], answer: 1, explain: 'Low and connected: the BB has more of these hands.' },
       { q: 'Should you decide whose board it is before or after looking at your hand?', options: ['Before', 'After'], answer: 0, explain: 'It is a range question first.' },
     ],
   },

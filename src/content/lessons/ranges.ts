@@ -197,7 +197,7 @@ export const RANGES: Lesson[] = [
       'In practice, you can implement mixes with simple rules (use the second hand on your watch, the color of a card) or by splitting hands by suit.',
     ],
     why: ['It explains why charts show split colors and why reviews say “both are reasonable”.'],
-    example: { title: 'A mixed preflop hand', steps: ['The baseline big-blind chart 3-bets A4s 60% of the time against a button open and calls it 40%. Either action is fine on any one hand; over many hands, aim for roughly that split.'] },
+    example: { title: 'A mixed preflop hand', steps: ['The baseline big-blind chart 3-bets A3s 70% of the time against a button open and calls it 30%. Either action is fine on any one hand; over many hands, aim for roughly that split.'] },
     mistakes: ['Thinking a mix means “random is fine for everything”.', 'Treating mixed spots as mistakes when you choose the less common action.'],
     assumptions: ['Against exploitable opponents, a pure (unmixed) exploit can be better.'],
     quiz: [{ q: 'Can one hand show whether you mix at the right frequency?', options: ['Yes', 'No'], answer: 1, explain: 'Frequencies only show up over many hands.' }],

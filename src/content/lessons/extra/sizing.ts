@@ -177,7 +177,6 @@ export const SIZING_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'An overbet works best when…', options: ['Your opponent is capped and you have a nut advantage', 'You have a medium hand', 'The board is very wet and you have nothing'], answer: 0, explain: 'You can hold hands they cannot.' },
       { q: 'A 1.5× pot bluff needs to work how often to break even?', options: ['40%', '50%', '60%'], answer: 2, explain: '1.5 / 2.5 = 60%.' },
     ],
   },
@@ -222,7 +221,6 @@ export const SIZING_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Large bets usually come from…', options: ['Polarized ranges', 'Merged ranges'], answer: 0, explain: 'Strong hands and bluffs want big pots or big fold equity.' },
       { q: 'Against a polarized river bet, a medium pair is…', options: ['A bluff-catcher', 'A value raise', 'Always a fold'], answer: 0, explain: 'It beats the bluffs and loses to the value.' },
     ],
   },
@@ -268,7 +266,6 @@ export const SIZING_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'A player calls with any pair no matter the size. Your value bets should be…', options: ['Bigger', 'Smaller', 'The same'], answer: 0, explain: 'Their calls do not depend on size, so charge more.' },
       { q: 'A larger bet usually makes the calling range…', options: ['Stronger', 'Weaker', 'Unchanged'], answer: 0, explain: 'Weaker hands drop out.' },
     ],
   },
@@ -358,7 +355,6 @@ export const SIZING_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Against a calling station, value bets should be…', options: ['Larger', 'Smaller'], answer: 0, explain: 'They call anyway; charge more.' },
       { q: 'A player bets big only with strong hands. Your best response?', options: ['Fold more to their big bets', 'Call every big bet', 'Ignore it'], answer: 0, explain: 'Their big bets are rarely bluffs.' },
     ],
   },

@@ -222,7 +222,6 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'On which board does an overpair most need protection?', options: ['K♠ 7♦ 2♣', 'J♥ T♥ 8♣', 'A♠ A♦ 3♣'], answer: 1, explain: 'Wet and connected: many hands have strong draws.' },
-      { q: 'Which hand realizes its equity better?', options: ['A nut flush draw in position', 'Bottom pair out of position'], answer: 0, explain: 'It can continue easily and wins big when it hits.' },
     ],
   },
 
@@ -268,7 +267,6 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
     ],
     quiz: [
       { q: 'On a board that strongly favors your range, the usual c-bet plan is…', options: ['High frequency, small size', 'Low frequency, large size', 'Never bet'], answer: 0, explain: 'Most hands benefit and the opponent’s range is weak.' },
-      { q: 'Why keep some strong hands in your checking range?', options: ['So opponents cannot bet every time you check', 'Because strong hands never want to bet', 'It is required'], answer: 0, explain: 'Otherwise your checks are an easy target.' },
     ],
   },
 
@@ -537,8 +535,6 @@ export const POSTFLOP_X: Record<string, LessonExtra> = {
       },
     ],
     quiz: [
-      { q: 'Facing a half-pot river bet, what equity do you need to call?', options: ['25%', '33%', '50%'], answer: 0, explain: '0.5 / (1 + 0.5 + 0.5) = 25%.' },
-      { q: 'A good bluff-catcher…', options: ['Blocks the opponent’s bluffs', 'Blocks the opponent’s value hands', 'Blocks nothing'], answer: 1, explain: 'Removing value hands raises the share of bluffs you face.' },
     ],
   },
 

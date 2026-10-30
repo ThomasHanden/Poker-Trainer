@@ -53,16 +53,24 @@ function firstSentence(t: string): string {
   return (m ? m[0] : t).trim();
 }
 
+/** How a decision is shown: right (the preferred play), close (reasonable) or missed. */
+function decisionMark(d: DecisionEvaluation): 'ok' | 'close' | 'off' {
+  const chosenPreferred = d.alternatives.some((a) => a.key === d.actionKey && a.rating === 'preferred');
+  return chosenPreferred || d.grade === 'best' ? 'ok' : d.grade === 'good' || d.grade === 'unscored' ? 'close' : 'off';
+}
+
 function DecisionCard({ d, id }: { d: DecisionEvaluation; id: string }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('situation');
   const pref = preferredText(d);
-  const chosenPreferred = d.alternatives.some((a) => a.key === d.actionKey && a.rating === 'preferred');
-  const mark = chosenPreferred || d.grade === 'best' ? 'ok' : d.grade === 'good' || d.grade === 'unscored' ? 'close' : 'off';
+  const mark = decisionMark(d);
   // the first reasons are usually facts (price, equity); the short answer uses the first piece of reasoning
-  const isFact = (w: string) => /^(You must call|Your equity against)/.test(w);
+  // (and the hand-description lines of preflop explanations); preflop chart spots lead with the chart
+  const isFact = (w: string) =>
+    /^(You must call|Your equity against|Being suited adds|Offsuit hands make flushes|Chart frequencies)/.test(w) || / all-in equity against a random hand|fit into \d+ different straights/.test(w);
+  const chartLine = d.why.find((w) => w.startsWith('Chart frequencies'));
   const reason = d.why.find((w) => !isFact(w)) ?? d.why[0];
-  const short = reason ? firstSentence(reason) : verdict(d);
+  const short = chartLine ? chartLine.replace(/^Chart frequencies \(([^)]+)\): /, 'The chart for this spot ($1): ') : reason ? firstSentence(reason) : verdict(d);
   // preflop, SPR and multiway equity against players who have not acted are more confusing than useful
   // right answers collapse to one line; only the decisions to learn from get the side-by-side boxes
   const compact = mark === 'ok' && d.sizing?.verdict !== 'off';
@@ -268,9 +276,18 @@ export function ReviewView({
   const res = finalState.result;
   const villains = finalState.players.filter((p) => p.index !== hero && p.hole.length === 2);
   const hidden = Object.entries(scenario.trueProfiles).filter(([i, p]) => scenario.shownProfiles[Number(i)] !== p);
-  const right = evaluation.decisions.filter((d) => d.grade === 'best' || d.grade === 'good').length;
-  const n = evaluation.decisions.length;
-  const headline = !n ? 'Hand review' : right === n ? (n === 1 ? 'You got it right' : `All ${n} decisions right`) : n === 1 ? 'One to learn from' : `${right} of ${n} decisions right`;
+  // same rule as the decision cards: right = the preferred play, close = a reasonable alternative
+  const marks = evaluation.decisions.map(decisionMark);
+  const right = marks.filter((m) => m === 'ok').length;
+  const close = marks.filter((m) => m === 'close').length;
+  const n = marks.length;
+  const headline = !n
+    ? 'Hand review'
+    : right === n
+      ? n === 1 ? 'You got it right' : `All ${n} decisions right`
+      : n === 1
+        ? close ? 'Close — a reasonable play' : 'One to learn from'
+        : `${right} of ${n} decisions right${close ? `, ${close} close` : ''}`;
   const lesson = evaluation.lessons.map((id) => LESSON_INDEX[id] && { id, title: LESSON_INDEX[id].title }).filter(Boolean) as { id: string; title: string }[];
   return (
     <div className="review" data-testid="review">

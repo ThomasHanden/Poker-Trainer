@@ -1,7 +1,7 @@
 // Daily puzzles: short multiple-choice questions whose answers are computed from the app's own
 // charts, hand evaluator and formulas. The same date gives the same five puzzles to everyone.
 
-import { Card, Rng, createRng, hashString, fullDeck, cardToString } from '../engine/cards';
+import { Card, Rng, createRng, hashString, fullDeck, cardToString, rankOf } from '../engine/cards';
 import { compareHands, describeScore, evaluate, categoryOf, HandCategory, CATEGORY_NAMES } from '../engine/evaluator';
 import { getChart, chartFreq, chartPlayRange } from '../ranges/presets';
 import { ALL_CLASSES, HandClass, combosOf, rangePercent } from '../ranges/hands';
@@ -219,7 +219,7 @@ function shovePuzzle(rng: Rng, id: string): Puzzle {
     id,
     kind: 'shove',
     topic: 'Push/fold',
-    prompt: `Tournament, heads-up. You are in the small blind with ${stack}bb. Shove all-in or fold?`,
+    prompt: `Tournament, heads-up, no antes. You are in the small blind with ${stack}bb. Shove all-in or fold?`,
     hero: holdingFor(rng, h),
     options: ['Shove', 'Fold'],
     answer: shove ? 0 : 1,
@@ -241,7 +241,14 @@ function outsPuzzle(rng: Rng, id: string): Puzzle {
     const flushOuts = outs.filter((c) => categoryOf(evaluate([...hero, ...board, c])) === HandCategory.Flush || categoryOf(evaluate([...hero, ...board, c])) === HandCategory.StraightFlush).length;
     const n = outs.length;
     if (n < 4 || n > 15) continue;
-    const kind = flushOuts >= 9 && n > flushOuts ? 'a combo draw (flush draw plus straight draw)' : flushOuts >= 9 ? 'a flush draw' : n >= 8 ? 'an open-ended straight draw' : 'a gutshot straight draw';
+    // name the straight draw by how many different ranks complete it, not by the out count
+    // (an open-ender with a blocked out still has two ranks; a double gutshot also has two)
+    const straightRanks = [...new Set(outs.filter((c) => categoryOf(evaluate([...hero, ...board, c])) === HandCategory.Straight).map(rankOf))];
+    // open-ended: the two completing ranks sit at both ends of four in a row, five ranks apart (the ace also counts low)
+    const low = (r: number) => (r === 12 ? -1 : r);
+    const openEnded = straightRanks.length === 2 && [Math.abs(straightRanks[0] - straightRanks[1]), Math.abs(low(straightRanks[0]) - low(straightRanks[1]))].includes(5);
+    const straightKind = straightRanks.length >= 2 ? (openEnded ? 'an open-ended straight draw' : 'a double gutshot straight draw') : 'a gutshot straight draw';
+    const kind = flushOuts >= 9 && n > flushOuts ? 'a combo draw (flush draw plus straight draw)' : flushOuts >= 9 ? 'a flush draw' : straightKind;
     const wrong = [...new Set([n + 1, n - 1, n + 4, n === 9 ? 8 : 9, n + 2].filter((x) => x !== n && x > 0))].slice(0, 3).map(String);
     const { options, answer } = shuffleOptions(rng, String(n), wrong);
     return {

@@ -9,7 +9,7 @@
   --surface-3: #e6e1d5;
   --text: #1c1a16;
   --text-2: #4c473e;
-  --muted: #7d766a;
+  --muted: #686155; /* 4.7:1 or better on every light surface (WCAG AA) */
   --border: #e0dacd;
   --border-strong: #c9c1b1;
   --accent: #1e5a3c;
@@ -471,6 +471,13 @@ textarea:focus {
   outline: none;
   border-color: var(--focus);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+}
+/* checkboxes, radios and sliders drop the box-shadow ring above, so keyboard focus needs an outline */
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible,
+input[type='range']:not(.fill-slider):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 input[type='checkbox'],
 input[type='radio'] {
@@ -2625,6 +2632,7 @@ tr.low-n .bar {
   border-top: 1px solid var(--border);
 }
 .tabs.small {
+  margin-top: 14px;
   margin-bottom: 8px;
 }
 .tabs.small button {
@@ -2943,8 +2951,10 @@ tr.low-n .bar {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  white-space: nowrap;
   margin-right: 8px;
+}
+.legend .li .sw {
+  flex: none;
 }
 .cell.dimmed {
   opacity: 0.28;
@@ -4727,8 +4737,7 @@ h3 {
   color: var(--muted);
   font-size: 0.86rem;
 }
-.ph-chips .pchip + .pchip::before,
-.ph-chips .pchip + .ph-change::before {
+.ph-chips .pchip + .pchip::before {
   content: '·';
   margin: 0 8px;
   color: var(--border-strong);
@@ -4737,8 +4746,23 @@ h3 {
   color: var(--accent);
   font-weight: 600;
 }
-.ph-chips .ph-change {
-  margin-left: 12px;
+/* chips and the settings link wrap independently: the gap only applies when they share a line,
+   so a wrapped “Change settings” starts flush with the chips instead of indented */
+/* the practice target sits outside the dot-separated chips; its text wraps with the × right after it */
+.pchip.ph-target {
+  display: block;
+  height: auto;
+  padding: 0;
+  background: none;
+  white-space: normal;
+  font-size: 0.86rem;
+}
+.ph-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 22px;
+  row-gap: 6px;
 }
 .session-strip {
   background: none;
@@ -5043,9 +5067,6 @@ details.sequence[open] {
 }
 .da-row.you.close .da-v {
   color: var(--warn);
-}
-.ph-chips .pchip + .ph-change::before {
-  content: none;
 }
 .score-label {
   text-transform: lowercase;

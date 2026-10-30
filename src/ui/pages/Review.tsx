@@ -32,7 +32,7 @@ export function ReviewListPage() {
           Show
           <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
             <option value="all">All hands</option>
-            <option value="bookmarked">Bookmarked</option>
+            <option value="bookmarked">Saved hands</option>
             <option value="mistakes">With mistakes</option>
             <option value="unassisted">Unassisted only</option>
             <option value="assisted">Assisted only</option>
@@ -72,7 +72,8 @@ export function ReviewListPage() {
                 </Link>
                 <button
                   className="star"
-                  aria-label={h.bookmarked ? 'Remove bookmark' : 'Bookmark'}
+                  aria-label={h.bookmarked ? 'Unsave hand' : 'Save hand'}
+                  title={h.bookmarked ? 'Saved — click to unsave' : 'Save hand'}
                   aria-pressed={h.bookmarked}
                   onClick={() => update((d) => ({ ...d, history: d.history.map((x) => (x.id === h.id ? { ...x, bookmarked: !x.bookmarked } : x)) }))}
                 >
