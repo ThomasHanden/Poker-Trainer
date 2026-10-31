@@ -38,6 +38,8 @@ interface AuthValue {
   setDisplayName(name: string): Promise<AuthResult>;
   /** everywhere: also end the sessions on the player's other devices */
   signOut(everywhere?: boolean): Promise<void>;
+  /** delete the account and everything saved in it, then sign out */
+  deleteAccount(): Promise<AuthResult>;
   /** run before signing out (the store saves and forgets this device's copy) */
   beforeSignOut(fn: () => Promise<void>): () => void;
 }
@@ -250,6 +252,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error && everywhere) await supabase.auth.signOut({ scope: 'local' });
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    if (!supabase) return fail(null);
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) return { ok: false as const, message: /fetch|network/i.test(error.message) ? 'Could not reach your account. Try again.' : 'Your account could not be deleted. Try again.' };
+    // the account is gone: forget this device's copy and the session
+    await signOut();
+    return { ok: true as const };
+  }, [signOut]);
+
   const beforeSignOut = useCallback((fn: () => Promise<void>) => {
     hooks.current.add(fn);
     return () => void hooks.current.delete(fn);
@@ -270,9 +281,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePassword,
       setDisplayName,
       signOut,
+      deleteAccount,
       beforeSignOut,
     }),
-    [status, account, notice, recovering, signInWithGoogle, signInWithPassword, signUp, resendConfirmation, sendPasswordReset, updatePassword, setDisplayName, signOut, beforeSignOut],
+    [status, account, notice, recovering, signInWithGoogle, signInWithPassword, signUp, resendConfirmation, sendPasswordReset, updatePassword, setDisplayName, signOut, deleteAccount, beforeSignOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

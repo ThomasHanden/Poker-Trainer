@@ -85,7 +85,7 @@ organisation "Milton".
 1. **Google sign-in** (Google Cloud Console, about 5 minutes):
    1. https://console.cloud.google.com → create a project (or pick one).
    2. **Google Auth Platform → Branding**: app name *Felt School*, your support email; add the
-      authorised domains `feltschool.vercel.app` and `supabase.co`. **Audience**: External, then
+      authorised domains `feltschool.vercel.app` and `uiqbxzeemhojjmpoechp.supabase.co` (Google refuses plain `supabase.co`: it is a shared domain, like `vercel.app`). **Audience**: External, then
       Publish. **Data access**: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`.
    3. **Clients → Create client → Web application**:
       - Authorised JavaScript origins: `https://feltschool.vercel.app` and `http://localhost:5173`

@@ -176,3 +176,24 @@ describe('puzzle results', () => {
     expect(await as(BOB, () => rows(`select * from public.puzzle_runs`))).toEqual([]);
   });
 });
+
+describe('deleting an account', () => {
+  it('removes the account and everything it owns, and only yours', async () => {
+    const CAT = '33333333-3333-4333-8333-333333333333';
+    await db.query(`insert into auth.users (id, email) values ($1, 'cat@example.com')`, [CAT]);
+    await as(CAT, async () => {
+      await db.query(`select public.save_progress(0, '{"lessons":{}}')`);
+      await db.query(`select public.save_hands($1)`, [[{ record: hand('c-1'), updatedAt: 1 }]]);
+    });
+    // nobody else can delete it, and visitors cannot call it at all
+    expect(await as(null, () => fails(db.query(`select public.delete_my_account()`)))).toMatch(/permission denied/);
+    await as(CAT, () => db.query(`select public.delete_my_account()`));
+    expect(await rows(`select id from auth.users where id = $1`, [CAT])).toEqual([]);
+    for (const t of ['profiles', 'progress', 'practice_hands'])
+      expect(await rows(`select 1 from public.${t} where ${t === 'profiles' ? 'id' : 'user_id'} = $1`, [CAT]), t).toEqual([]);
+    // the others are untouched
+    expect((await rows(`select id from auth.users order by id`)).length).toBe(2);
+    expect((await rows(`select 1 from public.practice_hands where user_id = $1`, [ANN])).length).toBe(2);
+  });
+});
+

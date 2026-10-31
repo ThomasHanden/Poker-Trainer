@@ -38,6 +38,7 @@ const STATIC: Record<string, PageMeta> = {
   '/play': page('Play live', 'Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables.'),
   '/review': page('Review', 'Every hand you finish is saved here. Open one to replay it and read the review again.', true),
   '/progress': page('Progress', 'How your decisions are scoring, where you are strong, and what to work on next.', true),
+  '/privacy': page('Privacy', 'What Felt School stores, why, where it is kept, and how to delete it.'),
   '/login': page('Sign in', 'Sign in to keep your Felt School progress on every device.', true),
   '/account': page('Your account', 'Your Felt School account.', true),
   '/auth/callback': page('Signing in', 'Signing in to Felt School.', true),

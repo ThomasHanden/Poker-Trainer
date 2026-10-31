@@ -553,6 +553,42 @@ function GuestChips() {
   );
 }
 
+/** Delete the account and everything in it, after a clear confirmation. */
+function DeleteAccount() {
+  const { deleteAccount } = useAuth();
+  const nav = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const go = async () => {
+    if (!confirm('Delete your account? Your profile, lesson progress, saved ranges, settings, practice hands and puzzle results will be deleted from every device. This cannot be undone.')) return;
+    setBusy(true);
+    setError(null);
+    const r = await deleteAccount();
+    setBusy(false);
+    if (r.ok) nav('/', { replace: true });
+    else setError(r.message);
+  };
+  return (
+    <section className="auth-card" aria-labelledby="delete-title">
+      <h2 id="delete-title">Delete account</h2>
+      <p className="note">
+        Deletes your account and everything saved in it, on every device, straight away. Live-table chips stay under an anonymous number that nobody can link to you
+        any more. <Link to="/privacy">Privacy</Link>
+      </p>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="row">
+        <button className="btn danger" onClick={go} disabled={busy}>
+          {busy ? 'Deleting…' : 'Delete my account'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function AccountPage() {
   const auth = useAuth();
   const { unsaved } = useStore();
@@ -700,6 +736,8 @@ export function AccountPage() {
       </section>
 
       <GuestChips />
+
+      <DeleteAccount />
 
       <section className="auth-card" aria-labelledby="signout-title">
         <h2 id="signout-title">Sign out</h2>

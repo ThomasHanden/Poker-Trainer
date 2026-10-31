@@ -7232,3 +7232,13 @@ label > span:first-child:not(.select-value) {
 .guest-import .row {
   gap: 8px;
 }
+.privacy {
+  max-width: 720px;
+}
+.privacy h2 {
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+}
+.privacy li + li {
+  margin-top: 6px;
+}

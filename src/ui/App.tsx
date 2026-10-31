@@ -10,6 +10,7 @@ import { ProgressPage } from './pages/Progress';
 import { HomePage } from './pages/Home';
 import { PlayLobbyPage, PlayTablePage } from './pages/Play';
 import { AccountPage, AuthCallbackPage, GuestImport, LoginPage, ResetPasswordPage } from './pages/Account';
+import { PrivacyPage } from './pages/Privacy';
 import { AuthMenu } from './components/AuthMenu';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
@@ -129,12 +130,15 @@ export function Shell() {
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>
       </main>
       <footer className="footer">
-        <span className="foot-brand">Felt School</span>
+        <span className="foot-brand">
+          Felt School · <Link to="/privacy">Privacy</Link>
+        </span>
         <span>
           Scores are teaching estimates, not solver output.{' '}
           {owner

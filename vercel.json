@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/:page(practice|learn|ranges|play|review|progress)", "destination": "/:page.html" },
+    { "source": "/:page(practice|learn|ranges|play|review|progress|privacy)", "destination": "/:page.html" },
     { "source": "/learn/:lesson", "destination": "/learn/:lesson.html" },
     { "source": "/play/:room", "destination": "/app.html" },
     { "source": "/review/:hand", "destination": "/app.html" },
