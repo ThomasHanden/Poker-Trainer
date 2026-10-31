@@ -64,14 +64,16 @@ export interface Cashout {
 }
 
 export type ClientMessage =
-  /** buyIn: chips to bring, in table units (ignored when already seated) */
-  | { type: 'sit'; name: string; buyIn?: number }
+  /** seat: which seat (0 to MAX_SEATS - 1); buyIn: chips to bring, in table units (both ignored when already seated) */
+  | { type: 'sit'; name: string; seat?: number; buyIn?: number }
   | { type: 'leave' }
   | { type: 'start' }
   | { type: 'action'; action: PlayerAction };
 
 export interface SeatView {
   id: string;
+  /** fixed seat number around the table, 0 to MAX_SEATS - 1 */
+  seat: number;
   name: string;
   stack: number;
   /** disconnected */
@@ -94,6 +96,9 @@ export interface TableView {
   hand: HandState | null;
   /** the viewer's index in hand.players, or -1 when not in the hand */
   me: number;
+  /** seat number and player id for each hand.players index (who was dealt in, and where) */
+  handSeats: number[];
+  handIds: string[];
   handNo: number;
   turnEndsAt: number | null;
   nextHandAt: number | null;
@@ -116,6 +121,7 @@ export interface TableSummary {
 
 interface Seat {
   id: string;
+  seat: number;
   name: string;
   stack: number;
   leaving: boolean;
@@ -168,7 +174,9 @@ export class LiveTable {
   nextHandAt: number | null = null;
   readonly autoDeal: boolean;
   readonly stakes: Stakes;
-  private button = 0; // index into seats
+  /** the next hand's button goes to the first occupied seat at or after this seat number */
+  private buttonSeat = 0;
+  private handSeats: number[] = [];
   private settled = 0; // handNo of the last hand whose result was paid out
   private clock: () => number;
   private shuffleDeck: <T>(a: T[]) => T[];
@@ -176,7 +184,7 @@ export class LiveTable {
 
   constructor(opts: LiveTableOptions = {}) {
     this.stakes = opts.stakes ?? LOW_STAKES;
-    this.autoDeal = opts.autoDeal ?? false;
+    this.autoDeal = opts.autoDeal ?? true;
     this.clock = opts.clock ?? Date.now;
     this.shuffleDeck = opts.shuffleDeck ?? shuffle;
   }
@@ -238,8 +246,15 @@ export class LiveTable {
     return { players: this.seats.length, maxSeats: MAX_SEATS, playing: this.inHand() };
   }
 
+  /** Why a player cannot take this seat, or null if it is free. */
+  seatProblem(seatNo: unknown): string | null {
+    if (typeof seatNo !== 'number' || !Number.isInteger(seatNo) || seatNo < 0 || seatNo >= MAX_SEATS) return 'Pick a seat';
+    if (this.seats.some((s) => s.seat === seatNo)) return 'Someone just took that seat. Pick another one.';
+    return null;
+  }
+
   /** Take a seat with a buy-in already drawn from the bank, or (already seated) change name and stay. */
-  sit(id: string, name: string, buyIn = 0): string | null {
+  sit(id: string, name: string, buyIn = 0, seatNo?: number): string | null {
     const seat = this.seatOf(id);
     if (seat) {
       seat.name = name;
@@ -247,8 +262,12 @@ export class LiveTable {
       seat.offlineSince = null;
     } else {
       if (this.seats.length >= MAX_SEATS) return 'The table is full';
+      const chosen = seatNo ?? this.firstFreeSeat();
+      const problem = this.seatProblem(chosen);
+      if (problem) return problem;
       if (buyIn <= 0) return 'You need chips to sit down';
-      this.seats.push({ id, name, stack: buyIn, leaving: false, offlineSince: null, timeouts: 0 });
+      this.seats.push({ id, seat: chosen, name, stack: buyIn, leaving: false, offlineSince: null, timeouts: 0 });
+      this.seats.sort((a, b) => a.seat - b.seat); // clockwise by seat number
     }
     this.refreshNextHand();
     return null;
@@ -270,9 +289,12 @@ export class LiveTable {
     for (const s of [...this.seats]) if (s.leaving || s.offlineSince !== null) this.removeSeat(s.id);
     const n = this.seats.length;
     if (n < 2) return 'You need at least two players';
+    // the button goes to the first occupied seat at or after buttonSeat, going clockwise
+    const button = Math.max(0, this.seats.findIndex((s) => s.seat >= this.buttonSeat));
     // players[] runs UTG ... BTN, SB, BB (clockwise); rotate the seats so the button seat lands on BTN.
     const btn = buttonIndexFor(n);
-    const ordered = Array.from({ length: n }, (_, i) => this.seats[(this.button + i - btn + n) % n]);
+    const ordered = Array.from({ length: n }, (_, i) => this.seats[(button + i - btn + n) % n]);
+    this.handSeats = ordered.map((s) => s.seat);
     const deck = this.shuffleDeck(fullDeck());
     const holes = ordered.map(() => [deck.pop()!, deck.pop()!]);
     this.order = ordered.map((s) => s.id);
@@ -343,6 +365,7 @@ export class LiveTable {
       you: id,
       seats: this.seats.map((s) => ({
         id: s.id,
+        seat: s.seat,
         name: s.name,
         stack: s.stack,
         away: s.offlineSince !== null,
@@ -362,6 +385,8 @@ export class LiveTable {
         })),
       },
       me: h ? this.order.indexOf(id) : -1,
+      handSeats: h ? this.handSeats : [],
+      handIds: h ? this.order : [],
       handNo: this.handNo,
       turnEndsAt: this.inHand() ? this.turnEndsAt : null,
       nextHandAt: this.nextHandAt,
@@ -406,7 +431,8 @@ export class LiveTable {
       const seat = this.seatOf(this.order[i]);
       if (seat) seat.stack = p.stack;
     });
-    if (this.seats.length) this.button = (this.button + 1) % this.seats.length;
+    // the button moves one seat clockwise (on to the next occupied seat when the next hand starts)
+    this.buttonSeat = (this.handSeats[h.buttonIndex] + 1) % MAX_SEATS;
     // no free rebuys: a player who lost their stack stands up and can buy in again from their bank
     for (const s of this.seats.filter((x) => x.leaving || x.stack <= 0)) this.removeSeat(s.id);
     this.refreshNextHand();
@@ -435,10 +461,12 @@ export class LiveTable {
     const j = this.inHand() ? this.order.indexOf(id) : -1;
     this.cashouts.push({ id, amount: j >= 0 ? this.hand!.players[j].stack : this.seats[k].stack });
     this.seats.splice(k, 1);
-    // keep the button on the same player when someone before it leaves
-    if (k < this.button) this.button--;
-    if (this.button >= this.seats.length) this.button = 0;
     this.refreshNextHand();
+  }
+
+  private firstFreeSeat(): number {
+    for (let n = 0; n < MAX_SEATS; n++) if (!this.seats.some((s) => s.seat === n)) return n;
+    return -1;
   }
 
   private seatOf(id: string): Seat | undefined {

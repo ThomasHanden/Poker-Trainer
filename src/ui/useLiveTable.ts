@@ -115,7 +115,7 @@ export function useLiveTable(room: string) {
     error,
     status,
     offset,
-    sit: (name: string, buyIn?: number) => send({ type: 'sit', name, buyIn }),
+    sit: (name: string, seat: number, buyIn: number) => send({ type: 'sit', name, seat, buyIn }),
     leave: () => send({ type: 'leave' }),
     start: () => send({ type: 'start' }),
     act: (action: PlayerAction) => send({ type: 'action', action }),

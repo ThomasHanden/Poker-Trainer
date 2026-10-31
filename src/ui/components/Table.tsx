@@ -119,6 +119,22 @@ const PORTRAIT = { w: 1, h: 1.75 };
 // live tables seat at most six, so on phones they use a shorter felt that fits beside the action buttons
 const PORTRAIT_LIVE = { w: 1, h: 1.45 };
 
+/**
+ * Live tables have fixed seats: players sit where they chose, empty seats can be taken, and people who
+ * sat down mid-hand wait in their seat. Without this, players are spaced evenly with the hero at the bottom.
+ */
+export interface Seating {
+  slots: number;
+  /** the seat drawn at the bottom (yours, once you sit) */
+  viewSlot: number;
+  /** seat for each hand.players index; -1 hides that player (they have left) */
+  slotOf: (i: number) => number;
+  /** empty seats; onSit makes them a "Sit here" button */
+  open: { slot: number; onSit?: () => void }[];
+  /** seated but not in the hand shown */
+  idle: { slot: number; name: string; stack: number; you: boolean; note: string }[];
+}
+
 
 export function Table({
   state,
@@ -133,6 +149,7 @@ export function Table({
   turnEndsAt = null,
   turnMs,
   money,
+  seating,
 }: {
   state: HandState;
   hero: number;
@@ -152,6 +169,7 @@ export function Table({
   turnMs?: number;
   /** format amounts (live tables show chips); defaults to big blinds */
   money?: Money;
+  seating?: Seating;
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -179,21 +197,23 @@ export function Table({
   // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
   const box = narrow ? (live ? PORTRAIT_LIVE : PORTRAIT) : LANDSCAPE;
-  const geo = (i: number) => {
-    const t = ((i - hero + n) % n) / n;
+  // position round the rail: by fixed seat on live tables, else evenly spaced from the hero
+  const slotT = (slot: number) => (seating ? ((slot - seating.viewSlot + seating.slots) % seating.slots) / seating.slots : 0);
+  const geo = (i: number) => geoAt(seating ? slotT(seating.slotOf(i)) : ((i - hero + n) % n) / n, i === hero);
+  const geoAt = (t: number, isHero: boolean) => {
     const raw = stadiumPoint(t, box.w, box.h, 1);
     // portrait: push the side seats out onto the rail so they clear the board
     const seat = narrow ? { x: 50 + (raw.x - 50) * 1.08, y: raw.y } : raw;
     // bets sit between the seat and the middle, clear of the board and of the hole cards
     const chip = narrow
-      ? i === hero
+      ? isHero
         ? { x: 50, y: 73 } // above the hero's cards
         : raw.x < 12 || raw.x > 88
           ? innerChip({ x: raw.x < 50 ? 28 : 72, y: raw.y + (raw.y > 50 ? -7 : 7) }) // side seats: straight in from the plate
           : raw.y > 65
             ? (({ x, y }) => ({ x, y: Math.min(y, 75) }))(stadiumPoint(t, box.w, box.h, 0.7)) // bottom-curve seats: clear of the hero's chip and cards
             : innerChip(stadiumPoint(t, box.w, box.h, 0.56))
-      : i === hero
+      : isHero
         ? { x: 63, y: 84 } // beside the hero's (large) hole cards
         : { x: 50 + (seat.x - 50) * 0.5, y: 50 + (seat.y - 50) * 0.5 };
     return {
@@ -225,6 +245,7 @@ export function Table({
           </div>
         </div>
         {state.players.map((p, i) => {
+          if (seating && seating.slotOf(i) < 0) return null;
           const g = geo(i);
           const act = lastStreetAction(state, i);
           const isTurn = spotlight ? spotlight.seat === i : state.toAct === i && !state.complete;
@@ -300,6 +321,38 @@ export function Table({
                   <span className="chip-dot" aria-hidden="true" />
                   {!narrow && act && (act.type === 'bet' || act.type === 'raise') ? (p.allIn ? 'All-in ' : act.type === 'raise' ? 'Raise to ' : 'Bet ') : ''}
                   {fmt(p.streetCommitted)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {seating?.idle.map((s) => {
+          const g = geoAt(slotT(s.slot), s.you);
+          return (
+            <div key={`idle-${s.slot}`} className={`seat idle ${s.you ? 'hero' : ''} ${g.low ? 'low' : 'high'}`} style={g.seat}>
+              <div className="plate">
+                <span className="plate-pos">
+                  {s.you ? 'You' : <span className="plate-name">{s.name}</span>}
+                </span>
+                <span className="plate-stack">{fmt(s.stack)}</span>
+              </div>
+              <div className="seat-tags">
+                <div className="seat-action seat-wait">{s.note}</div>
+              </div>
+            </div>
+          );
+        })}
+        {seating?.open.map((o) => {
+          const g = geoAt(slotT(o.slot), false);
+          return (
+            <div key={`open-${o.slot}`} className={`seat open ${g.low ? 'low' : 'high'}`} style={g.seat}>
+              {o.onSit ? (
+                <button type="button" className="plate plate-open" onClick={o.onSit} aria-label={`Sit in seat ${o.slot + 1}`}>
+                  Sit here
+                </button>
+              ) : (
+                <div className="plate plate-open empty" aria-label={`Seat ${o.slot + 1}: empty`}>
+                  Empty
                 </div>
               )}
             </div>

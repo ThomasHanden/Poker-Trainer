@@ -6688,3 +6688,87 @@ label > span:first-child:not(.select-value) {
 .live-range.bad {
   color: var(--bad);
 }
+
+/* ============================================================
+   Live tables: open seats, waiting players, the buy-in window
+   ============================================================ */
+.seat.open .plate-open {
+  min-width: 84px;
+  padding: 9px 12px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  box-shadow: none;
+}
+.seat.open button.plate-open {
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.seat.open button.plate-open:hover,
+.seat.open button.plate-open:focus-visible {
+  background: rgba(245, 196, 81, 0.25);
+  border-color: #f5c451;
+  border-style: solid;
+  outline: none;
+}
+.seat.open .plate-open.empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+.seat.idle .plate {
+  opacity: 0.85;
+}
+.seat-action.seat-wait {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.live-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 12, 10, 0.5);
+}
+.live-modal-box {
+  width: min(480px, 100%);
+  max-height: calc(100svh - 32px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+.live-modal-box h2 {
+  font-size: 1.2rem;
+  margin: 0 0 8px;
+}
+.live-have {
+  margin: 0;
+  color: var(--text-2);
+}
+.live-have strong {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  /* on phones the window slides up from the bottom */
+  .live-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .live-modal-box {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+}

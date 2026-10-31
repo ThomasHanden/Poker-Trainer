@@ -1,7 +1,7 @@
 import { CSSProperties, FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
-import { Table, DecisionFacts, HistoryList, dealMs } from '../components/Table';
+import { Table, DecisionFacts, HistoryList, dealMs, type Seating } from '../components/Table';
 import { ActionBar, type AmountUnit } from '../components/ActionBar';
 import { PARTY_HOST, fetchBankroll, rememberTable, tableInfoUrl, useLiveTable, type Bankroll } from '../useLiveTable';
 import {
@@ -17,6 +17,7 @@ import {
   fmtChips,
   stakesFor,
   tableLabel,
+  type Stakes,
   type TableSummary,
 } from '../../multiplayer/table';
 import { DAILY } from '../../multiplayer/bank';
@@ -242,11 +243,32 @@ function useSecondsUntil(at: number | null, offset: number): number | null {
   return at === null ? null : Math.max(0, Math.ceil((at - (Date.now() + offset)) / 1000));
 }
 
+/** A felt with no cards on it yet, for a table before its first hand. */
+function emptyHand(stakes: Stakes): HandState {
+  return {
+    config: { format: 'cash', numPlayers: 0, sb: stakes.sb, bb: stakes.bb, ante: 0, anteType: 'none' },
+    players: [],
+    buttonIndex: -1,
+    street: 'preflop',
+    board: [],
+    deck: [],
+    currentBet: 0,
+    minRaiseIncrement: stakes.bb,
+    fullRaiseCount: 0,
+    lastFullBetLevel: 0,
+    toAct: -1,
+    history: [],
+    complete: false,
+    lastAggressor: -1,
+    preflopAggressor: -1,
+  };
+}
+
 export function PlayTablePage() {
   const { room = '' } = useParams();
   const nav = useNavigate();
   const { data } = useStore();
-  const { view, bank, error, status, offset, sit, leave, start, act } = useLiveTable(room);
+  const { view, bank, error, status, offset, sit, leave, act } = useLiveTable(room);
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
   // buy-in choice, in whole chips: from the table minimum up to its maximum or what you have, whichever is less
@@ -268,16 +290,25 @@ export function PlayTablePage() {
   const turnLeft = useSecondsUntil(view?.turnEndsAt ?? null, offset);
   const dealIn = useSecondsUntil(view?.nextHandAt ?? null, offset);
   const ready = view ? view.seats.filter((s) => !s.away && !s.leaving).length : 0;
-  // before the first hand there is nothing to show on the felt; after one, the last hand stays up
-  const waiting = !!view && !h;
+
+  // the seat you clicked: the buy-in window is open for it until you sit down or cancel
+  const [picking, setPicking] = useState<number | null>(null);
+  const seated = !!mySeat;
+  useEffect(() => {
+    if (seated) {
+      setPicking(null);
+      rememberTable(room);
+    }
+  }, [seated, room]);
+  useEffect(() => {
+    if (picking === null) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPicking(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [picking]);
 
   // one action per turn: re-enable when the server sends the next state
   useEffect(() => setSent(false), [h?.history.length, view?.handNo]);
-
-  const seated = !!mySeat;
-  useEffect(() => {
-    if (seated) rememberTable(room);
-  }, [seated, room]);
 
   // pre-actions: chosen while waiting, played as soon as it is your turn; cleared each street
   const [pre, setPre] = useState<PreAction | null>(null);
@@ -320,9 +351,9 @@ export function PlayTablePage() {
 
   const sitDown = (e: FormEvent) => {
     e.preventDefault();
-    if (!buyValid) return;
+    if (!buyValid || picking === null) return;
     saveName(name.trim());
-    sit(name, (buyChips as number) * CHIP);
+    sit(name, picking, (buyChips as number) * CHIP);
   };
 
   if (!PARTY_HOST)
@@ -337,6 +368,39 @@ export function PlayTablePage() {
   const results = h?.complete && h.result ? resultLines(h, me) : [];
   const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
+  // Seats. Players in the hand are drawn in the seat they were dealt in; once a hand is over, anyone
+  // who has since left is hidden. Seated players not in the hand shown wait in their seat.
+  const slots = view?.maxSeats ?? MAX_SEATS;
+  const handSeats = view?.handSeats ?? [];
+  const handIds = view?.handIds ?? [];
+  const holder = (slot: number) => view?.seats.find((s) => s.seat === slot);
+  const slotOf = (i: number) => {
+    const slot = handSeats[i];
+    if (holder(slot)?.id === handIds[i]) return slot;
+    // left mid-hand but still has cards (all-in): stays in view until the hand ends
+    return live && h && !h.players[i].folded ? slot : -1;
+  };
+  const shown = new Set(h ? h.players.map((_, i) => (slotOf(i) >= 0 ? handIds[i] : '')) : []);
+  const used = new Set([...(view?.seats.map((s) => s.seat) ?? []), ...(h ? h.players.map((_, i) => slotOf(i)) : [])]);
+  const seating: Seating = {
+    slots,
+    viewSlot: mySeat?.seat ?? 0,
+    slotOf,
+    open: Array.from({ length: slots }, (_, slot) => slot)
+      .filter((slot) => !used.has(slot))
+      .map((slot) => ({ slot, onSit: mySeat ? undefined : () => setPicking(slot) })),
+    idle: (view?.seats ?? [])
+      .filter((s) => !shown.has(s.id))
+      .map((s) => ({
+        slot: s.seat,
+        name: s.name,
+        stack: s.stack,
+        you: s.id === view?.you,
+        note: s.leaving ? 'Leaving' : s.away ? 'Away' : live ? 'Next hand' : 'Waiting',
+      })),
+  };
+  const pickedTaken = picking !== null && !!holder(picking) && !mySeat;
+
   return (
     <div className={`page practice live ${(myTurn && !dealing) || canPre ? 'has-dock' : ''}`}>
       <header className="practice-head">
@@ -348,13 +412,6 @@ export function PlayTablePage() {
             </span>
             <span className="pchip muted">Blinds {stakes.label}</span>
             {bank && <span className="pchip muted">Your chips: {fmtChips(bank.balance)}</span>}
-            {view?.seats.map((s) => (
-              <span key={s.id} className={`pchip ${s.away || s.leaving ? 'muted' : ''}`}>
-                {s.name}
-                {s.id === view.you ? ' (you)' : ''} · {fmtChips(s.stack)}
-                {s.leaving ? ' · leaving' : s.away ? ' · away' : ''}
-              </span>
-            ))}
           </div>
         </div>
         <div className="ph-side live-invite">
@@ -390,7 +447,7 @@ export function PlayTablePage() {
         </div>
       </header>
 
-      {error && (
+      {error && picking === null && (
         <div className="banner warn" role="alert">
           {error}
         </div>
@@ -399,117 +456,21 @@ export function PlayTablePage() {
       {mySeat?.leaving && (
         <div className="banner warn" role="status">
           You missed two turns in a row, so you will stand up after this hand.{' '}
-          <button className="linklike" onClick={() => sit(mySeat.name)}>
+          <button className="linklike" onClick={() => sit(mySeat.name, mySeat.seat, 0)}>
             Stay seated
           </button>
         </div>
-      )}
-
-      {view && !mySeat && (
-        <section className="decision-panel live-sit">
-          {view.seats.length >= view.maxSeats ? (
-            <p>The table is full. You can watch until a seat opens.</p>
-          ) : !canBuyIn ? (
-            <p>
-              You are out of chips for today: this table needs at least {fmtChips(buyIn.min)} and you have {fmtChips(bank!.balance)}. You get topped up to {fmtChips(DAILY)} at{' '}
-              {refillTime(bank!.refillsAt)}.
-            </p>
-          ) : (
-            <form className="live-buyin" onSubmit={sitDown}>
-              <div className="row">
-                <label htmlFor="live-name">Your name</label>
-                <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
-              </div>
-              <div className="live-buyin-row">
-                <label htmlFor="buyin-amount">Buy in for</label>
-                <span className="live-amt-box">
-                  <input
-                    id="buyin-amount"
-                    type="number"
-                    inputMode="numeric"
-                    min={minChips}
-                    max={maxChips}
-                    step={1}
-                    value={buyChips}
-                    aria-invalid={!buyValid}
-                    aria-describedby="buyin-range"
-                    onChange={(e) => setBuyChips(e.target.value === '' ? '' : Number(e.target.value))}
-                  />
-                  <span className="unit">chips</span>
-                </span>
-                <span className="live-quick">
-                  <button type="button" className={`btn small ${buyChips === minChips ? 'primary' : ''}`} onClick={() => setBuyChips(minChips)}>
-                    Min {minChips}
-                  </button>
-                  <button type="button" className={`btn small ${buyChips === maxChips ? 'primary' : ''}`} onClick={() => setBuyChips(maxChips)}>
-                    Max {maxChips}
-                  </button>
-                </span>
-              </div>
-              <input
-                type="range"
-                className="size-slider live-buyin-slider"
-                aria-label="Buy-in amount"
-                min={minChips}
-                max={maxChips}
-                step={1}
-                value={buyValid ? buyChips : maxChips}
-                style={{ '--fill': `${maxChips > minChips && buyValid ? (100 * ((buyChips as number) - minChips)) / (maxChips - minChips) : 100}%` } as CSSProperties}
-                onChange={(e) => setBuyChips(Number(e.target.value))}
-              />
-              <p id="buyin-range" className={`note live-range ${buyValid ? '' : 'bad'}`}>
-                {buyValid ? '' : `Type an amount from ${minChips} to ${maxChips}. `}
-                This table: {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} chips
-                {maxChips < buyIn.max / CHIP ? ` (you have ${fmtChips(bank!.balance)}, so up to ${maxChips})` : ''}.
-              </p>
-              <div className="row">
-                <button className="btn primary" type="submit" disabled={!buyValid}>
-                  Sit down with {buyValid ? buyChips : '…'} chips
-                </button>
-                <span className="note">
-                  {bank ? `You have ${fmtChips(bank.balance)} chips. ` : ''}
-                  {live ? 'You will be dealt in from the next hand.' : ''}
-                </span>
-              </div>
-            </form>
-          )}
-        </section>
       )}
 
       {!view ? (
         <div className="loading" role="status">
           Connecting to the table…
         </div>
-      ) : waiting ? (
-        <section className="decision-panel live-wait" aria-live="polite">
-          {ready < 2 ? (
-            <p>
-              {view.seats.length === 0
-                ? 'Nobody is seated yet.'
-                : view.autoDeal
-                  ? 'Waiting for one more player. The first hand starts as soon as someone sits down.'
-                  : 'Waiting for another player. Send the invite link to a friend.'}
-            </p>
-          ) : dealIn !== null ? (
-            <p>
-              {ready} players seated. First hand in {dealIn}s.
-            </p>
-          ) : (
-            <>
-              <p>{ready} players seated.</p>
-              {mySeat && (
-                <button className="btn primary big" onClick={start}>
-                  Deal the first hand
-                </button>
-              )}
-            </>
-          )}
-        </section>
       ) : (
         <div className="practice-body">
           <Table
-            state={h!}
-            hero={me >= 0 ? me : 0}
+            state={h ?? emptyHand(stakes)}
+            hero={me}
             profiles={{}}
             fourColor={data.prefs.fourColor}
             showNames
@@ -518,32 +479,38 @@ export function PlayTablePage() {
             turnEndsAt={view.turnEndsAt === null || dealing ? null : view.turnEndsAt - offset}
             turnMs={TURN_MS}
             money={fmtChips}
+            seating={seating}
           />
           <p className="live-status" aria-live="polite">
             {live && dealing
               ? 'Dealing…'
               : live
-              ? myTurn
-                ? `Your turn · ${turnLeft ?? ''}s`
-                : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
-              : results.length
-                ? results.map((line) => (
+                ? myTurn
+                  ? `Your turn · ${turnLeft ?? ''}s`
+                  : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
+                : results.map((line) => (
                     <span key={line} className="live-result">
                       {line}
                     </span>
-                  ))
-                : 'Hand over'}
-            {!live && dealIn !== null && <span className="live-next">Next hand in {dealIn}s</span>}
+                  ))}
+            {!live && dealIn !== null && <span className="live-next">{h ? 'Next hand' : 'First hand'} in {dealIn}s</span>}
             {!live && ready < 2 && (
               <span className="live-next">
-                {view.autoDeal ? 'Waiting for another player to sit down.' : 'Waiting for another player. Send the invite link to a friend.'}
+                {mySeat
+                  ? 'Waiting for another player. The first hand starts as soon as someone sits down.'
+                  : seating.open.length
+                    ? 'Pick an open seat to play.'
+                    : 'The table is full.'}
               </span>
+            )}
+            {!mySeat && (live || (ready >= 2 && dealIn !== null)) && (
+              <span className="live-next">{seating.open.length ? 'You are watching. Pick an open seat to join the next hand.' : 'You are watching. The table is full.'}</span>
             )}
           </p>
           {busted && (
             <p className="note live-bust">
               {canBuyIn
-                ? `You lost your stack. Buy in again above (${fmtChips(buyIn.min)}–${fmtChips(buyIn.max)}); you have ${fmtChips(bank?.balance ?? 0)} chips left today.`
+                ? `You lost your stack. Pick an open seat to buy in again; you have ${fmtChips(bank?.balance ?? 0)} chips left today.`
                 : `You lost your stack, and that is your chips for today. More at ${bank ? refillTime(bank.refillsAt) : 'midnight'}.`}
             </p>
           )}
@@ -576,10 +543,105 @@ export function PlayTablePage() {
               />
             </section>
           )}
-          <details className="more live-history">
-            <summary>Hand history</summary>
-            <HistoryList state={h!} hero={me} showNames money={fmtChips} />
-          </details>
+          {h && (
+            <details className="more live-history">
+              <summary>Hand history</summary>
+              <HistoryList state={h} hero={me} showNames money={fmtChips} />
+            </details>
+          )}
+        </div>
+      )}
+
+      {picking !== null && !mySeat && (
+        <div className="live-modal" role="presentation" onClick={(e) => e.target === e.currentTarget && setPicking(null)}>
+          <section className="live-modal-box live-sit" role="dialog" aria-modal="true" aria-labelledby="sit-title">
+            <h2 id="sit-title">Take seat {picking + 1}</h2>
+            {pickedTaken ? (
+              <>
+                <p>Someone just took that seat. Pick another one.</p>
+                <button className="btn" onClick={() => setPicking(null)}>
+                  Back to the table
+                </button>
+              </>
+            ) : !canBuyIn ? (
+              <>
+                <p>
+                  You are out of chips for today: this table needs at least {fmtChips(buyIn.min)} and you have {fmtChips(bank!.balance)}. You get topped up to {fmtChips(DAILY)} at{' '}
+                  {refillTime(bank!.refillsAt)}.
+                </p>
+                <button className="btn" onClick={() => setPicking(null)}>
+                  Back to the table
+                </button>
+              </>
+            ) : (
+              <form className="live-buyin" onSubmit={sitDown}>
+                <p className="live-have">
+                  You have <strong>{bank ? fmtChips(bank.balance) : '…'}</strong> chips
+                </p>
+                <div className="row">
+                  <label htmlFor="live-name">Your name</label>
+                  <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" autoFocus={!name} />
+                </div>
+                <div className="live-buyin-row">
+                  <label htmlFor="buyin-amount">Buy in for</label>
+                  <span className="live-amt-box">
+                    <input
+                      id="buyin-amount"
+                      type="number"
+                      inputMode="numeric"
+                      min={minChips}
+                      max={maxChips}
+                      step={1}
+                      value={buyChips}
+                      autoFocus={!!name}
+                      aria-invalid={!buyValid}
+                      aria-describedby="buyin-range"
+                      onChange={(e) => setBuyChips(e.target.value === '' ? '' : Number(e.target.value))}
+                    />
+                    <span className="unit">chips</span>
+                  </span>
+                  <span className="live-quick">
+                    <button type="button" className={`btn small ${buyChips === minChips ? 'primary' : ''}`} onClick={() => setBuyChips(minChips)}>
+                      Min {minChips}
+                    </button>
+                    <button type="button" className={`btn small ${buyChips === maxChips ? 'primary' : ''}`} onClick={() => setBuyChips(maxChips)}>
+                      Max {maxChips}
+                    </button>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  className="size-slider live-buyin-slider"
+                  aria-label="Buy-in amount"
+                  min={minChips}
+                  max={maxChips}
+                  step={1}
+                  value={buyValid ? buyChips : maxChips}
+                  style={{ '--fill': `${maxChips > minChips && buyValid ? (100 * ((buyChips as number) - minChips)) / (maxChips - minChips) : 100}%` } as CSSProperties}
+                  onChange={(e) => setBuyChips(Number(e.target.value))}
+                />
+                <p id="buyin-range" className={`note live-range ${buyValid ? '' : 'bad'}`}>
+                  {buyValid ? '' : `Type an amount from ${minChips} to ${maxChips}. `}
+                  This table: {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} chips
+                  {maxChips < buyIn.max / CHIP ? ` (you have ${fmtChips(bank!.balance)}, so up to ${maxChips})` : ''}.
+                </p>
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="row">
+                  <button className="btn primary" type="submit" disabled={!buyValid}>
+                    Sit down with {buyValid ? buyChips : '…'} chips
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setPicking(null)}>
+                    Cancel
+                  </button>
+                </div>
+                {live && <p className="note">You will be dealt in from the next hand.</p>}
+              </form>
+            )}
+          </section>
         </div>
       )}
     </div>

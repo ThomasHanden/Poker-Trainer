@@ -284,7 +284,7 @@ describe('public tables', () => {
     expect(t.summary()).toEqual({ players: 2, maxSeats: MAX_SEATS, playing: true });
   });
 
-  it('private tables wait for someone to press Deal', () => {
+  it('can be set to wait for someone to press Deal instead', () => {
     const { t } = setup(['ann', 'bob']);
     expect(t.nextHandAt).toBeNull();
     expect(t.viewFor('ann').autoDeal).toBe(false);
@@ -404,5 +404,57 @@ describe('daily bank', () => {
     expect(id).toMatch(/^[0-9a-f]{24}$/);
     expect(id).toBe(await playerId('a-secret-key-that-is-long-enough'));
     expect(id).not.toBe(await playerId('another-secret-key-long-enough'));
+  });
+});
+
+describe('picking a seat', () => {
+  const table = () => {
+    let now = 1_000_000;
+    const t = new LiveTable({ clock: () => now });
+    return { t, advance: (ms: number) => (now += ms) };
+  };
+
+  it('a player sits in the seat they pick, and a taken seat is refused', () => {
+    const { t } = table();
+    expect(t.sit('ann', 'Ann', START_STACK, 4)).toBeNull();
+    expect(t.viewFor('x').seats).toEqual([expect.objectContaining({ id: 'ann', seat: 4 })]);
+    expect(t.sit('bob', 'Bob', START_STACK, 4)).toMatch(/took that seat/);
+    expect(t.seatProblem(9)).toBe('Pick a seat');
+    expect(t.seatProblem(2.5)).toBe('Pick a seat');
+    expect(t.sit('bob', 'Bob', START_STACK, 1)).toBeNull();
+    expect(t.seats.map((s) => s.seat)).toEqual([1, 4]); // kept in clockwise order
+  });
+
+  it('sitting alone waits; the first hand deals itself once a second player sits down', () => {
+    const { t, advance } = table();
+    t.sit('ann', 'Ann', START_STACK, 3);
+    t.setOnline('ann', true);
+    expect(t.nextHandAt).toBeNull();
+    t.sit('bob', 'Bob', START_STACK, 0);
+    t.setOnline('bob', true);
+    expect(t.nextHandAt).not.toBeNull();
+    advance(NEXT_HAND_MS);
+    t.tick();
+    expect(t.inHand()).toBe(true);
+    const v = t.viewFor('ann');
+    expect(v.handSeats.slice().sort()).toEqual([0, 3]);
+    expect(v.handIds[v.me]).toBe('ann');
+    expect(v.handSeats[v.me]).toBe(3);
+  });
+
+  it('the button moves clockwise round the occupied seats, skipping empty ones', () => {
+    const { t, advance } = table();
+    for (const [id, seat] of [['a', 0], ['b', 2], ['c', 5]] as const) {
+      t.sit(id, id, START_STACK, seat);
+      t.setOnline(id, true);
+    }
+    const buttons: number[] = [];
+    for (let k = 0; k < 4; k++) {
+      advance(NEXT_HAND_MS);
+      t.tick();
+      buttons.push(t.viewFor('a').handSeats[t.hand!.buttonIndex]);
+      while (t.inHand()) t.act(t.order[t.hand!.toAct], { type: 'fold' });
+    }
+    expect(buttons).toEqual([0, 2, 5, 0]);
   });
 });

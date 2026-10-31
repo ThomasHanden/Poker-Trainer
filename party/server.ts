@@ -5,7 +5,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { Server, routePartykitRequest, type Connection, type ConnectionContext, type WSMessage } from 'partyserver';
-import { LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
+import { LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, stakesFor } from '../src/multiplayer/table';
 import { KEY_PATTERN, deposit, nextRefill, playerId, refresh, utcDay, withdraw, type Account } from '../src/multiplayer/bank';
 
 type Env = { PokerTable: DurableObjectNamespace<PokerTable>; Bank: DurableObjectNamespace<Bank> };
@@ -42,7 +42,8 @@ export class PokerTable extends Server<Env> {
   timer: ReturnType<typeof setTimeout> | null = null;
 
   async onStart() {
-    this.table = new LiveTable({ stakes: stakesFor(this.name), autoDeal: isPublicTable(this.name) });
+    // every table deals by itself once two players are sitting
+    this.table = new LiveTable({ stakes: stakesFor(this.name) });
     // The game lives in memory, so a restart (a deploy, or Cloudflare moving the table) loses it.
     // Give everyone who was seated their chips back; an unfinished hand is called off.
     const saved = await this.ctx.storage.get<{ id: string; stack: number }[]>('seats');
@@ -80,8 +81,8 @@ export class PokerTable extends Server<Env> {
     } catch {
       return;
     }
-    const m = msg as { type?: unknown; name?: unknown; buyIn?: unknown };
-    const err = m?.type === 'sit' ? await this.sit(pid, m.name, m.buyIn) : this.table.handle(pid, msg);
+    const m = msg as { type?: unknown; name?: unknown; seat?: unknown; buyIn?: unknown };
+    const err = m?.type === 'sit' ? await this.sit(pid, m.name, m.seat, m.buyIn) : this.table.handle(pid, msg);
     if (err) conn.send(JSON.stringify({ type: 'error', message: err }));
     await this.update();
   }
@@ -95,11 +96,13 @@ export class PokerTable extends Server<Env> {
     await this.update();
   }
 
-  /** Buy in from the bank for the amount chosen and sit down (or, already seated, just stay). */
-  async sit(pid: string, rawName: unknown, rawBuyIn: unknown): Promise<string | null> {
+  /** Buy in from the bank for the amount chosen and sit in the chosen seat (or, already seated, just stay). */
+  async sit(pid: string, rawName: unknown, rawSeat: unknown, rawBuyIn: unknown): Promise<string | null> {
     const name = cleanName(rawName);
     if (this.table.isSeated(pid)) return this.table.sit(pid, name);
     if (this.table.seats.length >= MAX_SEATS) return 'The table is full';
+    const seatProblem = this.table.seatProblem(rawSeat);
+    if (seatProblem) return seatProblem;
     const { min, max } = buyInFor(this.table.stakes);
     const want = checkBuyIn(this.table.stakes, rawBuyIn);
     if (want === null) return `Buy in for between ${fmtChips(min)} and ${fmtChips(max)} chips.`;
@@ -109,8 +112,8 @@ export class PokerTable extends Server<Env> {
       await this.sendBank(pid);
       return `You do not have ${fmtChips(want)} chips. You get more at midnight (UTC).`;
     }
-    const err = this.table.sit(pid, name, amount);
-    if (err) await bank.deposit(pid, amount); // the last seat went while we were at the bank
+    const err = this.table.sit(pid, name, amount, rawSeat as number);
+    if (err) await bank.deposit(pid, amount); // the seat went while we were at the bank
     await this.sendBank(pid);
     return err;
   }
