@@ -6,6 +6,9 @@ import { Term } from './Term';
 import { describeHolding } from '../../engine/board';
 import { describeScore, evaluate } from '../../engine/evaluator';
 
+/** How a table shows an amount: big blinds by default, chips on live tables. */
+export type Money = (amount: number) => string;
+
 export const fmtBB = (chips: number, bb: number) => {
   const v = chips / bb;
   return `${Number.isInteger(v) ? v : v.toFixed(v < 10 ? 2 : 1).replace(/\.?0+$/, '')}bb`;
@@ -129,6 +132,7 @@ export function Table({
   live = false,
   turnEndsAt = null,
   turnMs,
+  money,
 }: {
   state: HandState;
   hero: number;
@@ -146,9 +150,12 @@ export function Table({
   /** live tables: when the current turn runs out (local clock, ms) and the full turn length, for the timer bar */
   turnEndsAt?: number | null;
   turnMs?: number;
+  /** format amounts (live tables show chips); defaults to big blinds */
+  money?: Money;
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
+  const fmt: Money = money ?? ((x) => fmtBB(x, bb));
   const showdown = state.complete && state.result?.reason === 'showdown' ? new Set(state.result.showdownPlayers) : new Set<number>();
   const totalPot = potSize(state);
   const streetBets = state.players.reduce((a, p) => a + p.streetCommitted, 0);
@@ -203,16 +210,16 @@ export function Table({
         <div className="table-center">
           {/* live: once the pot has gone to the winner, the middle is empty */}
           <div className="pot-pill" aria-live="polite" style={won ? { visibility: 'hidden' } : undefined}>
-            <Term id="pot">Pot</Term> <strong data-testid="pot">{fmtBB(totalPot, bb)}</strong>
+            <Term id="pot">Pot</Term> <strong data-testid="pot">{fmt(totalPot)}</strong>
           </div>
           <div className="board" aria-label="Community cards">
             <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} deal />
           </div>
           <div className="pot-sub">
-            {streetBets > 0 && potBefore > 0 && !state.complete ? `${fmtBB(potBefore, bb)} in the middle + ${fmtBB(streetBets, bb)} bet this street` : '\u00a0'}
+            {streetBets > 0 && potBefore > 0 && !state.complete ? `${fmt(potBefore)} in the middle + ${fmt(streetBets)} bet this street` : '\u00a0'}
             {state.config.anteType !== 'none' && state.config.ante > 0 && (
               <span className="blinds-line">
-                Blinds {fmtBB(state.config.sb, bb)}/{fmtBB(state.config.bb, bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmtBB(state.config.ante, bb)}
+                Blinds {fmt(state.config.sb)}/{fmt(state.config.bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmt(state.config.ante)}
               </span>
             )}
           </div>
@@ -244,7 +251,7 @@ export function Table({
               <div
                 className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''} ${g.low ? 'low' : 'high'} ${winners.has(i) ? 'winner' : ''}`}
                 style={g.seat}
-                aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmtBB(p.stack, bb)}`}
+                aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmt(p.stack)}`}
               >
                 {g.low && cards}
                 <div className="plate">
@@ -257,7 +264,7 @@ export function Table({
                     {p.position}
                     {p.isHero ? ' · You' : showNames ? <span className="plate-name"> · {p.name}</span> : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
                   </span>
-                  <span className="plate-stack">{p.allIn ? 'All-in' : fmtBB(p.stack, bb)}</span>
+                  <span className="plate-stack">{p.allIn && !state.complete ? 'All-in' : fmt(p.stack)}</span>
                   {isTurn && timer && (
                     <span key={turnKey} className="turn-bar" style={{ '--from': timer.from, animationDuration: `${timer.left}ms` } as CSSProperties} aria-hidden="true" />
                   )}
@@ -274,7 +281,7 @@ export function Table({
                   {winners.has(i) && won ? (
                     // one badge: what they won, and with what at a showdown
                     <div className="seat-win">
-                      <strong>Wins {fmtBB(won[i], bb)}</strong>
+                      <strong>Wins {fmt(won[i])}</strong>
                       {showdown.has(i) && state.board.length === 5 && <span>{shownHand(p.hole)}</span>}
                     </div>
                   ) : (
@@ -285,14 +292,14 @@ export function Table({
               {winners.has(i) && won && (
                 <div className="bet-chip pot-win" style={g.chip} aria-hidden="true">
                   <span className="chip-dot" />
-                  {fmtBB(won[i], bb)}
+                  {fmt(won[i])}
                 </div>
               )}
               {p.streetCommitted > 0 && !state.complete && (
-                <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmtBB(p.streetCommitted, bb)}`}>
+                <div className={`bet-chip ${act?.type === 'raise' || act?.type === 'bet' ? 'agg' : ''}`} style={g.chip} aria-label={`${p.isHero ? 'Your' : p.position} bet this street: ${fmt(p.streetCommitted)}`}>
                   <span className="chip-dot" aria-hidden="true" />
                   {!narrow && act && (act.type === 'bet' || act.type === 'raise') ? (p.allIn ? 'All-in ' : act.type === 'raise' ? 'Raise to ' : 'Bet ') : ''}
-                  {fmtBB(p.streetCommitted, bb)}
+                  {fmt(p.streetCommitted)}
                 </div>
               )}
             </div>
@@ -304,8 +311,9 @@ export function Table({
 }
 
 /** The numbers a decision is made with: pot, amount to call, effective stack and current hand. */
-export function DecisionFacts({ state, hero }: { state: HandState; hero: number }) {
+export function DecisionFacts({ state, hero, money }: { state: HandState; hero: number; money?: Money }) {
   const bb = state.config.bb;
+  const fmt: Money = money ?? ((x) => fmtBB(x, bb));
   const me = state.players[hero];
   const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - me.streetCommitted, me.stack)) : 0;
   return (
@@ -314,21 +322,21 @@ export function DecisionFacts({ state, hero }: { state: HandState; hero: number 
         <span className="fact-l">
           <Term id="pot">Pot</Term>
         </span>
-        <span className="fact-v">{fmtBB(potSize(state), bb)}</span>
+        <span className="fact-v">{fmt(potSize(state))}</span>
       </div>
       <div className="fact">
         <span className="fact-l">
           <Term id="tocall">To call</Term>
         </span>
         <span className="fact-v" data-testid="to-call">
-          {fmtBB(toCall, bb)}
+          {fmt(toCall)}
         </span>
       </div>
       <div className="fact">
         <span className="fact-l">
           <Term id="effective">Effective stack</Term>
         </span>
-        <span className="fact-v">{fmtBB(effectiveStack(state, hero), bb)}</span>
+        <span className="fact-v">{fmt(effectiveStack(state, hero))}</span>
       </div>
       {me.hole.length === 2 && state.board.length >= 3 && (
         <div className="fact wide">
@@ -340,8 +348,9 @@ export function DecisionFacts({ state, hero }: { state: HandState; hero: number 
   );
 }
 
-export function HistoryList({ state, hero, showNames = false }: { state: HandState; hero: number; showNames?: boolean }) {
+export function HistoryList({ state, hero, showNames = false, money }: { state: HandState; hero: number; showNames?: boolean; money?: Money }) {
   const bb = state.config.bb;
+  const fmt: Money = money ?? ((x) => fmtBB(x, bb));
   const streets = ['preflop', 'flop', 'turn', 'river'] as const;
   const boardAt = { preflop: 0, flop: 3, turn: 4, river: 5 };
   return (
@@ -361,13 +370,13 @@ export function HistoryList({ state, hero, showNames = false }: { state: HandSta
                 let txt = '';
                 switch (h.type) {
                   case 'post-sb':
-                    txt = `posts small blind ${fmtBB(h.amount, bb)}`;
+                    txt = `posts small blind ${fmt(h.amount)}`;
                     break;
                   case 'post-bb':
-                    txt = `posts big blind ${fmtBB(h.amount, bb)}`;
+                    txt = `posts big blind ${fmt(h.amount)}`;
                     break;
                   case 'post-ante':
-                    txt = `posts ante ${fmtBB(h.amount, bb)}`;
+                    txt = `posts ante ${fmt(h.amount)}`;
                     break;
                   case 'fold':
                     txt = 'folds';
@@ -376,13 +385,13 @@ export function HistoryList({ state, hero, showNames = false }: { state: HandSta
                     txt = 'checks';
                     break;
                   case 'call':
-                    txt = `calls ${fmtBB(h.amount, bb)}`;
+                    txt = `calls ${fmt(h.amount)}`;
                     break;
                   case 'bet':
-                    txt = `bets ${fmtBB(h.to, bb)}`;
+                    txt = `bets ${fmt(h.to)}`;
                     break;
                   case 'raise':
-                    txt = `raises to ${fmtBB(h.to, bb)}`;
+                    txt = `raises to ${fmt(h.to)}`;
                     break;
                 }
                 if (h.player === hero) txt = txt.replace(/^(posts|folds|checks|calls|bets|raises)/, (w) => ({ posts: 'post', folds: 'fold', checks: 'check', calls: 'call', bets: 'bet', raises: 'raise' })[w] ?? w);

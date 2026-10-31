@@ -1,13 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { HandState, legalActions, potFractionTo, PlayerAction, validateAction } from '../../engine/rules';
-import { fmtBB } from './Table';
+import { fmtBB, type Money } from './Table';
 import { Term } from './Term';
 
 const POT_PRESETS = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5];
 
-export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct: (a: PlayerAction) => void; disabled?: boolean }) {
+/** The unit amounts are typed and shown in: big blinds by default, chips on live tables. */
+export interface AmountUnit {
+  /** engine chips per unit */
+  per: number;
+  fmt: Money;
+  /** short label after the amount box, e.g. "bb" (empty for none) */
+  short: string;
+  /** for screen readers, e.g. "big blinds" */
+  name: string;
+}
+
+export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; onAct: (a: PlayerAction) => void; disabled?: boolean; unit?: AmountUnit }) {
   const la = legalActions(state);
   const bb = state.config.bb;
+  const u: AmountUnit = unit ?? { per: bb, fmt: (x) => fmtBB(x, bb), short: 'bb', name: 'big blinds' };
   const canSize = !!la && (la.canBet || la.canRaise);
   const [amountBB, setAmountBB] = useState<string>('');
   const [sizingOpen, setSizingOpen] = useState(false);
@@ -23,11 +35,11 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
   }, [state, la, canSize, bb]);
 
   useEffect(() => {
-    setAmountBB(defaultTo ? String(+(defaultTo / bb).toFixed(2)) : '');
+    setAmountBB(defaultTo ? String(+(defaultTo / u.per).toFixed(2)) : '');
     setSizingOpen(false);
-  }, [defaultTo, bb, state.history.length]);
+  }, [defaultTo, u.per, state.history.length]);
 
-  const toChips = Math.round(parseFloat(amountBB || '0') * bb);
+  const toChips = Math.round(parseFloat(amountBB || '0') * u.per);
   const verb = la?.canBet ? 'Bet' : 'Raise to';
   const err = canSize && la ? (Number.isFinite(toChips) ? validateAction(state, { type: la.canBet ? 'bet' : 'raise', to: toChips }) : 'Enter an amount') : null;
 
@@ -52,17 +64,17 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
         setSizingOpen(true);
         setTimeout(() => document.getElementById('bet-amount')?.focus(), 0);
       } else if (k === 'a' && canSize) {
-        setAmountBB(String(+(la.maxTo / bb).toFixed(2)));
+        setAmountBB(String(+(la.maxTo / u.per).toFixed(2)));
         setSizingOpen(true);
       } else if (/^[1-7]$/.test(k) && canSize) {
         const f = POT_PRESETS[Number(k) - 1];
-        setAmountBB(String(+(potFractionTo(state, f) / bb).toFixed(2)));
+        setAmountBB(String(+(potFractionTo(state, f) / u.per).toFixed(2)));
         setSizingOpen(true);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [la, disabled, canSize, onAct, state, bb, toChips, err]);
+  }, [la, disabled, canSize, onAct, state, u.per, toChips, err]);
 
   if (!la || !me) return null;
   const raiseBy = la.canRaise ? toChips - state.currentBet : 0;
@@ -73,7 +85,7 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
     ? (state.currentBet <= bb ? [2, 2.5, 3, 4] : [2.5, 3, 4]).map((m) => ({ label: `${m}x`, to: Math.round(state.currentBet * m) }))
     : POT_PRESETS.filter((f) => f !== 0.25).map((f) => ({ label: f === 1 ? 'Pot' : f === 1.5 ? '1.5×' : `${Math.round(f * 100)}%`, to: potFractionTo(state, f), key: String(POT_PRESETS.indexOf(f) + 1) }));
   const shown = presets.filter((p, i, arr) => p.to >= la.minTo && p.to < la.maxTo && arr.findIndex((q) => q.to === p.to) === i);
-  const setTo = (to: number) => setAmountBB(String(+(Math.max(la.minTo, Math.min(la.maxTo, to)) / bb).toFixed(2)));
+  const setTo = (to: number) => setAmountBB(String(+(Math.max(la.minTo, Math.min(la.maxTo, to)) / u.per).toFixed(2)));
   const step = pre ? bb / 2 : Math.max(bb / 2, Math.round(la.pot / 20 / (bb / 2)) * (bb / 2));
   const valid = Number.isFinite(toChips);
   const allIn = valid && toChips === la.maxTo;
@@ -96,7 +108,7 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
         {la.canCall && (
           <button className="btn act call" disabled={disabled} onClick={() => onAct({ type: 'call' })}>
             <span className="act-label">
-              Call <span className="act-amt">{fmtBB(la.toCall, bb)}</span>
+              Call <span className="act-amt">{u.fmt(la.toCall)}</span>
               {la.toCall >= me.stack ? ' · all-in' : ''}
             </span>
             <kbd>C</kbd>
@@ -113,12 +125,12 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
       {canSize && sizingOpen && (
         <div className="sizing" aria-label="Bet sizing">
           {la.shortAllInOnly ? (
-            <p className="note">You cannot make a full raise: the only legal raise is all-in for {fmtBB(la.maxTo, bb)} (it may not reopen the betting).</p>
+            <p className="note">You cannot make a full raise: the only legal raise is all-in for {u.fmt(la.maxTo)} (it may not reopen the betting).</p>
           ) : (
             <>
               <div className="size-readout" aria-live="polite">
                 <span className="sr-verb">{la.canBet ? 'Bet' : <Term id="raiseto">Raise to</Term>}</span>
-                <span className="sr-amt">{valid ? fmtBB(toChips, bb) : '—'}</span>
+                <span className="sr-amt">{valid ? u.fmt(toChips) : '—'}</span>
                 <span className="sr-sub">
                   {allIn
                     ? 'All-in'
@@ -127,7 +139,7 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
                       : pre && la.canRaise
                         ? `${+(toChips / state.currentBet).toFixed(2)}× the ${state.currentBet <= bb ? 'big blind' : 'current raise'}`
                         : `${pct(toChips)}% of the pot`}
-                  {la.canRaise && valid && !allIn ? ` · ${fmtBB(raiseBy, bb)} more than the current bet` : ''}
+                  {la.canRaise && valid && !allIn ? ` · ${u.fmt(raiseBy)} more than the current bet` : ''}
                 </span>
               </div>
               <div className="size-presets" role="group" aria-label="Standard sizes">
@@ -153,40 +165,42 @@ export function ActionBar({ state, onAct, disabled }: { state: HandState; onAct:
                   max={la.maxTo}
                   step={Math.max(1, Math.round(bb / 10))}
                   value={valid ? Math.min(la.maxTo, Math.max(la.minTo, toChips)) : la.minTo}
-                  onChange={(e) => setAmountBB(String(+(Number(e.target.value) / bb).toFixed(2)))}
+                  onChange={(e) => setAmountBB(String(+(Number(e.target.value) / u.per).toFixed(2)))}
                 />
                 <button className="size-step" aria-label="Bigger" onClick={() => setTo((valid ? toChips : la.minTo) + step)} disabled={valid && toChips >= la.maxTo}>
                   +
                 </button>
                 <label className="size-input">
-                  <span className="sr-only">{la.canBet ? 'Bet' : 'Raise to'} amount in big blinds</span>
+                  <span className="sr-only">
+                    {la.canBet ? 'Bet' : 'Raise to'} amount in {u.name}
+                  </span>
                   <input
                     id="bet-amount"
                     data-amount="1"
                     type="number"
                     inputMode="decimal"
                     step="0.01"
-                    min={la.minTo / bb}
-                    max={la.maxTo / bb}
+                    min={la.minTo / u.per}
+                    max={la.maxTo / u.per}
                     value={amountBB}
                     onChange={(e) => setAmountBB(e.target.value)}
                     aria-invalid={!!err}
                     aria-describedby="sizing-help"
                   />
-                  <span className="unit">bb</span>
+                  {u.short && <span className="unit">{u.short}</span>}
                 </label>
               </div>
             </>
           )}
           <p id="sizing-help" className="size-help">
-            {err ? <span className="error">{err.replace(/\d+ \(to\)/, `${fmtBB(la.minTo, bb)}`)}</span> : <>Min {fmtBB(la.minTo, bb)} · Max {fmtBB(la.maxTo, bb)} (all-in)</>}
+            {err ? <span className="error">{err.replace(/\d+ \(to\)/, `${u.fmt(la.minTo)}`)}</span> : <>Min {u.fmt(la.minTo)} · Max {u.fmt(la.maxTo)} (all-in)</>}
           </p>
           <div className="size-actions">
             <button className="btn ghost" onClick={() => setSizingOpen(false)}>
               Cancel
             </button>
             <button className="btn primary sizing-confirm" disabled={!!err || disabled} onClick={() => onAct({ type: la.canBet ? 'bet' : 'raise', to: toChips })}>
-              {allIn ? `All-in ${fmtBB(toChips, bb)}` : `${verb} ${valid ? fmtBB(toChips, bb) : ''}`}
+              {allIn ? `All-in ${u.fmt(toChips)}` : `${verb} ${valid ? u.fmt(toChips) : ''}`}
             </button>
           </div>
         </div>

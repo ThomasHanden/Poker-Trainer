@@ -5,8 +5,15 @@
   "main": "party/server.ts",
   "compatibility_date": "2026-10-01",
   "durable_objects": {
-    "bindings": [{ "name": "PokerTable", "class_name": "PokerTable" }]
+    "bindings": [
+      { "name": "PokerTable", "class_name": "PokerTable" },
+      // everyone's daily chips (one instance)
+      { "name": "Bank", "class_name": "Bank" }
+    ]
   },
   // the free plan only allows SQLite-backed Durable Objects
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PokerTable"] }]
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PokerTable"] },
+    { "tag": "v2", "new_sqlite_classes": ["Bank"] }
+  ]
 }

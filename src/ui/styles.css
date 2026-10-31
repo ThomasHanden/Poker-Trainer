@@ -6594,3 +6594,14 @@ label > span:first-child:not(.select-value) {
 .live-invite .short {
   display: none;
 }
+.live-bank {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+}
+.live-bank strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}

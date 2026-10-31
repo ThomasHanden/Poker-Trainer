@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { LiveTable, START_STACK, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, isPublicTable, tableLabel } from '../src/multiplayer/table';
+import { LiveTable, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
+import { DAILY, refresh, withdraw, deposit, nextRefill, playerId } from '../src/multiplayer/bank';
 import { totalChips } from '../src/engine/rules';
+
+/** a full 0.5/1 buy-in: 100 big blinds */
+const START_STACK = buyInFor(LOW_STAKES).max;
 
 function setup(names: string[], autoDeal = false) {
   let now = 1_000_000;
@@ -12,7 +16,7 @@ function setup(names: string[], autoDeal = false) {
   const t = new LiveTable({ autoDeal, clock: () => now });
   for (const n of names) {
     t.setOnline(n, true);
-    expect(t.handle(n, { type: 'sit', name: n })).toBeNull();
+    expect(t.sit(n, n, START_STACK)).toBeNull();
   }
   return { t, clock };
 }
@@ -84,11 +88,12 @@ describe('live table: dealing and privacy', () => {
 
   it('seats at most the table size and cleans up names', () => {
     const { t } = setup(Array.from({ length: MAX_SEATS }, (_, i) => `p${i}`));
-    expect(t.handle('late', { type: 'sit', name: 'x' })).toMatch(/full/);
-    t.handle('p0', { type: 'sit', name: '   a   very long name indeed  ' });
+    expect(t.sit('late', 'x', START_STACK)).toMatch(/full/);
+    t.sit('p0', cleanName('   a   very long name indeed  '));
     expect(t.seats[0].name).toBe('a very long');
-    t.handle('p1', { type: 'sit', name: 42 });
-    expect(t.seats[1].name).toBe('Player');
+    expect(t.seats[0].stack).toBe(START_STACK); // renaming does not buy in again
+    expect(cleanName(42)).toBe('Player');
+    expect(t.sit('new', 'x')).toMatch(/full|chips/);
   });
 });
 
@@ -272,7 +277,7 @@ describe('public tables', () => {
     const { t, clock } = setup(['ann'], true);
     expect(t.nextHandAt).toBeNull();
     t.setOnline('bob', true);
-    t.handle('bob', { type: 'sit', name: 'Bob' });
+    t.sit('bob', 'Bob', START_STACK);
     expect(t.nextHandAt).not.toBeNull();
     runTimer(t, clock);
     expect(t.inHand()).toBe(true);
@@ -285,10 +290,106 @@ describe('public tables', () => {
     expect(t.viewFor('ann').autoDeal).toBe(false);
   });
 
-  it('are named for the lobby', () => {
+  it('are named for the lobby, half at 0.5/1 and half at 1/2', () => {
     expect(isPublicTable('public-2')).toBe(true);
     expect(isPublicTable('k7m2qp')).toBe(false);
-    expect(tableLabel('public-2')).toBe('1/2 NLH #2');
-    expect(tableLabel('k7m2qp')).toBe('1/2 NLH · k7m2qp');
+    expect(tableLabel('public-2')).toBe('0.5/1 NLH #2');
+    expect(tableLabel('public-3')).toBe('1/2 NLH #3');
+    expect(tableLabel('k7m2qp')).toBe('0.5/1 NLH · k7m2qp');
+    expect(tableLabel('hi-k7m2qp')).toBe('1/2 NLH · k7m2qp');
+    expect(stakesFor('public-1')).toBe(LOW_STAKES);
+    expect(stakesFor('public-4')).toBe(HIGH_STAKES);
+  });
+});
+
+describe('chips and buy-ins', () => {
+  it('shows amounts as chips, half-chips included', () => {
+    expect(fmtChips(1)).toBe('0.5');
+    expect(fmtChips(2)).toBe('1');
+    expect(fmtChips(2500)).toBe('1,250');
+    expect(buyInFor(LOW_STAKES)).toEqual({ max: 200, min: 40 }); // 100 and 20 chips
+    expect(buyInFor(HIGH_STAKES)).toEqual({ max: 400, min: 80 }); // 200 and 40 chips
+  });
+
+  it('a 1/2 table posts 1 and 2 chip blinds', () => {
+    const t = new LiveTable({ stakes: HIGH_STAKES });
+    t.sit('ann', 'Ann', 400);
+    t.sit('bob', 'Bob', 400);
+    t.setOnline('ann', true);
+    t.setOnline('bob', true);
+    t.start();
+    expect(t.hand!.config.sb).toBe(2);
+    expect(t.hand!.config.bb).toBe(4);
+  });
+
+  it('every chip that leaves the table is paid out, and none are made up', () => {
+    const { t, clock } = setup(['ann', 'bob', 'cat']);
+    const paid: Cashout[] = [];
+    const drain = () => paid.push(...t.takeCashouts());
+    for (let hand = 0; hand < 3; hand++) {
+      t.start();
+      // someone shoves, everyone calls: stacks move around
+      expect(t.act(toAct(t), { type: 'allin' })).toBeNull();
+      playOut(t);
+      drain();
+      clock.advance(NEXT_HAND_MS);
+      if (t.seats.length < 2) break;
+    }
+    for (const s of [...t.seats]) t.leave(s.id);
+    drain();
+    expect(t.seats).toHaveLength(0);
+    expect(paid.reduce((a, c) => a + c.amount, 0)).toBe(3 * START_STACK);
+  });
+
+  it('a player who loses their stack is stood up instead of getting a free one', () => {
+    const { t } = setup(['ann', 'bob']);
+    t.start();
+    const shover = toAct(t);
+    expect(t.act(shover, { type: 'allin' })).toBeNull();
+    expect(callOrCheck(t)).toBeNull();
+    expect(t.hand!.complete).toBe(true);
+    const loser = t.hand!.players.find((p) => p.stack === 0);
+    if (!loser) return; // a split pot: nobody busted this time
+    expect(ids(t)).not.toContain(t.order[loser.index]);
+    expect(t.takeCashouts().filter((c) => c.id === t.order[loser.index])).toEqual([]); // nothing to pay out
+  });
+
+  it('a folded player who leaves mid-hand takes only what is left in front of them', () => {
+    const { t } = setup(['ann', 'bob', 'cat']);
+    t.start();
+    const sb = t.order[t.hand!.players.length - 2]; // small blind has 0.5 in the pot
+    while (toAct(t) !== sb) expect(callOrCheck(t)).toBeNull();
+    expect(t.act(sb, { type: 'fold' })).toBeNull();
+    t.leave(sb);
+    expect(t.takeCashouts()).toEqual([{ id: sb, amount: START_STACK - LOW_STAKES.sb }]);
+  });
+});
+
+describe('daily bank', () => {
+  it('starts everyone with the daily amount and tops it up each day, keeping winnings', () => {
+    const a = refresh(undefined, '2026-10-30');
+    expect(a.balance).toBe(DAILY);
+    expect(refresh({ balance: 50, day: '2026-10-30' }, '2026-10-30').balance).toBe(50); // same day: no top-up
+    expect(refresh({ balance: 50, day: '2026-10-30' }, '2026-10-31').balance).toBe(DAILY);
+    expect(refresh({ balance: DAILY * 3, day: '2026-10-30' }, '2026-10-31').balance).toBe(DAILY * 3);
+  });
+
+  it('buys in for up to the full amount, the rest of the balance down to the minimum, or not at all', () => {
+    const acc = { balance: 300, day: 'd' };
+    expect(withdraw(acc, 200, 40)).toEqual({ acc: { balance: 100, day: 'd' }, amount: 200 });
+    expect(withdraw({ ...acc, balance: 120 }, 200, 40).amount).toBe(120);
+    expect(withdraw({ ...acc, balance: 30 }, 200, 40)).toEqual({ acc: { ...acc, balance: 30 }, amount: 0 });
+    expect(deposit(acc, 55).balance).toBe(355);
+  });
+
+  it('refills at the next UTC midnight', () => {
+    expect(new Date(nextRefill(Date.UTC(2026, 9, 30, 15, 0))).toISOString()).toBe('2026-10-31T00:00:00.000Z');
+  });
+
+  it('identifies players by a hash of their secret key, not the key itself', async () => {
+    const id = await playerId('a-secret-key-that-is-long-enough');
+    expect(id).toMatch(/^[0-9a-f]{24}$/);
+    expect(id).toBe(await playerId('a-secret-key-that-is-long-enough'));
+    expect(id).not.toBe(await playerId('another-secret-key-long-enough'));
   });
 });

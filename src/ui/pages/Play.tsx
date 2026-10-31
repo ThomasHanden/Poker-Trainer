@@ -1,15 +1,50 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
-import { Table, DecisionFacts, HistoryList, fmtBB, dealMs } from '../components/Table';
-import { ActionBar } from '../components/ActionBar';
-import { PARTY_HOST, tableInfoUrl, useLiveTable } from '../useLiveTable';
-import { MAX_SEATS, NAME_MAX, START_STACK, SB, BB, STAKES, PUBLIC_TABLES, TURN_MS, tableLabel, type TableSummary } from '../../multiplayer/table';
+import { Table, DecisionFacts, HistoryList, dealMs } from '../components/Table';
+import { ActionBar, type AmountUnit } from '../components/ActionBar';
+import { PARTY_HOST, fetchBankroll, rememberTable, tableInfoUrl, useLiveTable, type Bankroll } from '../useLiveTable';
+import {
+  CHIP,
+  HIGH_PREFIX,
+  HIGH_STAKES,
+  LOW_STAKES,
+  MAX_SEATS,
+  NAME_MAX,
+  PUBLIC_TABLES,
+  TURN_MS,
+  buyInFor,
+  fmtChips,
+  stakesFor,
+  tableLabel,
+  type TableSummary,
+} from '../../multiplayer/table';
+import { DAILY } from '../../multiplayer/bank';
 import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
 import { describeScore } from '../../engine/evaluator';
 
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alikes (i/l/1, o/0)
 const LOBBY_POLL_MS = 10_000;
+
+/** Live tables type and show amounts in chips. */
+const CHIPS: AmountUnit = { per: CHIP, fmt: fmtChips, short: '', name: 'chips' };
+
+/** When balances refill, in the viewer's own time, e.g. "7:00 PM". */
+const refillTime = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+function BankLine({ bank }: { bank: Bankroll | null }) {
+  if (!bank) return null;
+  return (
+    <p className="live-bank">
+      <span>
+        Your chips: <strong>{fmtChips(bank.balance)}</strong>
+      </span>
+      <span className="note">
+        Topped up to {fmtChips(DAILY)} at {refillTime(bank.refillsAt)} each day
+      </span>
+    </p>
+  );
+}
 
 function newCode(): string {
   const r = new Uint32Array(6);
@@ -85,6 +120,19 @@ export function PlayLobbyPage() {
   const nav = useNavigate();
   const [code, setCode] = useState('');
   const tables = usePublicTables();
+  const [bank, setBank] = useState<Bankroll | null>(null);
+  useEffect(() => {
+    if (!PARTY_HOST) return;
+    // check again shortly after arriving: a stack you just left with may still be on its way back
+    const load = () => !document.hidden && fetchBankroll().then((b) => b && setBank(b));
+    load();
+    const soon = setTimeout(load, 1500);
+    const t = setInterval(load, LOBBY_POLL_MS);
+    return () => {
+      clearTimeout(soon);
+      clearInterval(t);
+    };
+  }, []);
   const join = (e: FormEvent) => {
     e.preventDefault();
     const c = cleanCode(code);
@@ -96,11 +144,13 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money poker against real people. Every table is {STAKES} (No-Limit Hold’em, blinds {SB}/{BB}): everyone starts with {START_STACK} chips, which is {START_STACK / BB} big blinds, and busted players get a fresh stack.
+            Free play-money No-Limit Hold’em against real people. You get {fmtChips(DAILY)} chips a day. Sitting down buys in for 100 big blinds, and your stack comes back to you when you
+            leave. Run out, and you are done until tomorrow.
           </p>
         </div>
       </header>
       {!PARTY_HOST && <NotConfigured />}
+      <BankLine bank={bank} />
       <section className="live-card live-public" aria-labelledby="pub-title">
         <h2 id="pub-title">Public tables</h2>
         <p className="note">Open to anyone. Hands start on their own once two players sit down.</p>
@@ -108,11 +158,12 @@ export function PlayLobbyPage() {
           {PUBLIC_TABLES.map((room) => {
             const s = tables[room];
             const full = !!s && s.players >= s.maxSeats;
+            const buyIn = buyInFor(stakesFor(room));
             return (
               <li key={room}>
                 <span className="lt-name">{tableLabel(room)}</span>
                 <span className="lt-count note">
-                  {s === undefined ? '…' : s === null ? 'unavailable' : `${s.players}/${s.maxSeats} seated${s.playing ? ' · in a hand' : ''}`}
+                  Buy-in {fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : `${s.players}/${s.maxSeats} seated${s.playing ? ' · in a hand' : ''}`}
                 </span>
                 <Link className={`btn small ${full ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${full ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
                   {full ? 'Watch' : 'Join'}
@@ -127,9 +178,14 @@ export function PlayLobbyPage() {
         <section className="live-card">
           <h3>Start a table</h3>
           <p className="note">Only people with the link can join. Up to {MAX_SEATS} players.</p>
-          <button className="btn primary" onClick={() => nav(`/play/${newCode()}`)} disabled={!PARTY_HOST}>
-            Start a private table
-          </button>
+          <div className="row">
+            <button className="btn primary" onClick={() => nav(`/play/${newCode()}`)} disabled={!PARTY_HOST}>
+              Start {LOW_STAKES.label} table
+            </button>
+            <button className="btn primary" onClick={() => nav(`/play/${HIGH_PREFIX}${newCode()}`)} disabled={!PARTY_HOST}>
+              Start {HIGH_STAKES.label} table
+            </button>
+          </div>
         </section>
         <section className="live-card">
           <h3>Join a table</h3>
@@ -149,7 +205,7 @@ export function PlayLobbyPage() {
   );
 }
 
-/** Who won each pot and with what, e.g. "Bob wins 12bb with two pair, kings and fours". */
+/** Who won each pot and with what, e.g. "Bob wins 12 with two pair, kings and fours". */
 function resultLines(h: HandState, me: number): string[] {
   const r = h.result!;
   const who = (i: number) => (i === me ? 'You' : h.players[i].name);
@@ -157,7 +213,7 @@ function resultLines(h: HandState, me: number): string[] {
   if (r.reason === 'fold') {
     const w = r.pots[0].winners[0];
     const total = r.pots.reduce((a, pot) => a + pot.amount, 0);
-    return [`${who(w)} ${wins(w)} ${fmtBB(total, BB)}. Everyone else folded.`];
+    return [`${who(w)} ${wins(w)} ${fmtChips(total)}. Everyone else folded.`];
   }
   // a pot only one player could win is an uncalled bet coming back, not a win
   const pots = r.pots.filter((pot) => pot.eligible.length > 1);
@@ -166,10 +222,10 @@ function resultLines(h: HandState, me: number): string[] {
     const hand = pot.score !== undefined ? ` with ${describeScore(pot.score).toLowerCase()}` : '';
     if (pot.winners.length > 1) {
       const names = pot.winners.map((i) => (i === me ? 'you' : h.players[i].name));
-      return `${label}${fmtBB(pot.amount, BB)} split between ${names.join(' and ')}${hand}.`;
+      return `${label}${fmtChips(pot.amount)} split between ${names.join(' and ')}${hand}.`;
     }
     const w = pot.winners[0];
-    return `${label}${who(w)} ${wins(w)} ${fmtBB(pot.amount, BB)}${hand}.`;
+    return `${label}${who(w)} ${wins(w)} ${fmtChips(pot.amount)}${hand}.`;
   });
 }
 
@@ -190,7 +246,12 @@ export function PlayTablePage() {
   const { room = '' } = useParams();
   const nav = useNavigate();
   const { data } = useStore();
-  const { view, error, status, offset, sit, leave, start, act } = useLiveTable(room);
+  const { view, bank, error, status, offset, sit, leave, start, act } = useLiveTable(room);
+  const stakes = view?.stakes ?? stakesFor(room);
+  const buyIn = buyInFor(stakes);
+  // what sitting down would buy in for: a full stack, or what is left today down to the minimum
+  const canBuyIn = !bank || bank.balance >= buyIn.min;
+  const buyInAmount = bank ? Math.min(buyIn.max, bank.balance) : buyIn.max;
   const [name, setName] = useState(loadName);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
@@ -203,11 +264,16 @@ export function PlayTablePage() {
   const turnLeft = useSecondsUntil(view?.turnEndsAt ?? null, offset);
   const dealIn = useSecondsUntil(view?.nextHandAt ?? null, offset);
   const ready = view ? view.seats.filter((s) => !s.away && !s.leaving).length : 0;
-  // between hands with fewer than two players there is nothing to show on the felt
-  const waiting = !!view && !live && (!h || ready < 2);
+  // before the first hand there is nothing to show on the felt; after one, the last hand stays up
+  const waiting = !!view && !h;
 
   // one action per turn: re-enable when the server sends the next state
   useEffect(() => setSent(false), [h?.history.length, view?.handNo]);
+
+  const seated = !!mySeat;
+  useEffect(() => {
+    if (seated) rememberTable(room);
+  }, [seated, room]);
 
   // pre-actions: chosen while waiting, played as soon as it is your turn; cleared each street
   const [pre, setPre] = useState<PreAction | null>(null);
@@ -263,7 +329,6 @@ export function PlayTablePage() {
     );
 
   const toActName = live ? h!.players[h!.toAct]?.name : '';
-  const winners = h?.complete && h.result ? h.players.filter((p) => (h.result!.net[p.index] ?? 0) > 0) : [];
   const results = h?.complete && h.result ? resultLines(h, me) : [];
   const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
@@ -276,13 +341,12 @@ export function PlayTablePage() {
             <span className={`pchip ${status === 'open' ? 'target' : 'muted'}`} role="status">
               {status === 'open' ? 'Connected' : status === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
             </span>
-            <span className="pchip muted">
-              Blinds {fmtBB(1, BB)}/{fmtBB(BB, BB)}
-            </span>
+            <span className="pchip muted">Blinds {stakes.label}</span>
+            {bank && <span className="pchip muted">Your chips: {fmtChips(bank.balance)}</span>}
             {view?.seats.map((s) => (
               <span key={s.id} className={`pchip ${s.away || s.leaving ? 'muted' : ''}`}>
                 {s.name}
-                {s.id === view.you ? ' (you)' : ''} · {fmtBB(s.stack, BB)}
+                {s.id === view.you ? ' (you)' : ''} · {fmtChips(s.stack)}
                 {s.leaving ? ' · leaving' : s.away ? ' · away' : ''}
               </span>
             ))}
@@ -340,14 +404,22 @@ export function PlayTablePage() {
         <section className="decision-panel live-sit">
           {view.seats.length >= view.maxSeats ? (
             <p>The table is full. You can watch until a seat opens.</p>
+          ) : !canBuyIn ? (
+            <p>
+              You are out of chips for today: this table needs at least {fmtChips(buyIn.min)} and you have {fmtChips(bank!.balance)}. You get topped up to {fmtChips(DAILY)} at{' '}
+              {refillTime(bank!.refillsAt)}.
+            </p>
           ) : (
             <form className="row" onSubmit={sitDown}>
               <label htmlFor="live-name">Your name</label>
               <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
               <button className="btn primary" type="submit">
-                Sit down
+                Sit down · buy in {fmtChips(buyInAmount)}
               </button>
-              {live && <span className="note">You will be dealt in from the next hand.</span>}
+              <span className="note">
+                {bank ? `You have ${fmtChips(bank.balance)} chips. ` : ''}
+                {live ? 'You will be dealt in from the next hand.' : ''}
+              </span>
             </form>
           )}
         </section>
@@ -359,11 +431,6 @@ export function PlayTablePage() {
         </div>
       ) : waiting ? (
         <section className="decision-panel live-wait" aria-live="polite">
-          {winners.length > 0 && (
-            <p className="note">
-              Last hand: {winners.map((p) => `${p.index === me ? 'you won' : `${p.name} won`} the ${fmtBB(h!.result!.payouts[p.index], BB)} pot`).join(', ')}.
-            </p>
-          )}
           {ready < 2 ? (
             <p>
               {view.seats.length === 0
@@ -399,6 +466,7 @@ export function PlayTablePage() {
             live
             turnEndsAt={view.turnEndsAt === null || dealing ? null : view.turnEndsAt - offset}
             turnMs={TURN_MS}
+            money={fmtChips}
           />
           <p className="live-status" aria-live="polite">
             {live && dealing
@@ -415,8 +483,19 @@ export function PlayTablePage() {
                   ))
                 : 'Hand over'}
             {!live && dealIn !== null && <span className="live-next">Next hand in {dealIn}s</span>}
+            {!live && ready < 2 && (
+              <span className="live-next">
+                {view.autoDeal ? 'Waiting for another player to sit down.' : 'Waiting for another player. Send the invite link to a friend.'}
+              </span>
+            )}
           </p>
-          {busted && <p className="note live-bust">You ran out of chips. You will get a fresh {START_STACK / BB}bb stack next hand.</p>}
+          {busted && (
+            <p className="note live-bust">
+              {canBuyIn
+                ? `You lost your stack. Sit down again to buy in for ${fmtChips(buyInAmount)} (you have ${fmtChips(bank?.balance ?? 0)} chips left today).`
+                : `You lost your stack, and that is your chips for today. More at ${bank ? refillTime(bank.refillsAt) : 'midnight'}.`}
+            </p>
+          )}
           {canPre && (
             <div className="live-pre live-dock" role="group" aria-label="Act in advance">
               <span className="note">While you wait:</span>
@@ -434,8 +513,9 @@ export function PlayTablePage() {
           )}
           {myTurn && !dealing && (
             <section className="decision-panel live-dock" aria-label="Your decision">
-              <DecisionFacts state={h!} hero={me} />
+              <DecisionFacts state={h!} hero={me} money={fmtChips} />
               <ActionBar
+                unit={CHIPS}
                 state={h!}
                 disabled={sent}
                 onAct={(a) => {
@@ -447,7 +527,7 @@ export function PlayTablePage() {
           )}
           <details className="more live-history">
             <summary>Hand history</summary>
-            <HistoryList state={h!} hero={me} showNames />
+            <HistoryList state={h!} hero={me} showNames money={fmtChips} />
           </details>
         </div>
       )}

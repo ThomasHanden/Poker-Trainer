@@ -5,9 +5,22 @@
 import { fullDeck } from '../engine/cards';
 import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
 
-export const SB = 1;
-export const BB = 2;
-export const START_STACK = 200; // 100bb
+/**
+ * Live tables count in half-chips so 0.5/1 blinds are whole numbers for the engine: every amount
+ * on a live table (stacks, bets, the bank) is in these units, shown to players divided by CHIP.
+ */
+export const CHIP = 2;
+export interface Stakes {
+  sb: number;
+  bb: number;
+  /** blinds as players see them, e.g. "0.5/1" */
+  label: string;
+}
+export const LOW_STAKES: Stakes = { sb: 1, bb: 2, label: '0.5/1' };
+export const HIGH_STAKES: Stakes = { sb: 2, bb: 4, label: '1/2' };
+/** Sitting down buys in for this many big blinds, or as many as you have down to the minimum. */
+export const BUY_IN_BB = 100;
+export const MIN_BUY_IN_BB = 20;
 export const MAX_SEATS = 6;
 export const NAME_MAX = 12;
 export const TURN_MS = 30_000;
@@ -19,11 +32,29 @@ export const RECONNECT_MS = 20_000;
 /** Timed-out turns in a row before a player is stood up. */
 export const MAX_TIMEOUTS = 2;
 
-/** Always-open tables anyone can join from the lobby; hands deal themselves. */
+/** Always-open tables anyone can join from the lobby; hands deal themselves. Half play 0.5/1, half 1/2. */
 export const PUBLIC_TABLES = ['public-1', 'public-2', 'public-3', 'public-4'];
+const HIGH_PUBLIC = ['public-3', 'public-4'];
 export const isPublicTable = (room: string) => PUBLIC_TABLES.includes(room);
-export const STAKES = `${SB}/${BB} NLH`;
-export const tableLabel = (room: string) => (isPublicTable(room) ? `${STAKES} #${room.slice('public-'.length)}` : `${STAKES} · ${room}`);
+/** Private tables at 1/2 have codes starting "hi-"; all others play 0.5/1. */
+export const HIGH_PREFIX = 'hi-';
+export const stakesFor = (room: string): Stakes => (HIGH_PUBLIC.includes(room) || room.startsWith(HIGH_PREFIX) ? HIGH_STAKES : LOW_STAKES);
+export const tableLabel = (room: string) => {
+  const name = `${stakesFor(room).label} NLH`;
+  return isPublicTable(room) ? `${name} #${room.slice('public-'.length)}` : `${name} · ${room.replace(HIGH_PREFIX, '')}`;
+};
+export const buyInFor = (st: Stakes) => ({ max: BUY_IN_BB * st.bb, min: MIN_BUY_IN_BB * st.bb });
+
+/** An amount in table units as chips, e.g. 1 → "0.5", 2500 → "1,250". */
+export function fmtChips(units: number): string {
+  return (units / CHIP).toLocaleString('en-US', { maximumFractionDigits: 1 });
+}
+
+/** Chips a player takes back to their bank when they stand up. */
+export interface Cashout {
+  id: string;
+  amount: number;
+}
 
 export type ClientMessage =
   | { type: 'sit'; name: string }
@@ -50,6 +81,7 @@ export interface TableView {
   maxSeats: number;
   /** hands deal themselves (public tables); otherwise someone presses Deal for the first hand */
   autoDeal: boolean;
+  stakes: Stakes;
   /** the current (or last finished) hand, with the deck and other players' cards removed */
   hand: HandState | null;
   /** the viewer's index in hand.players, or -1 when not in the hand */
@@ -61,7 +93,11 @@ export interface TableView {
   now: number;
 }
 
-export type ServerMessage = TableView | { type: 'error'; message: string };
+export type ServerMessage =
+  | TableView
+  | { type: 'error'; message: string }
+  /** the viewer's chips away from the table, and when they next refill */
+  | { type: 'bank'; balance: number; refillsAt: number };
 
 /** What the lobby shows for a table. */
 export interface TableSummary {
@@ -108,6 +144,7 @@ function shuffle<T>(a: T[]): T[] {
 }
 
 export interface LiveTableOptions {
+  stakes?: Stakes;
   autoDeal?: boolean;
   clock?: () => number;
   shuffleDeck?: <T>(a: T[]) => T[];
@@ -122,12 +159,15 @@ export class LiveTable {
   turnEndsAt: number | null = null;
   nextHandAt: number | null = null;
   readonly autoDeal: boolean;
+  readonly stakes: Stakes;
   private button = 0; // index into seats
   private settled = 0; // handNo of the last hand whose result was paid out
   private clock: () => number;
   private shuffleDeck: <T>(a: T[]) => T[];
+  private cashouts: Cashout[] = [];
 
   constructor(opts: LiveTableOptions = {}) {
+    this.stakes = opts.stakes ?? LOW_STAKES;
     this.autoDeal = opts.autoDeal ?? false;
     this.clock = opts.clock ?? Date.now;
     this.shuffleDeck = opts.shuffleDeck ?? shuffle;
@@ -137,13 +177,25 @@ export class LiveTable {
     return !!this.hand && !this.hand.complete;
   }
 
-  /** Apply one message from a player. Returns an error to show them, or null. */
+  isSeated(id: string): boolean {
+    return !!this.seatOf(id);
+  }
+
+  /** Chips owed to players who stood up since the last call; the server pays them into the bank. */
+  takeCashouts(): Cashout[] {
+    const out = this.cashouts.filter((c) => c.amount > 0);
+    this.cashouts = [];
+    return out;
+  }
+
+  /**
+   * Apply one message from a player. Returns an error to show them, or null. Sitting down is
+   * handled by the server, since buying in has to wait for the bank.
+   */
   handle(id: string, msg: unknown): string | null {
     if (!msg || typeof msg !== 'object') return 'Bad message';
     const m = msg as Record<string, unknown>;
     switch (m.type) {
-      case 'sit':
-        return this.sit(id, cleanName(m.name));
       case 'leave':
         this.leave(id);
         return null;
@@ -178,7 +230,8 @@ export class LiveTable {
     return { players: this.seats.length, maxSeats: MAX_SEATS, playing: this.inHand() };
   }
 
-  sit(id: string, name: string): string | null {
+  /** Take a seat with a buy-in already drawn from the bank, or (already seated) change name and stay. */
+  sit(id: string, name: string, buyIn = 0): string | null {
     const seat = this.seatOf(id);
     if (seat) {
       seat.name = name;
@@ -186,7 +239,8 @@ export class LiveTable {
       seat.offlineSince = null;
     } else {
       if (this.seats.length >= MAX_SEATS) return 'The table is full';
-      this.seats.push({ id, name, stack: START_STACK, leaving: false, offlineSince: null, timeouts: 0 });
+      if (buyIn <= 0) return 'You need chips to sit down';
+      this.seats.push({ id, name, stack: buyIn, leaving: false, offlineSince: null, timeouts: 0 });
     }
     this.refreshNextHand();
     return null;
@@ -215,7 +269,7 @@ export class LiveTable {
     const holes = ordered.map(() => [deck.pop()!, deck.pop()!]);
     this.order = ordered.map((s) => s.id);
     this.hand = newHand({
-      config: { format: 'cash', numPlayers: n, sb: SB, bb: BB, ante: 0, anteType: 'none' },
+      config: { format: 'cash', numPlayers: n, sb: this.stakes.sb, bb: this.stakes.bb, ante: 0, anteType: 'none' },
       stacks: ordered.map((s) => s.stack),
       heroIndex: -1,
       holes,
@@ -289,6 +343,7 @@ export class LiveTable {
       })),
       maxSeats: MAX_SEATS,
       autoDeal: this.autoDeal,
+      stakes: this.stakes,
       hand: h && {
         ...h,
         deck: [],
@@ -341,10 +396,11 @@ export class LiveTable {
     this.turnEndsAt = null;
     h.players.forEach((p, i) => {
       const seat = this.seatOf(this.order[i]);
-      if (seat) seat.stack = p.stack > 0 ? p.stack : START_STACK; // free rebuy when busted
+      if (seat) seat.stack = p.stack;
     });
     if (this.seats.length) this.button = (this.button + 1) % this.seats.length;
-    for (const s of this.seats.filter((x) => x.leaving)) this.removeSeat(s.id);
+    // no free rebuys: a player who lost their stack stands up and can buy in again from their bank
+    for (const s of this.seats.filter((x) => x.leaving || x.stack <= 0)) this.removeSeat(s.id);
     this.refreshNextHand();
   }
 
@@ -363,9 +419,13 @@ export class LiveTable {
     }
   }
 
+  /** Stand a player up and pay out what they have in front of them. */
   private removeSeat(id: string) {
     const k = this.seats.findIndex((s) => s.id === id);
     if (k < 0) return;
+    // mid-hand (only possible once they have folded) their chips are what is left after this hand's bets
+    const j = this.inHand() ? this.order.indexOf(id) : -1;
+    this.cashouts.push({ id, amount: j >= 0 ? this.hand!.players[j].stack : this.seats[k].stack });
     this.seats.splice(k, 1);
     // keep the button on the same player when someone before it leaves
     if (k < this.button) this.button--;
