@@ -1,6 +1,6 @@
 # Felt School — No-Limit Hold’em Decision Trainer
 
-A complete, local-first training web app that teaches better NLHE decisions through fresh practice scenarios, honest post-hand reviews, a theory library, a range explorer and progress tracking. No account, no paid API, no levels or unlocks.
+A complete, local-first training web app that teaches better NLHE decisions through fresh practice scenarios, honest post-hand reviews, a theory library, a range explorer and progress tracking. No account needed (an optional one keeps progress on every device), no paid API, no levels or unlocks.
 
 ## Run it
 
@@ -45,7 +45,8 @@ src/opponents/    profiles, policy (shared by play and inference), Bayesian rang
 src/scenarios/    template types, 37 templates, generator/materializer (seeded, reproducible), play controller
 src/evaluation/   decision context, rollouts (model EV), guidance builders, scoring/grades, explanations
 src/content/      lessons (81), concepts, glossary, sources, coverage
-src/persistence/  versioned localStorage, export/import/migrate
+src/persistence/  versioned localStorage, export/import/migrate, syncing progress to an account
+src/auth/         optional accounts (Supabase): sign-in state, progress storage
 src/workers/      Web Worker for generation/evaluation/equity (main-thread fallback)
 src/multiplayer/  live tables: seats, timers, bots, what each player may see (run by party/server.ts)
 src/seo.ts        page titles, descriptions and the sitemap's page list
@@ -55,7 +56,7 @@ scripts/          preflop equity and push/fold table generators, build-time prer
 tests/, e2e/      Vitest and Playwright suites
 ```
 
-Docs: [LIVE TABLES & bots](docs/LIVE_TABLES.md) · [Addresses, search & link previews](docs/SITE.md) · [RULES](docs/RULES.md) · [EVALUATION & limitations](docs/EVALUATION.md) · [RANGE_FORMAT](docs/RANGE_FORMAT.md) · [Adding scenarios](docs/ADDING_SCENARIOS.md) · [Adding lessons](docs/ADDING_LESSONS.md) · [Adding ranges](docs/ADDING_RANGES.md) · [COVERAGE](docs/COVERAGE.md) · [SOURCES](docs/SOURCES.md) · [CONTINUATION checklist](docs/CONTINUATION.md)
+Docs: [ACCOUNTS (setup)](docs/ACCOUNTS.md) · [LIVE TABLES & bots](docs/LIVE_TABLES.md) · [Addresses, search & link previews](docs/SITE.md) · [RULES](docs/RULES.md) · [EVALUATION & limitations](docs/EVALUATION.md) · [RANGE_FORMAT](docs/RANGE_FORMAT.md) · [Adding scenarios](docs/ADDING_SCENARIOS.md) · [Adding lessons](docs/ADDING_LESSONS.md) · [Adding ranges](docs/ADDING_RANGES.md) · [COVERAGE](docs/COVERAGE.md) · [SOURCES](docs/SOURCES.md) · [CONTINUATION checklist](docs/CONTINUATION.md)
 
 ## Honesty statement
 

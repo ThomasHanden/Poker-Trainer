@@ -6,15 +6,30 @@
 import { DurableObject } from 'cloudflare:workers';
 import { Server, routePartykitRequest, type Connection, type ConnectionContext, type WSMessage } from 'partyserver';
 import { BOT_SEATS, LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
-import { KEY_PATTERN, claimDaily, deposit, playerId, rollDaily, status, upgrade, utcDay, withdraw, type Account, type BankStatus } from '../src/multiplayer/bank';
+import { KEY_PATTERN, claimDaily, deposit, moveGuestChips, playerId, rollDaily, status, upgrade, utcDay, withdraw, type Account, type BankStatus } from '../src/multiplayer/bank';
 import { ChatRoom } from '../src/multiplayer/chat';
+import { accountPlayerId, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
 
 type Env = {
   PokerTable: DurableObjectNamespace<PokerTable>;
   Bank: DurableObjectNamespace<Bank>;
   /** wrangler.jsonc vars: how many seats bots fill at public tables (0 turns bots off) */
   BOT_SEATS?: string;
+  /** wrangler.jsonc vars: the Supabase project that signs players in (empty: accounts off) */
+  SUPABASE_URL?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
 };
+
+const authConfig = (env: Env): AccountAuthConfig => ({ supabaseUrl: env.SUPABASE_URL ?? '', publishableKey: env.SUPABASE_PUBLISHABLE_KEY ?? '' });
+
+/** The player a signed-in browser's access token belongs to, or null. */
+async function accountFromToken(token: unknown, env: Env): Promise<string | null> {
+  const userId = await verifyAccessToken(token, authConfig(env));
+  return userId ? accountPlayerId(userId) : null;
+}
+
+/** How long a signed-in connection has to send its token before it is closed. */
+const AUTH_WAIT_MS = 10_000;
 
 /** Bots only sit at public tables, filling up to BOT_SEATS players. */
 function botSeatsFor(room: string, env: Env): number {
@@ -57,12 +72,23 @@ export class Bank extends DurableObject<Env> {
   async deposit(pid: string, amount: number): Promise<void> {
     await this.ctx.storage.put(pid, deposit(await this.load(pid), amount));
   }
+
+  /** Move a guest wallet's chips into an account (once); both are written in one atomic put. */
+  async moveGuest(guestPid: string, accountPid: string): Promise<{ moved: number; status: BankStatus } | { error: string }> {
+    const r = moveGuestChips(await this.load(guestPid), guestPid, await this.load(accountPid), accountPid);
+    if ('error' in r) return r;
+    await this.ctx.storage.put({ [guestPid]: r.guest, [accountPid]: r.account });
+    return { moved: r.moved, status: status(r.account, Date.now()) };
+  }
 }
 
 const bankOf = (env: Env) => env.Bank.get(env.Bank.idFromName('bank'));
 
-/** Each connection's player, and whether its page understands chat (older pages are never sent any). */
-type ConnState = { pid: string; chat: boolean };
+/**
+ * Each connection's player, and whether its page understands chat (older pages are never sent any).
+ * A signed-in connection is `pending` (no player yet) until its token has been checked.
+ */
+type ConnState = { pid: string; chat: boolean; pending?: boolean };
 
 export class PokerTable extends Server<Env> {
   table = new LiveTable();
@@ -96,27 +122,53 @@ export class PokerTable extends Server<Env> {
     return (conn.state as ConnState | null)?.pid;
   }
 
+  /**
+   * Guests connect with their browser key in the address. Signed-in players connect with auth=1 and
+   * then send their access token as the first message, so the token never appears in a URL.
+   */
   async onConnect(conn: Connection, ctx: ConnectionContext) {
     const params = new URL(ctx.request.url).searchParams;
+    const chat = params.get('chat') === '1';
+    if (params.get('auth') === '1') {
+      conn.setState({ pid: '', chat, pending: true } satisfies ConnState);
+      setTimeout(() => (conn.state as ConnState | null)?.pending && conn.close(4003, 'Sign-in not confirmed'), AUTH_WAIT_MS);
+      return;
+    }
     const key = params.get('key') ?? '';
     if (!KEY_PATTERN.test(key)) return conn.close(4001, 'Missing player key');
-    const pid = await playerId(key);
-    conn.setState({ pid, chat: params.get('chat') === '1' } satisfies ConnState);
+    await this.joined(conn, await playerId(key), chat);
+  }
+
+  /** A connection now known to be this player: they are online, and get the table and their bank. */
+  async joined(conn: Connection, pid: string, chat: boolean) {
+    conn.setState({ pid, chat } satisfies ConnState);
     this.table.setOnline(pid, true);
     await this.update();
     await this.sendBank(pid);
   }
 
   async onMessage(conn: Connection, raw: WSMessage) {
-    const pid = this.pidOf(conn);
-    if (!pid || typeof raw !== 'string' || raw.length > 4000) return;
+    if (typeof raw !== 'string' || raw.length > 4000) return;
     let msg: unknown;
     try {
       msg = JSON.parse(raw);
     } catch {
       return;
     }
-    const m = msg as { type?: unknown; name?: unknown; seat?: unknown; buyIn?: unknown; cid?: unknown; text?: unknown };
+    const m = msg as { type?: unknown; name?: unknown; seat?: unknown; buyIn?: unknown; cid?: unknown; text?: unknown; token?: unknown };
+    const st = conn.state as ConnState | null;
+    if (st?.pending) {
+      // until the sign-in is confirmed, the only thing this connection may do is confirm it
+      if (m?.type !== 'auth') return;
+      const pid = await accountFromToken(m.token, this.env);
+      if (!pid) {
+        conn.send(JSON.stringify({ type: 'auth-error', message: 'Your sign-in could not be confirmed. Sign in again.' }));
+        return conn.close(4003, 'Sign-in not confirmed');
+      }
+      return this.joined(conn, pid, st.chat);
+    }
+    const pid = st?.pid;
+    if (!pid) return;
     if (m?.type === 'chat') return this.onChat(conn, pid, m.cid, m.text);
     const err = m?.type === 'sit' ? await this.sit(pid, m.name, m.seat, m.buyIn) : this.table.handle(pid, msg);
     if (err) conn.send(JSON.stringify({ type: 'error', message: err }));
@@ -248,17 +300,43 @@ export class PokerTable extends Server<Env> {
   }
 }
 
+/**
+ * Who a bank request is from. The body is plain text, so browsers send it without a CORS preflight:
+ * a guest's browser key, or {"token": ...} with a signed-in player's access token.
+ */
+async function requester(body: string, env: Env): Promise<string | null> {
+  if (!body.startsWith('{')) return KEY_PATTERN.test(body) ? playerId(body) : null;
+  try {
+    return await accountFromToken((JSON.parse(body) as { token?: unknown }).token, env);
+  } catch {
+    return null;
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env) {
-    // POST /bank or /bank/claim with the player's key as the body (plain text, so browsers send it
-    // without a CORS preflight): their chips for the lobby, or today's claim
     const path = new URL(request.url).pathname;
+    // POST /bank or /bank/claim: the player's chips for the lobby, or today's claim
     if ((path === '/bank' || path === '/bank/claim') && request.method === 'POST') {
-      const key = (await request.text()).trim();
-      if (!KEY_PATTERN.test(key)) return Response.json({ error: 'bad key' }, { status: 400, headers: CORS });
-      const pid = await playerId(key);
+      const pid = await requester((await request.text()).trim(), env);
+      if (!pid) return Response.json({ error: 'Not signed in' }, { status: 401, headers: CORS });
       const body = path === '/bank/claim' ? await bankOf(env).claim(pid) : await bankOf(env).status(pid);
       return Response.json({ ...body, refillsAt: body.nextClaimAt }, { headers: CORS });
+    }
+    // POST /bank/move-guest {"token", "key"}: move this browser's guest chips into the signed-in
+    // account, once. Holding both the sign-in and the guest key proves both are yours.
+    if (path === '/bank/move-guest' && request.method === 'POST') {
+      let body: { token?: unknown; key?: unknown } = {};
+      try {
+        body = JSON.parse(await request.text());
+      } catch {
+        /* checked below */
+      }
+      const accountPid = await accountFromToken(body.token, env);
+      if (!accountPid) return Response.json({ error: 'Not signed in' }, { status: 401, headers: CORS });
+      if (typeof body.key !== 'string' || !KEY_PATTERN.test(body.key)) return Response.json({ error: 'No guest chips on this browser' }, { status: 400, headers: CORS });
+      const r = await bankOf(env).moveGuest(await playerId(body.key), accountPid);
+      return Response.json(r, { status: 'error' in r ? 409 : 200, headers: CORS });
     }
     return (await routePartykitRequest(request, env)) ?? new Response('Not found', { status: 404 });
   },

@@ -121,6 +121,33 @@ export function setKV(x: KV) {
   kv = x;
 }
 
+/** Whose data this browser is showing: null for a guest, else a signed-in account's id. */
+let owner: string | null = null;
+export function setOwner(id: string | null) {
+  owner = id;
+}
+export const currentOwner = () => owner;
+
+/**
+ * Where something is kept in this browser. Guests use the original keys, so progress from before
+ * accounts stays where it always was; a signed-in account keeps its own copy under its id, so
+ * people sharing a device never see each other's data.
+ */
+export function ownedKey(base: string, who: string | null = owner): string {
+  return who ? `${base}@${who}` : base;
+}
+
+/** Remove everything this browser keeps for an account (signing out on a shared device). */
+export function forgetOwner(id: string) {
+  try {
+    const mine = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter((k): k is string => !!k && k.endsWith(`@${id}`));
+    for (const k of mine) localStorage.removeItem(k);
+  } catch {
+    /* storage unavailable: nothing was kept */
+  }
+  for (const k of [...memory.keys()]) if (k.endsWith(`@${id}`)) memory.delete(k);
+}
+
 /** Migrate older shapes to the current schema; unknown fields are dropped safely. */
 export function migrate(raw: unknown): AppData {
   const base = emptyData();
@@ -148,9 +175,9 @@ function validHand(h: unknown): h is HandRecord {
   return typeof x.id === 'string' && typeof x.scenarioId === 'string' && Array.isArray(x.heroActions) && Array.isArray(x.decisions);
 }
 
-export function load(): AppData {
+export function load(who: string | null = owner): AppData {
   try {
-    const s = kv.getItem(STORAGE_KEY);
+    const s = kv.getItem(ownedKey(STORAGE_KEY, who));
     if (!s) return emptyData();
     return migrate(JSON.parse(s));
   } catch (e) {
@@ -159,15 +186,16 @@ export function load(): AppData {
   }
 }
 
-export function save(d: AppData): { ok: boolean; error?: string } {
+export function save(d: AppData, who: string | null = owner): { ok: boolean; error?: string } {
+  const key = ownedKey(STORAGE_KEY, who);
   try {
-    kv.setItem(STORAGE_KEY, JSON.stringify(d));
+    kv.setItem(key, JSON.stringify(d));
     return { ok: true };
   } catch (e) {
     // quota: drop oldest history and retry once
     try {
       const trimmed = { ...d, history: d.history.slice(-Math.floor(d.history.length / 2)) };
-      kv.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      kv.setItem(key, JSON.stringify(trimmed));
       return { ok: true, error: 'Storage was full; the oldest half of your hand history was removed.' };
     } catch {
       return { ok: false, error: (e as Error).message };
@@ -199,15 +227,15 @@ export function importData(text: string, current: AppData, mode: 'replace' | 'me
   };
 }
 
-function bestQuiz(a?: LessonProgress['quizBest'], b?: LessonProgress['quizBest']) {
+export function bestQuiz(a?: LessonProgress['quizBest'], b?: LessonProgress['quizBest']) {
   if (!a) return b;
   if (!b) return a;
   return b.correct / b.total > a.correct / a.total ? b : a;
 }
 
-export function reset(): AppData {
+export function reset(who: string | null = owner): AppData {
   try {
-    kv.removeItem(STORAGE_KEY);
+    kv.removeItem(ownedKey(STORAGE_KEY, who));
   } catch {
     /* ignore */
   }

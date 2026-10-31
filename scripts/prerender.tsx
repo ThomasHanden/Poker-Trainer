@@ -31,6 +31,7 @@ const { renderToString } = await import('react-dom/server');
 // MemoryRouter, not react-router-dom/server: that entry loads a second copy of the router here
 const { MemoryRouter } = await import('react-router-dom');
 const { StoreProvider } = await import('../src/ui/store');
+const { AuthProvider } = await import('../src/auth/AuthContext');
 const { Shell } = await import('../src/ui/App');
 const { SITE_NAME, OG_IMAGE, NOT_FOUND, indexablePaths, pageMeta } = await import('../src/seo');
 const { SECTIONS } = await import('../src/content/lessons');
@@ -118,9 +119,11 @@ function page(meta: PageMeta, path: string | null, body: string): string {
 function render(path: string): string {
   return renderToString(
     <MemoryRouter initialEntries={[path]}>
-      <StoreProvider>
-        <Shell />
-      </StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
+          <Shell />
+        </StoreProvider>
+      </AuthProvider>
     </MemoryRouter>,
   );
 }

@@ -13,7 +13,11 @@ export type AnalyticsEvent =
   | 'Bot Seat Replacement Completed'
   | 'First Live Hand Dealt'
   | 'First Live Hand Completed'
-  | 'Daily Chips Claimed';
+  | 'Daily Chips Claimed'
+  | 'Sign In Started'
+  | 'Sign In Completed'
+  | 'Guest Progress Imported'
+  | 'Guest Progress Import Failed';
 
 type Props = Record<string, string | number | boolean | null>;
 

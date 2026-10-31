@@ -30,7 +30,7 @@ function aggregate(rows: { key: string; d: DecisionSummary }[]): Agg[] {
 const MIN_N = 5;
 
 export function ProgressPage() {
-  const { data, replaceAll } = useStore();
+  const { data, replaceAll, owner } = useStore();
   const [assistedView, setAssistedView] = useState<'unassisted' | 'assisted'>('unassisted');
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -65,7 +65,7 @@ export function ProgressPage() {
     try {
       const text = await file.text();
       const next = importData(text, data, mode);
-      replaceAll(next);
+      replaceAll(next, mode);
       setMsg(`Imported (${mode}). ${next.history.length} hands, ${next.ranges.length} saved ranges.`);
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
@@ -186,8 +186,14 @@ export function ProgressPage() {
           <button
             className="btn danger"
             onClick={() => {
-              if (confirm('Delete all hands, lesson progress and saved ranges from this browser? This cannot be undone (export first if unsure).')) {
-                replaceAll(reset());
+              if (
+                confirm(
+                  owner
+                    ? 'Delete all hands, lesson progress and saved ranges from your account, on every device? This cannot be undone (export first if unsure).'
+                    : 'Delete all hands, lesson progress and saved ranges from this browser? This cannot be undone (export first if unsure).',
+                )
+              ) {
+                replaceAll(reset(), 'reset');
                 setMsg('All data reset.');
               }
             }}

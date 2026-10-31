@@ -15,6 +15,10 @@ export interface Account {
   claim?: { day: string; amount: number };
   /** accounts from before claims: the UTC day the old automatic top-up last ran (see upgrade) */
   day?: string;
+  /** a signed-in account: the guest wallet whose chips were moved into it (once only) */
+  guestMovedFrom?: string;
+  /** a guest wallet: the account its chips were moved into */
+  movedTo?: string;
 }
 
 /** What the player is shown. */
@@ -25,6 +29,8 @@ export interface BankStatus {
   claim: { day: string; amount: number } | null;
   /** when the player can claim again: now if they have not claimed today, else the next UTC midnight */
   nextClaimAt: number;
+  /** an account that has already taken in a guest wallet, or a guest wallet already moved */
+  guestMoved: boolean;
 }
 
 export const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -47,7 +53,36 @@ export function upgrade(acc: Account | undefined): Account {
 
 export function status(acc: Account, now: number): BankStatus {
   const claimedToday = acc.claim?.day === utcDay(now);
-  return { balance: acc.balance, claimedToday, claim: claimedToday ? acc.claim! : null, nextClaimAt: claimedToday ? nextUtcMidnight(now) : now };
+  return {
+    balance: acc.balance,
+    claimedToday,
+    claim: claimedToday ? acc.claim! : null,
+    nextClaimAt: claimedToday ? nextUtcMidnight(now) : now,
+    guestMoved: !!(acc.guestMovedFrom || acc.movedTo),
+  };
+}
+
+/**
+ * Move a guest's chips (their browser key's bank) into their account: once per account and once
+ * per guest wallet, and only what the server holds, so nothing the browser says counts. The chips
+ * move rather than copy, and the later of the two daily claims stays, so nobody gets a second
+ * claim that day.
+ */
+export function moveGuestChips(
+  guest: Account,
+  guestId: string,
+  account: Account,
+  accountId: string,
+): { guest: Account; account: Account; moved: number } | { error: string } {
+  if (account.guestMovedFrom) return { error: 'This account has already taken in chips from a guest. It can do that only once.' };
+  if (guest.movedTo) return { error: 'These guest chips have already been moved to an account.' };
+  if (guest.balance <= 0) return { error: 'There are no guest chips to move.' };
+  const later = !account.claim ? guest.claim : !guest.claim ? account.claim : guest.claim.day > account.claim.day ? guest.claim : account.claim;
+  return {
+    guest: { ...guest, balance: 0, movedTo: accountId },
+    account: { ...account, balance: account.balance + guest.balance, guestMovedFrom: guestId, ...(later ? { claim: later } : {}) },
+    moved: guest.balance,
+  };
 }
 
 /** A whole number of chips from DAILY_MIN to DAILY_MAX. Rejection sampling, so no amount comes up more often. */

@@ -24,6 +24,7 @@ import {
 } from '../../multiplayer/table';
 import { DAILY_MAX, DAILY_MIN, nextUtcMidnight } from '../../multiplayer/bank';
 import { isBotId } from '../../multiplayer/bots';
+import { useAuth } from '../../auth/AuthContext';
 import { track, trackFirst, trackOnce, waitBucket } from '../analytics';
 import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
 import { describeScore } from '../../engine/evaluator';
@@ -370,7 +371,9 @@ export function PlayTablePage() {
   const { room = '' } = useParams();
   const nav = useNavigate();
   const { data } = useStore();
-  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat } = useLiveTable(room);
+  const { account } = useAuth();
+  // signed in: you play, buy in and chat as your account; otherwise as this browser's guest
+  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat } = useLiveTable(room, account?.id ?? null);
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
   // buy-in choice, in whole chips: from the table minimum up to its maximum or what you have, whichever is less
@@ -380,7 +383,11 @@ export function PlayTablePage() {
   const [buyChips, setBuyChips] = useState<number | ''>(maxChips);
   useEffect(() => setBuyChips(maxChips), [maxChips]);
   const buyValid = typeof buyChips === 'number' && Number.isInteger(buyChips) && buyChips >= minChips && buyChips <= maxChips;
-  const [name, setName] = useState(loadName);
+  const [name, setName] = useState(() => loadName() || account?.displayName || '');
+  // the account's name arrives a moment after signing in; use it unless a name was already chosen
+  useEffect(() => {
+    if (account?.displayName && !loadName()) setName((n) => (!n || n === 'Player' ? account.displayName : n));
+  }, [account?.displayName]);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
   const kind = isPublicTable(room) ? 'public' : 'private';

@@ -6,7 +6,11 @@
   "compatibility_date": "2026-10-01",
   "vars": {
     // public tables: bots fill open seats up to this many players while someone is seated (0 = no bots)
-    "BOT_SEATS": "4"
+    "BOT_SEATS": "4",
+    // accounts: the Supabase project that signs players in (both values are public). Leave empty to
+    // keep live tables guest-only. Same values as VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY.
+    "SUPABASE_URL": "https://uiqbxzeemhojjmpoechp.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_HFZkRP585bnony3bWIVOTQ_-a5Ggsbl"
   },
   "durable_objects": {
     "bindings": [

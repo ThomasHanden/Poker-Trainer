@@ -12,7 +12,7 @@ export const PARTY_HOST: string | undefined = import.meta.env.VITE_PARTY_HOST ||
 export type LiveStatus = 'connecting' | 'open' | 'closed';
 
 /** Your chips away from the tables and today's claim (claimedToday is undefined from a server before claims). */
-export type Bankroll = Pick<BankStatus, 'balance' | 'nextClaimAt'> & Partial<Pick<BankStatus, 'claimedToday' | 'claim'>>;
+export type Bankroll = Pick<BankStatus, 'balance' | 'nextClaimAt'> & Partial<Pick<BankStatus, 'claimedToday' | 'claim' | 'guestMoved'>>;
 
 /** A chat line as this page shows it: delivered, or one of yours still on its way or not delivered. */
 export type ChatLine = ChatMessage & { state?: 'sending' | 'failed'; error?: string };
@@ -45,6 +45,34 @@ export function playerKey(): string {
   }
 }
 
+/** This browser's guest key if it has ever made one (signed-in players never need a new one). */
+export function existingPlayerKey(): string | null {
+  try {
+    return localStorage.getItem('live-key');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signed-in account, if any (set by AuthProvider). Signed-in players play and bank under their
+ * account: the server checks their access token. Guests use their browser key.
+ */
+let liveAccount: { id: string; token: () => Promise<string | null> } | null = null;
+export function setLiveAccount(a: typeof liveAccount) {
+  liveAccount = a;
+}
+
+/** Who a bank request is from: the guest's key, or the signed-in player's access token. */
+async function bankBody(): Promise<string> {
+  if (liveAccount) {
+    const token = await liveAccount.token();
+    if (!token) throw new Error('Your sign-in has expired. Sign in again.');
+    return JSON.stringify({ token });
+  }
+  return playerKey();
+}
+
 const SAT_AT_KEY = 'live-sat-at';
 const SAT_AT_DAYS = 3;
 
@@ -71,7 +99,7 @@ export async function fetchBankroll(): Promise<Bankroll | null> {
   }
   try {
     // plain text body: a simple request, so the browser does not need a CORS preflight
-    const r = await fetch(`${httpBase()}/bank`, { method: 'POST', body: playerKey(), headers: { 'Content-Type': 'text/plain' } });
+    const r = await fetch(`${httpBase()}/bank`, { method: 'POST', body: await bankBody(), headers: { 'Content-Type': 'text/plain' } });
     return r.ok ? toBankroll(await r.json()) : null;
   } catch {
     return null;
@@ -79,7 +107,38 @@ export async function fetchBankroll(): Promise<Bankroll | null> {
 }
 
 function toBankroll(b: Bankroll & { refillsAt?: number }): Bankroll {
-  return { balance: b.balance, nextClaimAt: b.nextClaimAt ?? b.refillsAt ?? 0, claimedToday: b.claimedToday, claim: b.claim };
+  return { balance: b.balance, nextClaimAt: b.nextClaimAt ?? b.refillsAt ?? 0, claimedToday: b.claimedToday, claim: b.claim, guestMoved: b.guestMoved };
+}
+
+/** The guest chips this browser holds (its key's bank), for offering to move them into an account. */
+export async function fetchGuestBankroll(): Promise<Bankroll | null> {
+  const key = existingPlayerKey();
+  if (!key) return null;
+  try {
+    const r = await fetch(`${httpBase()}/bank`, { method: 'POST', body: key, headers: { 'Content-Type': 'text/plain' } });
+    return r.ok ? toBankroll(await r.json()) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Move this browser's guest chips into the signed-in account. The server moves only what it holds
+ * for the guest key, once per account and once per guest wallet.
+ */
+export async function moveGuestChips(): Promise<{ moved: number; bank: Bankroll }> {
+  const key = existingPlayerKey();
+  const token = liveAccount ? await liveAccount.token() : null;
+  if (!key || !token) throw new Error('Sign in first.');
+  let r: Response;
+  try {
+    r = await fetch(`${httpBase()}/bank/move-guest`, { method: 'POST', body: JSON.stringify({ token, key }), headers: { 'Content-Type': 'text/plain' } });
+  } catch {
+    throw new Error('Could not reach the chip server. Check your connection and try again.');
+  }
+  const body = (await r.json().catch(() => ({}))) as { moved?: number; status?: Bankroll; error?: string };
+  if (!r.ok || !body.status) throw new Error(body.error ?? 'The chips could not be moved. Try again.');
+  return { moved: body.moved ?? 0, bank: toBankroll(body.status) };
 }
 
 /**
@@ -88,8 +147,11 @@ function toBankroll(b: Bankroll & { refillsAt?: number }): Bankroll {
  */
 export async function claimDailyChips(): Promise<Bankroll & { amount: number }> {
   const once = async () => {
-    const r = await fetch(`${httpBase()}/bank/claim`, { method: 'POST', body: playerKey(), headers: { 'Content-Type': 'text/plain' } });
-    if (!r.ok) throw new Error(r.status === 404 ? 'Daily chips are not switched on yet. Try again later.' : 'The chip server did not accept the claim. Try again.');
+    const r = await fetch(`${httpBase()}/bank/claim`, { method: 'POST', body: await bankBody(), headers: { 'Content-Type': 'text/plain' } });
+    if (!r.ok)
+      throw new Error(
+        r.status === 404 ? 'Daily chips are not switched on yet. Try again later.' : r.status === 401 ? 'Your sign-in could not be confirmed. Sign in again.' : 'The chip server did not accept the claim. Try again.',
+      );
     const b = (await r.json()) as Bankroll & { amount: number };
     return { ...toBankroll(b), amount: b.amount };
   };
@@ -102,7 +164,8 @@ export async function claimDailyChips(): Promise<Bankroll & { amount: number }> 
   }
 }
 
-export function useLiveTable(room: string) {
+/** A live table, as the signed-in account (accountId) or as this browser's guest; switching reconnects. */
+export function useLiveTable(room: string, accountId: string | null = null) {
   const [view, setView] = useState<TableView | null>(null);
   const [bank, setBank] = useState<Bankroll | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,15 +182,29 @@ export function useLiveTable(room: string) {
     // a new table: nothing from the last one may show here
     setChat(null);
     setView(null);
+    setBank(null);
     let current = true;
-    // chat=1: this page understands chat messages (the server sends none to pages that do not)
-    const socket = new PartySocket({ host: PARTY_HOST, party: 'poker-table', room, query: { key: playerKey(), chat: '1' } });
-    socket.addEventListener('open', () => current && setStatus('open'));
+    // chat=1: this page understands chat messages (the server sends none to pages that do not).
+    // Signed in: auth=1, then the access token as the first message on every (re)connect, so it
+    // is never part of an address.
+    const query = accountId ? { auth: '1', chat: '1' } : { key: playerKey(), chat: '1' };
+    const socket = new PartySocket({ host: PARTY_HOST, party: 'poker-table', room, query });
+    socket.addEventListener('open', () => {
+      if (!current) return;
+      setStatus('open');
+      if (!accountId) return;
+      const account = liveAccount?.id === accountId ? liveAccount : null;
+      void (account ? account.token() : Promise.resolve(null)).then((token) => {
+        if (!current) return;
+        if (token) socket.send(JSON.stringify({ type: 'auth', token }));
+        else setError('Your sign-in has expired. Sign in again to play under your account.');
+      });
+    });
     socket.addEventListener('close', () => current && setStatus('closed'));
     socket.addEventListener('message', (e) => {
       if (!current) return;
       const m = JSON.parse(e.data) as ServerMessage;
-      if (m.type === 'error') {
+      if (m.type === 'error' || m.type === 'auth-error') {
         setError(m.message);
       } else if (m.type === 'bank') {
         setBank(toBankroll(m));
@@ -163,7 +240,7 @@ export function useLiveTable(room: string) {
       for (const t of pending.values()) clearTimeout(t);
       pending.clear();
     };
-  }, [room]);
+  }, [room, accountId]);
 
   const send = useCallback((m: ClientMessage) => {
     setError(null);

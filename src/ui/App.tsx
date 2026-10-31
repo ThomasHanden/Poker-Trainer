@@ -9,6 +9,9 @@ import { ReviewListPage, ReviewDetailPage } from './pages/Review';
 import { ProgressPage } from './pages/Progress';
 import { HomePage } from './pages/Home';
 import { PlayLobbyPage, PlayTablePage } from './pages/Play';
+import { AccountPage, AuthCallbackPage, GuestImport, LoginPage, ResetPasswordPage } from './pages/Account';
+import { AuthMenu } from './components/AuthMenu';
+import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
 import { NOT_FOUND, pageMeta } from '../seo';
 
@@ -35,9 +38,39 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 }
 
+/** Account messages for every page: a session that ended, progress that could not be saved, and guest progress to add. */
+function AccountBanners() {
+  const { notice, clearNotice, status } = useAuth();
+  const { sync, retrySync } = useStore();
+  const { pathname } = useLocation();
+  const onAccountPages = ['/account', '/login', '/auth/callback', '/reset-password'].includes(pathname);
+  return (
+    <>
+      {notice && status === 'signed-out' && (
+        <div className="banner info" role="status">
+          {notice} <Link to={`/login?next=${encodeURIComponent(pathname)}`}>Sign in</Link> ·{' '}
+          <button className="linklike" onClick={clearNotice}>
+            Dismiss
+          </button>
+        </div>
+      )}
+      {!onAccountPages && (sync?.phase === 'load-failed' || sync?.phase === 'save-failed') && (
+        <div className="banner warn" role="alert">
+          {sync.message} {sync.phase === 'load-failed' ? 'Your account’s progress is not loaded yet.' : 'Your latest progress is kept on this device for now.'}{' '}
+          <button className="linklike" onClick={retrySync}>
+            Try again
+          </button>
+        </div>
+      )}
+      {!onAccountPages && <GuestImport />}
+    </>
+  );
+}
+
 /** The page itself; the build also renders it to HTML for every public page (scripts/prerender.tsx). */
 export function Shell() {
-  const { storageWarning } = useStore();
+  const { storageWarning, owner, sync } = useStore();
+  const { status } = useAuth();
   const [menu, setMenu] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => {
@@ -70,15 +103,18 @@ export function Shell() {
             </NavLink>
           ))}
         </nav>
+        <AuthMenu />
       </header>
       {storageWarning && (
         <div className="banner warn" role="status">
           {storageWarning}
         </div>
       )}
+      <AccountBanners />
       <main id="main">
         <ErrorBoundary>
-          <Routes>
+          {/* a different account (or signing out) starts every page afresh, so nothing of the last one stays on screen */}
+          <Routes key={owner ?? 'guest'}>
             <Route path="/" element={<HomePage />} />
             <Route path="/practice" element={<PracticePage />} />
             <Route path="/learn" element={<LearnPage />} />
@@ -89,13 +125,26 @@ export function Shell() {
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/play" element={<PlayLobbyPage />} />
             <Route path="/play/:room" element={<PlayTablePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/account" element={<AccountPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>
       </main>
       <footer className="footer">
         <span className="foot-brand">Felt School</span>
-        <span>Scores are teaching estimates, not solver output. Your progress is saved in this browser only.</span>
+        <span>
+          Scores are teaching estimates, not solver output.{' '}
+          {owner
+            ? sync?.phase === 'load-failed' || sync?.phase === 'save-failed'
+              ? 'Your progress is kept on this device until your account can be reached.'
+              : 'Your progress is saved to your account.'
+            : status === 'off'
+              ? 'Your progress is saved in this browser only.'
+              : 'Your progress is saved in this browser; sign in to keep it on every device.'}
+        </span>
       </footer>
     </>
   );
@@ -126,11 +175,13 @@ function PageAnalytics() {
 
 export function App() {
   return (
-    <StoreProvider>
-      <BrowserRouter>
-        <Shell />
-        <PageAnalytics />
-      </BrowserRouter>
-    </StoreProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <StoreProvider>
+          <Shell />
+          <PageAnalytics />
+        </StoreProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

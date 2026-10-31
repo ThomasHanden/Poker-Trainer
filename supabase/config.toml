@@ -1,0 +1,29 @@
+# Sign-in settings for the Felt School Supabase project. Only the properties written here are
+# changed when they are pushed; everything else stays as set in the dashboard.
+#   Preview: npx supabase config diff --project-ref uiqbxzeemhojjmpoechp
+#   Apply:   npx supabase config push --project-ref uiqbxzeemhojjmpoechp
+# Google's client id and secret are entered in the dashboard (Authentication → Providers → Google).
+
+project_id = "Poker-Trainer"
+
+[auth]
+site_url = "https://feltschool.vercel.app"
+# where sign-in, confirmation and reset links may return to
+additional_redirect_urls = [
+  "https://feltschool.vercel.app/auth/callback",
+  "https://feltschool.vercel.app/reset-password",
+  "https://pokertrainer-*-milton-c96e.vercel.app/**",
+  "http://localhost:5173/**",
+]
+enable_signup = true
+minimum_password_length = 8
+# Google and email sign-ins for the same verified address join one account automatically;
+# nobody can attach other sign-ins by hand
+enable_manual_linking = false
+
+[auth.email]
+enable_signup = true
+# new email accounts must confirm their address before they can sign in
+enable_confirmations = true
+# changing a password needs a recent sign-in (otherwise a reset link)
+secure_password_change = true

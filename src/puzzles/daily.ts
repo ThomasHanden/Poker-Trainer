@@ -6,6 +6,7 @@ import { compareHands, describeScore, evaluate, categoryOf, HandCategory, CATEGO
 import { getChart, chartFreq, chartPlayRange } from '../ranges/presets';
 import { ALL_CLASSES, HandClass, combosOf, rangePercent } from '../ranges/hands';
 import { preflopRanking } from '../ranges/preflopEquity';
+import { currentOwner, ownedKey } from '../persistence/storage';
 
 export interface Puzzle {
   id: string;
@@ -348,7 +349,7 @@ export function puzzleSet(key: string): Puzzle[] {
   return makers.map((m, i) => m(rng, `${key}#${i}`));
 }
 
-// ---------------- results (stored in this browser) ----------------
+// ---------------- results (stored in this browser, and in the account when signed in) ----------------
 
 export interface PuzzleRun {
   id: string;
@@ -367,9 +368,16 @@ export interface PuzzleRun {
 
 const KEY = 'felt-school:puzzles';
 
-export function loadRuns(): PuzzleRun[] {
+/** Told about each finished run, so a signed-in player's result is saved to their account too. */
+let runSaved: ((run: PuzzleRun) => void) | null = null;
+export function onRunSaved(fn: ((run: PuzzleRun) => void) | null) {
+  runSaved = fn;
+}
+
+/** Results kept in this browser for a guest (null) or a signed-in account. */
+export function loadRuns(who: string | null = currentOwner()): PuzzleRun[] {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? '[]');
+    const v = JSON.parse(localStorage.getItem(ownedKey(KEY, who)) ?? '[]');
     if (!Array.isArray(v)) return [];
     return v
       .filter((r) => r && typeof r.date === 'string')
@@ -392,12 +400,26 @@ export function loadRuns(): PuzzleRun[] {
 export function saveRun(run: PuzzleRun): PuzzleRun[] {
   const runs = loadRuns().filter((r) => r.id !== run.id);
   runs.push(run);
-  try {
-    localStorage.setItem(KEY, JSON.stringify(runs.slice(-400)));
-  } catch {
-    /* storage unavailable: keep the run for this visit */
-  }
+  writeRuns(runs);
+  runSaved?.(run);
   return runs;
+}
+
+export function writeRuns(runs: PuzzleRun[], who: string | null = currentOwner()) {
+  try {
+    localStorage.setItem(ownedKey(KEY, who), JSON.stringify(runs.slice(-400)));
+  } catch {
+    /* storage unavailable: keep the runs for this visit */
+  }
+}
+
+/** Forget a guest's results in this browser (after they have been moved into an account). */
+export function clearRuns(who: string | null) {
+  try {
+    localStorage.removeItem(ownedKey(KEY, who));
+  } catch {
+    /* nothing kept */
+  }
 }
 
 /** Text for sharing a result, e.g. "Felt School daily · Oct 29 · 455 pts ✅✅❌✅✅". */
@@ -419,7 +441,7 @@ export interface PuzzleProgress {
 const PKEY = 'felt-school:puzzle-progress';
 export function loadProgress(key: string): PuzzleProgress | null {
   try {
-    const v = JSON.parse(localStorage.getItem(`${PKEY}:${key}`) ?? 'null');
+    const v = JSON.parse(localStorage.getItem(ownedKey(`${PKEY}:${key}`)) ?? 'null');
     return v && v.key === key ? v : null;
   } catch {
     return null;
@@ -427,8 +449,8 @@ export function loadProgress(key: string): PuzzleProgress | null {
 }
 export function saveProgress(key: string, p: PuzzleProgress | null) {
   try {
-    if (p) localStorage.setItem(`${PKEY}:${key}`, JSON.stringify(p));
-    else localStorage.removeItem(`${PKEY}:${key}`);
+    if (p) localStorage.setItem(ownedKey(`${PKEY}:${key}`), JSON.stringify(p));
+    else localStorage.removeItem(ownedKey(`${PKEY}:${key}`));
   } catch {
     /* ignore */
   }

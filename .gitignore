@@ -7,3 +7,6 @@ playwright-report
 
 .wrangler
 .env.local
+
+# Supabase CLI working files
+supabase/.temp

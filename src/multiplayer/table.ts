@@ -84,6 +84,8 @@ export type ClientMessage =
   | { type: 'cancel' }
   | { type: 'start' }
   | { type: 'action'; action: PlayerAction }
+  /** a signed-in connection's first message: its access token */
+  | { type: 'auth'; token: string }
   | ChatClientMessage;
 
 export interface SeatView {
@@ -135,6 +137,8 @@ export type ServerMessage =
   | { type: 'error'; message: string }
   /** the viewer's chips away from the table and their daily claim */
   | ({ type: 'bank' } & BankStatus)
+  /** a signed-in connection whose token could not be confirmed (the server then closes it) */
+  | { type: 'auth-error'; message: string }
   | ChatServerMessage;
 
 /** What the lobby shows for a table. */

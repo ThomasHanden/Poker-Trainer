@@ -39,10 +39,12 @@ const untilMidnight = () => {
 type Mode = 'daily' | 'survival';
 
 export function HomePage() {
-  const { data } = useStore();
+  const { data, owner, runsVersion } = useStore();
   const nav = useNavigate();
   const today = todayKey();
   const [runs, setRuns] = useState<PuzzleRun[]>(loadRuns);
+  // results arrive from the account after signing in
+  useEffect(() => setRuns(loadRuns()), [owner, runsVersion]);
   const [mode, setMode] = useState<Mode>('daily');
   const dailyRun = runs.find((r) => r.id === `daily:${today}`);
 
@@ -146,7 +148,7 @@ export function HomePage() {
               </>
             )}
           </p>
-          <p className="note">Bests, runs and practice stats are saved in this browser only.</p>
+          <p className="note">{owner ? 'Bests, runs and practice stats are saved to your account.' : 'Bests, runs and practice stats are saved in this browser.'}</p>
         </aside>
       </div>
     </div>
