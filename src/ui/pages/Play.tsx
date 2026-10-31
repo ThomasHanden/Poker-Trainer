@@ -240,7 +240,8 @@ export function PlayLobbyPage() {
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
             Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables. Claim {DAILY_MIN}–{DAILY_MAX} free chips each day.
-            Each table has a minimum and maximum buy-in, and you choose how much to bring; your stack comes back to you when you leave.
+            Each table has a minimum and maximum buy-in, and you choose how much to bring; your stack comes back to you when you leave. Chips you win stay in
+            your balance: it never resets.
           </p>
         </div>
       </header>

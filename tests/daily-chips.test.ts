@@ -75,6 +75,23 @@ describe('daily chips: claiming', () => {
     for (const d of [1, 2, 30]) expect(status(acc, Date.UTC(2026, 10, d)).balance).toBe(40);
   });
 
+  it('winnings stay in the bank for good: no daily reset, no cap, only claims, buy-ins and cash-outs change it', () => {
+    // day 1: claim 100 chips, buy in for 60, win, and leave the table with 900
+    let acc = claimDaily(upgrade(undefined), '2026-11-01', () => 100).acc;
+    const buyIn = withdraw(acc, 60 * CHIP, 60 * CHIP);
+    acc = deposit(buyIn.acc, 900 * CHIP);
+    expect(acc.balance).toBe((100 - 60 + 900) * CHIP);
+    // a year of days later, looking at the balance changes nothing
+    const kept = acc.balance;
+    for (let day = 0; day < 365; day++) expect(status(acc, Date.UTC(2026, 10, 2 + day, 12)).balance).toBe(kept);
+    // claiming on later days only adds on top
+    acc = claimDaily(acc, '2027-03-01', () => 50).acc;
+    acc = claimDaily(acc, '2027-03-02', () => 200).acc;
+    expect(acc.balance).toBe(kept + 250 * CHIP);
+    // a large balance is never trimmed
+    expect(status({ balance: 10_000_000 }, Date.UTC(2030, 0, 1)).balance).toBe(10_000_000);
+  });
+
   it('accounts from the old 1,000-chip top-up keep their balance; a top-up today counts as today’s claim', () => {
     const toppedUpToday = upgrade({ balance: 2000, day: DAY });
     expect(toppedUpToday).toEqual({ balance: 2000, claim: { day: DAY, amount: 0 } });
