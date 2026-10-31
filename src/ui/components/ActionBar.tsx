@@ -16,7 +16,22 @@ export interface AmountUnit {
   name: string;
 }
 
-export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; onAct: (a: PlayerAction) => void; disabled?: boolean; unit?: AmountUnit }) {
+/**
+ * Whether a key press belongs to something the player is typing in (a box, or anything marked
+ * data-no-shortcuts such as table chat) rather than to the action shortcuts.
+ */
+export function isTyping(target: EventTarget | null): boolean {
+  const t = target as HTMLElement | null;
+  if (!t || typeof t.closest !== 'function') return false;
+  return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || !!t.closest('[data-no-shortcuts]');
+}
+
+/**
+ * Fold / check / call / bet / raise. In practice the amount starts at a typical size and the
+ * glossary is a click away; on live tables (`live`) the amount starts at the legal minimum and
+ * the shortcuts are plain sizes (min, half pot, pot, all-in), so nothing reads as advice.
+ */
+export function ActionBar({ state, onAct, disabled, unit, live = false }: { state: HandState; onAct: (a: PlayerAction) => void; disabled?: boolean; unit?: AmountUnit; live?: boolean }) {
   const la = legalActions(state);
   const bb = state.config.bb;
   const u: AmountUnit = unit ?? { per: bb, fmt: (x) => fmtBB(x, bb), short: 'bb', name: 'big blinds' };
@@ -27,12 +42,13 @@ export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; 
 
   const defaultTo = useMemo(() => {
     if (!la || !canSize) return 0;
+    if (live) return la.minTo;
     if (state.street === 'preflop') {
       const t = la.canRaise && state.currentBet <= bb ? Math.round(2.5 * bb) : Math.round(state.currentBet * 3);
       return Math.max(la.minTo, Math.min(la.maxTo, t));
     }
     return potFractionTo(state, 0.66);
-  }, [state, la, canSize, bb]);
+  }, [state, la, canSize, bb, live]);
 
   useEffect(() => {
     setAmountBB(defaultTo ? String(+(defaultTo / u.per).toFixed(2)) : '');
@@ -47,7 +63,7 @@ export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; 
     if (!la || disabled) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
+      if (isTyping(t)) {
         if (e.key === 'Enter' && t.getAttribute('data-amount') === '1' && !err) {
           e.preventDefault();
           onAct({ type: la.canBet ? 'bet' : 'raise', to: toChips });
@@ -66,7 +82,7 @@ export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; 
       } else if (k === 'a' && canSize) {
         setAmountBB(String(+(la.maxTo / u.per).toFixed(2)));
         setSizingOpen(true);
-      } else if (/^[1-7]$/.test(k) && canSize) {
+      } else if (!live && /^[1-7]$/.test(k) && canSize) {
         const f = POT_PRESETS[Number(k) - 1];
         setAmountBB(String(+(potFractionTo(state, f) / u.per).toFixed(2)));
         setSizingOpen(true);
@@ -74,16 +90,22 @@ export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [la, disabled, canSize, onAct, state, u.per, toChips, err]);
+  }, [la, disabled, canSize, onAct, state, u.per, toChips, err, live]);
 
   if (!la || !me) return null;
   const raiseBy = la.canRaise ? toChips - state.currentBet : 0;
   const pre = state.street === 'preflop';
   const pct = (to: number) => Math.round(100 * (la.canBet ? to / Math.max(1, la.pot) : (to - state.currentBet) / Math.max(1, la.pot + la.toCall)));
   // standard sizes: multiples of the current bet preflop, pot fractions after the flop
-  const presets: { label: string; to: number; key?: string }[] = pre && la.canRaise
-    ? (state.currentBet <= bb ? [2, 2.5, 3, 4] : [2.5, 3, 4]).map((m) => ({ label: `${m}x`, to: Math.round(state.currentBet * m) }))
-    : POT_PRESETS.filter((f) => f !== 0.25).map((f) => ({ label: f === 1 ? 'Pot' : f === 1.5 ? '1.5×' : `${Math.round(f * 100)}%`, to: potFractionTo(state, f), key: String(POT_PRESETS.indexOf(f) + 1) }));
+  const presets: { label: string; to: number; key?: string }[] = live
+    ? [
+        { label: 'Min', to: la.minTo },
+        { label: '½ Pot', to: potFractionTo(state, 0.5) },
+        { label: 'Pot', to: potFractionTo(state, 1) },
+      ]
+    : pre && la.canRaise
+      ? (state.currentBet <= bb ? [2, 2.5, 3, 4] : [2.5, 3, 4]).map((m) => ({ label: `${m}x`, to: Math.round(state.currentBet * m) }))
+      : POT_PRESETS.filter((f) => f !== 0.25).map((f) => ({ label: f === 1 ? 'Pot' : f === 1.5 ? '1.5×' : `${Math.round(f * 100)}%`, to: potFractionTo(state, f), key: String(POT_PRESETS.indexOf(f) + 1) }));
   const shown = presets.filter((p, i, arr) => p.to >= la.minTo && p.to < la.maxTo && arr.findIndex((q) => q.to === p.to) === i);
   const setTo = (to: number) => setAmountBB(String(+(Math.max(la.minTo, Math.min(la.maxTo, to)) / u.per).toFixed(2)));
   const step = pre ? bb / 2 : Math.max(bb / 2, Math.round(la.pot / 20 / (bb / 2)) * (bb / 2));
@@ -129,7 +151,7 @@ export function ActionBar({ state, onAct, disabled, unit }: { state: HandState; 
           ) : (
             <>
               <div className="size-readout" aria-live="polite">
-                <span className="sr-verb">{la.canBet ? 'Bet' : <Term id="raiseto">Raise to</Term>}</span>
+                <span className="sr-verb">{la.canBet ? 'Bet' : live ? 'Raise to' : <Term id="raiseto">Raise to</Term>}</span>
                 <span className="sr-amt">{valid ? u.fmt(toChips) : '—'}</span>
                 <span className="sr-sub">
                   {allIn

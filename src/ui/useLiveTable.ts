@@ -3,16 +3,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import PartySocket from 'partysocket';
 import type { PlayerAction } from '../engine/rules';
 import type { ClientMessage, ServerMessage, TableView } from '../multiplayer/table';
+import type { BankStatus } from '../multiplayer/bank';
+import type { ChatMessage } from '../multiplayer/chat';
 
 /** Address of the table server, e.g. felt-tables.<account>.workers.dev (set in .env.local / Vercel). */
 export const PARTY_HOST: string | undefined = import.meta.env.VITE_PARTY_HOST || undefined;
 
 export type LiveStatus = 'connecting' | 'open' | 'closed';
 
-export interface Bankroll {
-  balance: number;
-  refillsAt: number;
-}
+/** Your chips away from the tables and today's claim (claimedToday is undefined from a server before claims). */
+export type Bankroll = Pick<BankStatus, 'balance' | 'nextClaimAt'> & Partial<Pick<BankStatus, 'claimedToday' | 'claim'>>;
+
+/** A chat line as this page shows it: delivered, or one of yours still on its way or not delivered. */
+export type ChatLine = ChatMessage & { state?: 'sending' | 'failed'; error?: string };
+
+/** How long to wait for the server to confirm a message before calling it not delivered. */
+const CHAT_ACK_MS = 8000;
 
 const local = () => /^(localhost|127\.0\.0\.1)[:/]/.test(PARTY_HOST ?? '');
 const httpBase = () => `${local() ? 'http' : 'https'}://${PARTY_HOST}`;
@@ -66,9 +72,33 @@ export async function fetchBankroll(): Promise<Bankroll | null> {
   try {
     // plain text body: a simple request, so the browser does not need a CORS preflight
     const r = await fetch(`${httpBase()}/bank`, { method: 'POST', body: playerKey(), headers: { 'Content-Type': 'text/plain' } });
-    return r.ok ? ((await r.json()) as Bankroll) : null;
+    return r.ok ? toBankroll(await r.json()) : null;
   } catch {
     return null;
+  }
+}
+
+function toBankroll(b: Bankroll & { refillsAt?: number }): Bankroll {
+  return { balance: b.balance, nextClaimAt: b.nextClaimAt ?? b.refillsAt ?? 0, claimedToday: b.claimedToday, claim: b.claim };
+}
+
+/**
+ * Claim today's chips. The server picks the amount and pays it at most once per UTC day; asking
+ * again (a retry after a dropped connection) returns the same claim without paying twice.
+ */
+export async function claimDailyChips(): Promise<Bankroll & { amount: number }> {
+  const once = async () => {
+    const r = await fetch(`${httpBase()}/bank/claim`, { method: 'POST', body: playerKey(), headers: { 'Content-Type': 'text/plain' } });
+    if (!r.ok) throw new Error(r.status === 404 ? 'Daily chips are not switched on yet. Try again later.' : 'The chip server did not accept the claim. Try again.');
+    const b = (await r.json()) as Bankroll & { amount: number };
+    return { ...toBankroll(b), amount: b.amount };
+  };
+  try {
+    return await once();
+  } catch (e) {
+    // a dropped connection: asking again is safe, it cannot pay twice
+    if (e instanceof TypeError) return once().catch(() => Promise.reject(new Error('Could not reach the chip server. Check your connection and try again.')));
+    throw e;
   }
 }
 
@@ -79,28 +109,59 @@ export function useLiveTable(room: string) {
   const [status, setStatus] = useState<LiveStatus>('connecting');
   /** server clock minus ours, for countdowns */
   const [offset, setOffset] = useState(0);
+  /** this table's chat, or null while you may not see it (not seated) */
+  const [chat, setChat] = useState<ChatLine[] | null>(null);
   const ws = useRef<PartySocket | null>(null);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
     if (!PARTY_HOST) return;
-    const socket = new PartySocket({ host: PARTY_HOST, party: 'poker-table', room, query: { key: playerKey() } });
-    socket.addEventListener('open', () => setStatus('open'));
-    socket.addEventListener('close', () => setStatus('closed'));
+    // a new table: nothing from the last one may show here
+    setChat(null);
+    setView(null);
+    let current = true;
+    // chat=1: this page understands chat messages (the server sends none to pages that do not)
+    const socket = new PartySocket({ host: PARTY_HOST, party: 'poker-table', room, query: { key: playerKey(), chat: '1' } });
+    socket.addEventListener('open', () => current && setStatus('open'));
+    socket.addEventListener('close', () => current && setStatus('closed'));
     socket.addEventListener('message', (e) => {
+      if (!current) return;
       const m = JSON.parse(e.data) as ServerMessage;
       if (m.type === 'error') {
         setError(m.message);
       } else if (m.type === 'bank') {
-        setBank({ balance: m.balance, refillsAt: m.refillsAt });
+        setBank(toBankroll(m));
+      } else if (m.type === 'chat-history') {
+        // the whole history (after sitting down or reconnecting): replaces what we had, keeping
+        // only our own messages the server has not confirmed yet
+        setChat((old) => [...m.messages, ...(old ?? []).filter((l) => l.state && !m.messages.some((x) => x.cid === l.cid))]);
+      } else if (m.type === 'chat') {
+        const msg = m.message;
+        if (msg.cid) clearTimeout(timers.current.get(msg.cid));
+        setChat((old) => {
+          const lines = old ?? [];
+          if (lines.some((l) => l.id === msg.id && !l.state)) return lines; // already have it
+          const mine = lines.findIndex((l) => l.state && l.cid === msg.cid);
+          return mine >= 0 ? lines.map((l, i) => (i === mine ? msg : l)) : [...lines, msg];
+        });
+      } else if (m.type === 'chat-error') {
+        clearTimeout(timers.current.get(m.cid));
+        setChat((old) => old && old.map((l) => (l.state && l.cid === m.cid ? { ...l, state: 'failed', error: m.message } : l)));
+      } else if (m.type === 'chat-closed') {
+        setChat(null);
       } else {
         setView(m);
         setOffset(m.now - Date.now());
       }
     });
     ws.current = socket;
+    const pending = timers.current;
     return () => {
+      current = false;
       socket.close();
       ws.current = null;
+      for (const t of pending.values()) clearTimeout(t);
+      pending.clear();
     };
   }, [room]);
 
@@ -109,12 +170,28 @@ export function useLiveTable(room: string) {
     ws.current?.send(JSON.stringify(m));
   }, []);
 
+  /** Send a chat line (or send a failed one again: same cid, so it can never post twice). */
+  const sendChat = useCallback((text: string, retryCid?: string) => {
+    const cid = retryCid ?? crypto.randomUUID();
+    const line: ChatLine = { id: -1, kind: 'player', from: '', text, at: Date.now(), cid, state: 'sending' };
+    setChat((old) => (old ? (retryCid ? old.map((l) => (l.cid === cid ? line : l)) : [...old, line]) : old));
+    ws.current?.send(JSON.stringify({ type: 'chat', cid, text } satisfies ClientMessage));
+    clearTimeout(timers.current.get(cid));
+    timers.current.set(
+      cid,
+      setTimeout(() => setChat((old) => old && old.map((l) => (l.state === 'sending' && l.cid === cid ? { ...l, state: 'failed', error: 'Not delivered' } : l))), CHAT_ACK_MS),
+    );
+  }, []);
+
   return {
     view,
     bank,
+    setBank,
     error,
     status,
     offset,
+    chat,
+    sendChat,
     sit: (name: string, seat: number, buyIn: number) => send({ type: 'sit', name, seat, buyIn }),
     leave: () => send({ type: 'leave' }),
     start: () => send({ type: 'start' }),

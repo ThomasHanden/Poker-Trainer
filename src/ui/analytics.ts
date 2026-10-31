@@ -12,7 +12,8 @@ export type AnalyticsEvent =
   | 'Seat Assigned'
   | 'Bot Seat Replacement Completed'
   | 'First Live Hand Dealt'
-  | 'First Live Hand Completed';
+  | 'First Live Hand Completed'
+  | 'Daily Chips Claimed';
 
 type Props = Record<string, string | number | boolean | null>;
 

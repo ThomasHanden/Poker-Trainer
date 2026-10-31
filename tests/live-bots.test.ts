@@ -29,6 +29,9 @@ function botTable(opts: { botSeats?: number; botPolicy?: BotPolicy; seed?: strin
   };
 }
 
+/** bots that only check or call, so a hand is sure to go on until the person acts */
+const calls: BotPolicy = (v) => (legalActions(v.state)!.canCheck ? { type: 'check' } : { type: 'call' });
+
 const sitDown = (t: LiveTable, id: string, seat?: number, buyIn = START_STACK) => {
   t.setOnline(id, true);
   return t.sit(id, id, buyIn, seat);
@@ -73,7 +76,10 @@ describe('bots: filling a public table', () => {
     expect(x.t.summary()).toMatchObject({ players: 1, bots: BOT_SEATS - 1 });
     const v = x.t.viewFor('ann');
     expect(v.seats.filter((s) => s.bot)).toHaveLength(BOT_SEATS - 1);
-    expect(v.seats.find((s) => s.id === 'ann')!.bot).toBeNull();
+    expect(v.seats.find((s) => s.id === 'ann')!.bot).toBe(false);
+    // bots are named for their seat, and how they play never reaches the browser
+    for (const b of v.seats.filter((s) => s.bot)) expect(b.name).toBe(`Bot ${b.seat + 1}`);
+    expect(JSON.stringify(v)).not.toMatch(/"(tag|nit|station|lag|overfolder)"|TAG|Nit|Station|LAG|Overfolder/);
     expect(v.botSeats).toBe(BOT_SEATS);
     // the first hand deals without waiting for anyone else
     expect(x.t.nextHandAt).toBe(x.now() + NEXT_HAND_MS);
@@ -126,7 +132,7 @@ describe('bots: people come first', () => {
     // nobody's cards or stack change mid-hand; one bot is marked to stand up afterwards
     expect(x.t.hand!.players.map((p) => p.hole)).toEqual(before.map((p) => p.hole));
     expect(bots(x.t).filter((b) => b.leaving)).toHaveLength(1);
-    expect(x.t.viewFor('bob').seats.find((s) => s.leaving)!.bot).not.toBeNull();
+    expect(x.t.viewFor('bob').seats.find((s) => s.leaving)!.bot).toBe(true);
     const leaver = bots(x.t).find((b) => b.leaving)!.id;
     playHand(x);
     expect(x.t.seats.map((s) => s.id)).not.toContain(leaver);
@@ -163,8 +169,8 @@ describe('bots: people come first', () => {
 
 describe('bots: taking a bot’s seat', () => {
   /** all six seats used: ann and five bots, a hand under way */
-  function fullTable() {
-    const x = botTable({ botSeats: MAX_SEATS });
+  function fullTable(botPolicy?: BotPolicy) {
+    const x = botTable({ botSeats: MAX_SEATS, botPolicy });
     sitDown(x.t, 'ann', 0);
     expect(x.t.seats).toHaveLength(MAX_SEATS);
     x.runTimer();
@@ -241,7 +247,8 @@ describe('bots: taking a bot’s seat', () => {
   });
 
   it('a person who drops while waiting keeps their place through a reload, but not for good', () => {
-    const x = fullTable();
+    // calling bots: the hand cannot end before ann acts, so it outlasts cat's grace period
+    const x = fullTable(calls);
     const [b1, b2] = bots(x.t);
     sitDown(x.t, 'bob', b1.seat);
     x.t.setOnline('bob', false);
@@ -455,9 +462,6 @@ describe('bots: game integrity', () => {
     expect(x.t.tick()).toBe(false);
     expect(x.t.hand!.history.length).toBe(len);
   });
-
-  /** bots that only check or call, so a hand is sure to still be going */
-  const calls: BotPolicy = (v) => (legalActions(v.state)!.canCheck ? { type: 'check' } : { type: 'call' });
 
   it('a bot’s scheduled move is rescheduled when the table changes under it', () => {
     const x = botTable({ botSeats: 3, botPolicy: calls });

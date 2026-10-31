@@ -1,5 +1,5 @@
 import { CSSProperties, useEffect, useMemo, useState } from 'react';
-import { HandState, potSize, ActionRecord, effectiveStack } from '../../engine/rules';
+import { HandState, potSize, ActionRecord, effectiveStack, computePots } from '../../engine/rules';
 import { PlayingCard, CardRow, DEAL_GAP, DEAL_ANIM } from './Card';
 import { PROFILES, ProfileId } from '../../opponents/profiles';
 import { Term } from './Term';
@@ -119,6 +119,14 @@ const PORTRAIT = { w: 1, h: 1.75 };
 // live tables seat at most six, so on phones they use a shorter felt that fits beside the action buttons
 const PORTRAIT_LIVE = { w: 1, h: 1.45 };
 
+/** Contested pots (main first) from what was bet on earlier streets; one entry means no side pot. */
+function settledPots(state: HandState): number[] {
+  const before = { ...state, players: state.players.map((p) => ({ ...p, totalCommitted: p.totalCommitted - p.streetCommitted, streetCommitted: 0 })) };
+  return computePots(before)
+    .filter((pot) => pot.eligible.length > 1)
+    .map((pot) => pot.amount);
+}
+
 /**
  * Live tables have fixed seats: players sit where they chose, empty seats can be taken, and people who
  * sat down mid-hand wait in their seat. Without this, players are spaced evenly with the hero at the bottom.
@@ -131,10 +139,12 @@ export interface Seating {
   slotOf: (i: number) => number;
   /** empty seats; onSit makes them a "Sit here" button */
   open: { slot: number; onSit?: () => void }[];
-  /** seated but not in the hand shown; bot is a bot's style, or null for a person */
-  idle: { slot: number; name: string; stack: number; you: boolean; note: string; bot: string | null }[];
-  /** whether a hand.players index is a bot, labelled Bot on its seat */
+  /** seated but not in the hand shown */
+  idle: { slot: number; name: string; stack: number; you: boolean; note: string; bot: boolean }[];
+  /** whether a hand.players index is a bot (bots are named "Bot 3" and so on) */
   isBot: (i: number) => boolean;
+  /** whether a hand.players index has lost their connection */
+  isAway: (i: number) => boolean;
 }
 
 
@@ -180,6 +190,9 @@ export function Table({
   const totalPot = potSize(state);
   const streetBets = state.players.reduce((a, p) => a + p.streetCommitted, 0);
   const potBefore = state.complete ? totalPot : totalPot - streetBets;
+  // live: main and side pots once an all-in has split them, from bets already settled on earlier
+  // streets (an unanswered bet this street is not a side pot yet)
+  const sidePots = live && !state.complete && state.players.some((p) => p.allIn) ? settledPots(state) : [];
   const deal = handKey ?? state.players.map((p) => p.hole.join('.')).join('|');
   // hole cards go out one at a time, starting left of the button, two rounds
   const dealDelay = (i: number, round: number) => `${(round * n + ((i - state.buttonIndex - 1 + n) % n)) * DEAL_GAP}s`;
@@ -232,13 +245,17 @@ export function Table({
         <div className="table-center">
           {/* live: once the pot has gone to the winner, the middle is empty */}
           <div className="pot-pill" aria-live="polite" style={won ? { visibility: 'hidden' } : undefined}>
-            <Term id="pot">Pot</Term> <strong data-testid="pot">{fmt(totalPot)}</strong>
+            {live ? 'Pot' : <Term id="pot">Pot</Term>} <strong data-testid="pot">{fmt(totalPot)}</strong>
           </div>
           <div className="board" aria-label="Community cards">
             <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} deal />
           </div>
           <div className="pot-sub">
-            {streetBets > 0 && potBefore > 0 && !state.complete ? `${fmt(potBefore)} in the middle + ${fmt(streetBets)} bet this street` : '\u00a0'}
+            {sidePots.length > 1
+              ? sidePots.map((amt, k) => `${k === 0 ? 'Main' : sidePots.length > 2 ? `Side ${k}` : 'Side'} ${fmt(amt)}`).join(' · ')
+              : streetBets > 0 && potBefore > 0 && !state.complete
+                ? `${fmt(potBefore)} in the middle + ${fmt(streetBets)} bet this street`
+                : '\u00a0'}
             {state.config.anteType !== 'none' && state.config.ante > 0 && (
               <span className="blinds-line">
                 Blinds {fmt(state.config.sb)}/{fmt(state.config.bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmt(state.config.ante)}
@@ -287,7 +304,6 @@ export function Table({
                   <span className="plate-pos">
                     {p.position}
                     {p.isHero ? ' · You' : showNames ? <span className="plate-name"> · {p.name}</span> : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
-                    {bot && <BotTag />}
                   </span>
                   <span className="plate-stack">{p.allIn && !state.complete ? 'All-in' : fmt(p.stack)}</span>
                   {isTurn && timer && (
@@ -303,6 +319,7 @@ export function Table({
                   ) : (
                     act && !state.complete && act.type === 'check' && <div className="seat-action">Check</div>
                   )}
+                  {seating?.isAway(i) && !p.folded && !state.complete && <div className="seat-action seat-wait">Away</div>}
                   {winners.has(i) && won ? (
                     // one badge: what they won, and with what at a showdown
                     <div className="seat-win">
@@ -337,7 +354,6 @@ export function Table({
               <div className="plate">
                 <span className="plate-pos">
                   {s.you ? 'You' : <span className="plate-name">{s.name}</span>}
-                  {s.bot && <BotTag />}
                 </span>
                 <span className="plate-stack">{fmt(s.stack)}</span>
               </div>
@@ -365,15 +381,6 @@ export function Table({
         })}
       </div>
     </div>
-  );
-}
-
-/** Marks a seat played by the computer on live tables. */
-function BotTag() {
-  return (
-    <span className="bot-tag" title="A computer player">
-      Bot
-    </span>
   );
 }
 

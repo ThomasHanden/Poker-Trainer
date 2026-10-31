@@ -6335,41 +6335,6 @@ label > span:first-child:not(.select-value) {
   }
 }
 
-/* Bots at public tables: a small, always-visible label on their seat */
-.bot-tag {
-  display: inline-block;
-  margin-left: 5px;
-  padding: 0 4px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 4px;
-  color: #fff;
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1.45;
-  text-transform: uppercase;
-  vertical-align: 1px;
-}
-@media (max-width: 820px) {
-  .felt .bot-tag {
-    margin-left: 3px;
-    padding: 0 2px;
-    font-size: 0.5rem;
-    letter-spacing: 0.03em;
-  }
-}
-/* the same label in running text, off the table */
-.bot-tag.inline {
-  margin: 0 1px;
-  border-color: var(--border-strong);
-  color: var(--muted);
-}
-.live-bots-note {
-  max-width: 62ch;
-  margin: 0 auto 12px;
-  text-align: center;
-  font-size: 0.85rem;
-}
 .live-takeover {
   display: flex;
   flex-wrap: wrap;
@@ -6382,6 +6347,294 @@ label > span:first-child:not(.select-value) {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
+}
+
+/* Daily chips: your balance and the claim button */
+.live-wallet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+}
+.live-wallet .live-bank {
+  margin: 0;
+}
+.live-wallet.compact {
+  margin: 8px 0 12px;
+}
+.live-bust .live-wallet {
+  justify-content: center;
+}
+.daily {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.daily .note,
+.daily .error {
+  margin: 0;
+}
+.daily-got {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--good);
+  animation: daily-in 0.7s ease-out;
+}
+@keyframes daily-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .daily-got {
+    animation: none;
+  }
+}
+
+/* your controls keep their place while you are in a hand (phones pin them to the bottom instead):
+   room for them, and for a two-line status above them (a result and the next-hand countdown) */
+@media (min-width: 681px) {
+  .live-controls.reserve {
+    min-height: 104px;
+  }
+  .page.live .live-status {
+    min-height: 3em;
+  }
+}
+
+/* live table header: chat, invite and leave sit on one row */
+.page.live .live-invite {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Table chat: beside the table on wider screens, a drawer from the bottom on phones */
+.live-chat-btn .chat-badge {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--raise);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+.live-chat-btn.on {
+  background: var(--accent-soft);
+}
+.live-chat {
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.live-chat.open {
+  display: flex;
+}
+@media (min-width: 821px) {
+  .live-layout.chat-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: start;
+  }
+  .live-chat.open {
+    position: sticky;
+    top: 12px;
+    height: min(620px, calc(100vh - 120px));
+  }
+}
+@media (max-width: 820px) {
+  .live-chat.open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    height: min(60svh, 460px);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 0.95rem;
+}
+.chat-close {
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-close:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.chat-mutes {
+  list-style: none;
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-mutes li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+}
+.chat-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.chat-lines {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-line {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.chat-line.mine {
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+.chat-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.chat-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.chat-line.mine .chat-name {
+  color: var(--accent);
+}
+.chat-meta time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.chat-text {
+  display: block;
+  white-space: pre-wrap;
+}
+.chat-sys {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: italic;
+  text-align: center;
+}
+.chat-state {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.chat-state.bad {
+  color: var(--bad);
+}
+.chat-jump {
+  align-self: center;
+  margin: 0 0 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.chat-emoji {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+.chat-emoji button {
+  min-height: 38px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.chat-emoji button:hover,
+.chat-emoji button:focus-visible {
+  background: var(--accent-soft);
+}
+.chat-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+}
+.chat-emoji-btn {
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+.chat-emoji-btn[aria-expanded='true'] {
+  background: var(--accent-soft);
+}
+.chat-count {
+  margin: 0;
+  padding: 0 10px 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.chat-count.bad {
+  color: var(--bad);
 }
 
 /* ============================================================

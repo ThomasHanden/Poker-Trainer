@@ -1,9 +1,10 @@
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
-import { Table, DecisionFacts, HistoryList, dealMs, type Seating } from '../components/Table';
+import { Table, HistoryList, dealMs, type Seating } from '../components/Table';
 import { ActionBar, type AmountUnit } from '../components/ActionBar';
-import { PARTY_HOST, fetchBankroll, rememberTable, tableInfoUrl, useLiveTable, type Bankroll } from '../useLiveTable';
+import { LiveChat, useMutes } from '../components/LiveChat';
+import { PARTY_HOST, claimDailyChips, fetchBankroll, rememberTable, tableInfoUrl, useLiveTable, type Bankroll } from '../useLiveTable';
 import {
   CHIP,
   HIGH_PREFIX,
@@ -21,7 +22,7 @@ import {
   type Stakes,
   type TableSummary,
 } from '../../multiplayer/table';
-import { DAILY } from '../../multiplayer/bank';
+import { DAILY_MAX, DAILY_MIN, nextUtcMidnight } from '../../multiplayer/bank';
 import { isBotId } from '../../multiplayer/bots';
 import { track, trackFirst, trackOnce, waitBucket } from '../analytics';
 import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
@@ -33,20 +34,81 @@ const LOBBY_POLL_MS = 10_000;
 /** Live tables type and show amounts in chips. */
 const CHIPS: AmountUnit = { per: CHIP, fmt: fmtChips, short: '', name: 'chips' };
 
-/** When balances refill, in the viewer's own time, e.g. "7:00 PM". */
-const refillTime = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** A time in the viewer's own clock, e.g. "7:00 PM". */
+const localTime = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-function BankLine({ bank }: { bank: Bankroll | null }) {
+/**
+ * Your chips and the daily claim. The button only asks: the server picks the amount and allows one
+ * claim per UTC day for this browser's player key, and a repeat request cannot pay twice.
+ */
+function Wallet({ bank, onBank, compact = false }: { bank: Bankroll | null; onBank: (b: Bankroll) => void; compact?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [got, setGot] = useState<number | null>(null);
+  // a new day while the page is open: ask the server again when the next claim opens
+  const reopensAt = bank?.claimedToday ? bank.nextClaimAt : null;
+  useEffect(() => {
+    if (reopensAt === null) return;
+    const t = setTimeout(() => {
+      setGot(null);
+      fetchBankroll().then((b) => b && onBank(b));
+    }, Math.max(1000, reopensAt - Date.now() + 1000));
+    return () => clearTimeout(t);
+  }, [reopensAt, onBank]);
   if (!bank) return null;
+  const claim = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await claimDailyChips();
+      onBank(r);
+      setGot(r.amount);
+      trackOnce(`claim:${r.claim?.day}`, 'Daily Chips Claimed');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not claim your chips. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resetNote = `Resets at midnight UTC (${localTime(bank.claimedToday ? bank.nextClaimAt : nextUtcMidnight(Date.now()))} your time).`;
   return (
-    <p className="live-bank">
-      <span>
+    <section className={`live-wallet ${compact ? 'compact' : ''}`} aria-label="Your chips">
+      <p className="live-bank">
         Your chips: <strong>{fmtChips(bank.balance)}</strong>
-      </span>
-      <span className="note">
-        Topped up to {fmtChips(DAILY)} at {refillTime(bank.refillsAt)} each day
-      </span>
-    </p>
+      </p>
+      {bank.claimedToday === undefined ? null : bank.claimedToday ? (
+        <div className="daily">
+          <button className="btn" disabled>
+            Claimed today
+          </button>
+          <p className="note" role="status">
+            {got !== null && got > 0 ? (
+              <span className="daily-got">+{fmtChips(got)} chips</span>
+            ) : bank.claim?.amount ? (
+              `You claimed ${fmtChips(bank.claim.amount)} chips today.`
+            ) : (
+              'Today’s chips are already in your balance.'
+            )}{' '}
+            Next claim at {localTime(bank.nextClaimAt)} your time (midnight UTC).
+          </p>
+        </div>
+      ) : (
+        <div className="daily">
+          <button className="btn primary" onClick={claim} disabled={busy} aria-busy={busy}>
+            {busy ? 'Claiming…' : 'Claim daily chips'}
+          </button>
+          <p className="note">
+            Get {DAILY_MIN}–{DAILY_MAX} free chips each day. {resetNote}
+          </p>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -77,6 +139,25 @@ function saveName(name: string) {
     localStorage.setItem('live-name', name);
   } catch {
     /* name just isn't remembered */
+  }
+}
+
+const CHAT_OPEN_KEY = 'live-chat-open';
+const narrowScreen = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches;
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0');
+  } catch {
+    /* not remembered */
   }
 }
 
@@ -158,18 +239,18 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables. You get {fmtChips(DAILY)} chips a day. Each table has a minimum and maximum buy-in, and you choose how much
-            to bring; your stack comes back to you when you leave. Run out, and you are done until tomorrow.
+            Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables. Claim {DAILY_MIN}–{DAILY_MAX} free chips each day.
+            Each table has a minimum and maximum buy-in, and you choose how much to bring; your stack comes back to you when you leave.
           </p>
         </div>
       </header>
       {!PARTY_HOST && <NotConfigured />}
-      <BankLine bank={bank} />
+      <Wallet bank={bank} onBank={setBank} />
       <section className="live-card live-public" aria-labelledby="pub-title">
         <h2 id="pub-title">Public tables</h2>
         <p className="note">
-          Open to anyone, and you never wait for a game: when you sit down, bots (marked <span className="bot-tag inline">Bot</span>) fill the empty seats and
-          the first hand starts in a few seconds.
+          Open to anyone, and you never wait for a game: when you sit down, bots (named Bot 1, Bot 2 and so on) fill the empty seats and the first hand starts in a
+          few seconds.
         </p>
         <p className="note">
           <strong>You can always take a bot’s seat.</strong> People come first: if every seat is taken, press <em>Take seat from…</em> under the table, and
@@ -288,7 +369,7 @@ export function PlayTablePage() {
   const { room = '' } = useParams();
   const nav = useNavigate();
   const { data } = useStore();
-  const { view, bank, error, status, offset, sit, leave, act } = useLiveTable(room);
+  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat } = useLiveTable(room);
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
   // buy-in choice, in whole chips: from the table minimum up to its maximum or what you have, whichever is less
@@ -384,6 +465,25 @@ export function PlayTablePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, dealing, sent, pre]);
 
+  // chat: open beside the table (desktop) or as a drawer (phones); it starts closed, and on a phone
+  // it gets out of the way when it is your turn (your draft is kept)
+  const [chatOpen, setChatOpenState] = useState(() => !narrowScreen() && readFlag(CHAT_OPEN_KEY));
+  const setChatOpen = (open: boolean) => {
+    setChatOpenState(open);
+    if (!narrowScreen()) writeFlag(CHAT_OPEN_KEY, open);
+  };
+  useEffect(() => {
+    if (myTurn && !dealing && narrowScreen()) setChatOpenState(false);
+  }, [myTurn, dealing]);
+  const { muted, toggle: toggleMute } = useMutes();
+  const lastId = Math.max(0, ...(chat ?? []).map((l) => l.id));
+  const [seenId, setSeenId] = useState(0);
+  useEffect(() => {
+    if (chatOpen) setSeenId(lastId);
+  }, [chatOpen, lastId]);
+  useEffect(() => setSeenId(0), [room]);
+  const unread = (chat ?? []).filter((l) => l.kind === 'player' && !l.state && l.id > seenId && l.from !== view?.you && !muted.has(l.from ?? '')).length;
+
   const invite = `${location.origin}/play/${room}`;
   const copy = async () => {
     try {
@@ -416,6 +516,7 @@ export function PlayTablePage() {
     );
 
   const toActName = live ? h!.players[h!.toAct]?.name : '';
+  const others = (view?.seats ?? []).filter((s) => !s.bot && s.id !== view?.you).map((s) => ({ id: s.id, name: s.name }));
   const botToAct = live && isBotId(view?.handIds[h!.toAct] ?? '');
   const botTable = (view?.botSeats ?? 0) > 0;
   const results = h?.complete && h.result ? resultLines(h, me) : [];
@@ -452,6 +553,7 @@ export function PlayTablePage() {
         bot: s.bot,
       })),
     isBot: (i) => isBotId(handIds[i] ?? ''),
+    isAway: (i) => !!view?.seats.find((s) => s.id === handIds[i])?.away,
   };
   // the seat you clicked may be a bot's, which you can have; a person's (or one someone is waiting for) you cannot
   const picked = picking === null ? undefined : holder(picking);
@@ -475,6 +577,16 @@ export function PlayTablePage() {
           </div>
         </div>
         <div className="ph-side live-invite">
+          {chat && (
+            <button className={`btn live-chat-btn ${chatOpen ? 'on' : ''}`} aria-expanded={chatOpen} aria-controls="table-chat" onClick={() => setChatOpen(!chatOpen)}>
+              Chat
+              {unread > 0 && !chatOpen && (
+                <span className="chat-badge" aria-label={`${unread} unread`}>
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+          )}
           <button className="btn" onClick={copy}>
             {copied ? (
               'Copied'
@@ -539,113 +651,141 @@ export function PlayTablePage() {
           Connecting to the table…
         </div>
       ) : (
-        <div className="practice-body">
-          <Table
-            state={h ?? emptyHand(stakes)}
-            hero={me}
-            profiles={{}}
-            fourColor={data.prefs.fourColor}
-            showNames
-            handKey={view.handNo}
-            live
-            turnEndsAt={view.turnEndsAt === null || dealing || botToAct ? null : view.turnEndsAt - offset}
-            turnMs={TURN_MS}
-            money={fmtChips}
-            seating={seating}
-          />
-          <p className="live-status" aria-live="polite">
-            {live && dealing
-              ? 'Dealing…'
-              : live
-                ? myTurn
-                  ? `Your turn · ${turnLeft ?? ''}s`
-                  : botToAct
-                    ? `${toActName} (bot) is thinking…`
-                    : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
-                : results.map((line) => (
-                    <span key={line} className="live-result">
-                      {line}
-                    </span>
+        <div className={`live-layout ${chatOpen ? 'chat-open' : ''}`}>
+          <div className="practice-body">
+            <Table
+              state={h ?? emptyHand(stakes)}
+              hero={me}
+              profiles={{}}
+              fourColor={data.prefs.fourColor}
+              showNames
+              handKey={view.handNo}
+              live
+              turnEndsAt={view.turnEndsAt === null || dealing || botToAct ? null : view.turnEndsAt - offset}
+              turnMs={TURN_MS}
+              money={fmtChips}
+              seating={seating}
+            />
+            <p className="live-status" aria-live="polite">
+              {live && dealing
+                ? 'Dealing…'
+                : live
+                  ? myTurn
+                    ? `Your turn · ${turnLeft ?? ''}s`
+                    : botToAct
+                      ? `${toActName} is thinking…`
+                      : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
+                  : results.map((line) => (
+                      <span key={line} className="live-result">
+                        {line}
+                      </span>
+                    ))}
+              {!live && dealIn !== null && <span className="live-next">{h ? 'Next hand' : 'First hand'} in {dealIn}s</span>}
+              {!live && ready < 2 && !waiting && (
+                <span className="live-next">
+                  {mySeat
+                    ? 'Waiting for another player. The first hand starts as soon as someone sits down.'
+                    : seating.open.length
+                      ? botTable
+                        ? 'Pick an open seat to play. Bots fill the other seats, so the first hand starts in a few seconds.'
+                        : 'Pick an open seat to play.'
+                      : 'The table is full.'}
+                </span>
+              )}
+              {!mySeat && !waiting && (live || (ready >= 2 && dealIn !== null)) && (
+                <span className="live-next">
+                  {seating.open.length
+                    ? 'You are watching. Pick an open seat to join the next hand.'
+                    : botSeatsFree.length
+                      ? 'You are watching. Every seat is taken, but you can take a bot’s seat below.'
+                      : 'You are watching. The table is full.'}
+                </span>
+              )}
+            </p>
+            {botSeatsFree.length > 0 && (
+              <div className="live-takeover" role="group" aria-label="Take a bot’s seat">
+                {botSeatsFree.map((s) => (
+                  <button key={s.seat} className="btn small" onClick={() => setPicking(s.seat)}>
+                    Take seat {s.seat + 1} from {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {busted && (
+              <div className="note live-bust">
+                {canBuyIn ? (
+                  `You lost your stack. Pick an open seat to buy in again; you have ${fmtChips(bank?.balance ?? 0)} chips.`
+                ) : (
+                  <>
+                    <p>You lost your stack, and you do not have enough chips for this table.</p>
+                    <Wallet bank={bank} onBank={setBank} compact />
+                  </>
+                )}
+              </div>
+            )}
+            {/* your controls keep one place on the page, so nothing jumps when your turn comes */}
+            <div className={`live-controls ${myPlayer && live ? 'reserve' : ''}`}>
+              {canPre && (
+                <div className="live-pre live-dock" role="group" aria-label="Act in advance">
+                  <span className="note">While you wait:</span>
+                  {(
+                    [
+                      ['checkfold', 'Check / Fold'],
+                      ['callany', 'Call any'],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button key={k} className={`btn small ${pre === k ? 'primary' : ''}`} aria-pressed={pre === k} onClick={() => setPre(pre === k ? null : k)}>
+                      {label}
+                    </button>
                   ))}
-            {!live && dealIn !== null && <span className="live-next">{h ? 'Next hand' : 'First hand'} in {dealIn}s</span>}
-            {!live && ready < 2 && !waiting && (
-              <span className="live-next">
-                {mySeat
-                  ? 'Waiting for another player. The first hand starts as soon as someone sits down.'
-                  : seating.open.length
-                    ? botTable
-                      ? 'Pick an open seat to play. Bots fill the other seats, so the first hand starts in a few seconds.'
-                      : 'Pick an open seat to play.'
-                    : 'The table is full.'}
-              </span>
-            )}
-            {!mySeat && !waiting && (live || (ready >= 2 && dealIn !== null)) && (
-              <span className="live-next">
-                {seating.open.length
-                  ? 'You are watching. Pick an open seat to join the next hand.'
-                  : botSeatsFree.length
-                    ? 'You are watching. Every seat is taken, but you can take a bot’s seat below.'
-                    : 'You are watching. The table is full.'}
-              </span>
-            )}
-          </p>
-          {botSeatsFree.length > 0 && (
-            <div className="live-takeover" role="group" aria-label="Take a bot’s seat">
-              {botSeatsFree.map((s) => (
-                <button key={s.seat} className="btn small" onClick={() => setPicking(s.seat)}>
-                  Take seat {s.seat + 1} from {s.name}
-                </button>
-              ))}
+                </div>
+              )}
+              {myTurn && !dealing && (
+                <section className="decision-panel live-dock" aria-label="Your decision">
+                  <ActionBar
+                    live
+                    unit={CHIPS}
+                    state={h!}
+                    disabled={sent}
+                    onAct={(a) => {
+                      setSent(true);
+                      act(a);
+                    }}
+                  />
+                </section>
+              )}
             </div>
-          )}
-          {busted && (
-            <p className="note live-bust">
-              {canBuyIn
-                ? `You lost your stack. Pick an open seat to buy in again; you have ${fmtChips(bank?.balance ?? 0)} chips left today.`
-                : `You lost your stack, and that is your chips for today. More at ${bank ? refillTime(bank.refillsAt) : 'midnight'}.`}
-            </p>
-          )}
-          {canPre && (
-            <div className="live-pre live-dock" role="group" aria-label="Act in advance">
-              <span className="note">While you wait:</span>
-              {(
-                [
-                  ['checkfold', 'Check / Fold'],
-                  ['callany', 'Call any'],
-                ] as const
-              ).map(([k, label]) => (
-                <button key={k} className={`btn small ${pre === k ? 'primary' : ''}`} aria-pressed={pre === k} onClick={() => setPre(pre === k ? null : k)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          {myTurn && !dealing && (
-            <section className="decision-panel live-dock" aria-label="Your decision">
-              <DecisionFacts state={h!} hero={me} money={fmtChips} />
-              <ActionBar
-                unit={CHIPS}
-                state={h!}
-                disabled={sent}
-                onAct={(a) => {
-                  setSent(true);
-                  act(a);
-                }}
-              />
-            </section>
-          )}
-          {botTable && (
-            <p className="note live-bots-note">
-              <span className="bot-tag inline">Bot</span> seats are computer players using the practice styles (TAG, Nit, Station and others). They join only while
-              someone is playing, see only their own cards, and give their seats to people between hands. Their chips are their own, never anyone’s bank.
-            </p>
-          )}
-          {h && (
+            {h && (
+              <details className="more live-history">
+                <summary>Hand history</summary>
+                <HistoryList state={h} hero={me} showNames money={fmtChips} />
+              </details>
+            )}
             <details className="more live-history">
-              <summary>Hand history</summary>
-              <HistoryList state={h} hero={me} showNames money={fmtChips} />
+              <summary>About this table</summary>
+              <p className="note">
+                No-Limit Hold’em, blinds {stakes.label}. Buy in for {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} chips from your bank; your stack goes back when you
+                leave. You have {TURN_MS / 1000} seconds to act.
+              </p>
+              {botTable && (
+                <p className="note">
+                  Seats named Bot 1, Bot 2 and so on are played by the computer. Bots join only while someone is playing, see only their own cards, and give their
+                  seats to people between hands. Their chips are their own, never anyone’s bank.
+                </p>
+              )}
             </details>
-          )}
+          </div>
+          <LiveChat
+            id="table-chat"
+            open={chatOpen}
+            lines={chat}
+            me={view.you}
+            people={others}
+            muted={muted}
+            onToggleMute={toggleMute}
+            onSend={sendChat}
+            onClose={() => setChatOpen(false)}
+          />
         </div>
       )}
 
@@ -666,9 +806,9 @@ export function PlayTablePage() {
             ) : !canBuyIn ? (
               <>
                 <p>
-                  You are out of chips for today: this table needs at least {fmtChips(buyIn.min)} and you have {fmtChips(bank!.balance)}. You get topped up to {fmtChips(DAILY)} at{' '}
-                  {refillTime(bank!.refillsAt)}.
+                  This table needs at least {fmtChips(buyIn.min)} chips and you have {fmtChips(bank!.balance)}.
                 </p>
+                <Wallet bank={bank} onBank={setBank} compact />
                 <button className="btn" onClick={() => setPicking(null)}>
                   Back to the table
                 </button>

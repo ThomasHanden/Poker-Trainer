@@ -5,7 +5,9 @@
 import { fullDeck } from '../engine/cards';
 import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
 import type { ProfileId } from '../opponents/profiles';
-import { BOT_BUY_IN_BB, BOT_PREFIX, BOT_STYLES, BOT_THINK_MS, botStyleName, botView, practicePolicy, type BotPolicy } from './bots';
+import { BOT_BUY_IN_BB, BOT_PREFIX, BOT_STYLES, BOT_THINK_MS, botName, botView, practicePolicy, type BotPolicy } from './bots';
+import type { BankStatus } from './bank';
+import type { ChatClientMessage, ChatServerMessage } from './chat';
 
 /**
  * Live tables count in half-chips so 0.5/1 blinds are whole numbers for the engine: every amount
@@ -81,7 +83,8 @@ export type ClientMessage =
   /** stop waiting for a bot's seat (the buy-in goes back to the bank) */
   | { type: 'cancel' }
   | { type: 'start' }
-  | { type: 'action'; action: PlayerAction };
+  | { type: 'action'; action: PlayerAction }
+  | ChatClientMessage;
 
 export interface SeatView {
   id: string;
@@ -95,8 +98,8 @@ export interface SeatView {
   leaving: boolean;
   /** dealt into the current hand */
   playing: boolean;
-  /** a bot's style, e.g. "TAG", or null for a person */
-  bot: string | null;
+  /** played by the server (named "Bot 3" and so on); how a bot plays is never sent */
+  bot: boolean;
   /** a bot whose seat someone is waiting to take when this hand ends */
   reserved: boolean;
 }
@@ -130,8 +133,9 @@ export interface TableView {
 export type ServerMessage =
   | TableView
   | { type: 'error'; message: string }
-  /** the viewer's chips away from the table, and when they next refill */
-  | { type: 'bank'; balance: number; refillsAt: number };
+  /** the viewer's chips away from the table and their daily claim */
+  | ({ type: 'bank' } & BankStatus)
+  | ChatServerMessage;
 
 /** What the lobby shows for a table. */
 export interface TableSummary {
@@ -177,9 +181,10 @@ function cleanAction(a: unknown): PlayerAction | null {
   return to === undefined ? { type: type as PlayerAction['type'] } : { type: type as PlayerAction['type'], to: to as number };
 }
 
+/** A player's table name. Names starting with the word "bot" belong to bots, so nobody can pass for one (or pass a bot off as a person). */
 export function cleanName(raw: unknown): string {
   const s = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX).trim() : '';
-  return s || 'Player';
+  return s && !/^bot\b/i.test(s) ? s : 'Player';
 }
 
 // The app's seeded RNG is repeatable by design, so it is predictable; real deals use crypto.
@@ -250,6 +255,12 @@ export class LiveTable {
 
   isSeated(id: string): boolean {
     return !!this.seatOf(id);
+  }
+
+  /** A seated person's table name (for chat), or undefined. */
+  personName(id: string): string | undefined {
+    const s = this.seatOf(id);
+    return s && !s.bot ? s.name : undefined;
   }
 
   /** The bot's seat this person is waiting for, if any. */
@@ -493,7 +504,7 @@ export class LiveTable {
         away: s.offlineSince !== null,
         leaving: s.leaving,
         playing: this.inHand() && this.order.includes(s.id),
-        bot: s.bot ? botStyleName(s.bot) : null,
+        bot: !!s.bot,
         reserved: !!s.reservedBy,
       })),
       maxSeats: MAX_SEATS,
@@ -662,7 +673,7 @@ export class LiveTable {
     this.seats.push({
       id: `${BOT_PREFIX}${++this.botsMade}`,
       seat,
-      name: botStyleName(style),
+      name: botName(seat),
       stack: BOT_BUY_IN_BB * this.stakes.bb,
       leaving: false,
       offlineSince: null,

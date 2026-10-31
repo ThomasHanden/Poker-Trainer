@@ -11,8 +11,8 @@ export const BOT_STYLES: ProfileId[] = ['tag', 'nit', 'station', 'lag', 'overfol
 /** Bot ids start with this; player ids are hex hashes, so the two can never collide. */
 export const BOT_PREFIX = 'bot-';
 export const isBotId = (id: string) => id.startsWith(BOT_PREFIX);
-/** Short style name shown with the Bot label, e.g. "TAG". */
-export const botStyleName = (style: ProfileId) => PROFILES[style].short;
+/** Bots are named for their seat ("Bot 3"). Their style stays on the server: players see a bot, not how it plays. */
+export const botName = (seat: number) => `Bot ${seat + 1}`;
 /** Bots buy in for 100 big blinds; their chips are made for the table and never reach anyone's bank. */
 export const BOT_BUY_IN_BB = 100;
 

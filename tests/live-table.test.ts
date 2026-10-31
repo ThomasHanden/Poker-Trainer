@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LiveTable, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, checkBuyIn, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
-import { DAILY, refresh, withdraw, deposit, nextRefill, playerId } from '../src/multiplayer/bank';
+import { withdraw, deposit, playerId } from '../src/multiplayer/bank';
 import { totalChips } from '../src/engine/rules';
 
 /** a full 0.5/1 buy-in: 100 big blinds */
@@ -93,6 +93,10 @@ describe('live table: dealing and privacy', () => {
     expect(t.seats[0].name).toBe('a very long');
     expect(t.seats[0].stack).toBe(START_STACK); // renaming does not buy in again
     expect(cleanName(42)).toBe('Player');
+    // names starting with the word "bot" are kept for bots, so a person cannot pass for one
+    expect(cleanName('Bot 3')).toBe('Player');
+    expect(cleanName('bot')).toBe('Player');
+    expect(cleanName('Botond')).toBe('Botond');
     expect(t.sit('new', 'x')).toMatch(/full|chips/);
   });
 });
@@ -378,25 +382,13 @@ describe('chips and buy-ins', () => {
   });
 });
 
-describe('daily bank', () => {
-  it('starts everyone with the daily amount and tops it up each day, keeping winnings', () => {
-    const a = refresh(undefined, '2026-10-30');
-    expect(a.balance).toBe(DAILY);
-    expect(refresh({ balance: 50, day: '2026-10-30' }, '2026-10-30').balance).toBe(50); // same day: no top-up
-    expect(refresh({ balance: 50, day: '2026-10-30' }, '2026-10-31').balance).toBe(DAILY);
-    expect(refresh({ balance: DAILY * 3, day: '2026-10-30' }, '2026-10-31').balance).toBe(DAILY * 3);
-  });
-
+describe('bank', () => {
   it('buys in for up to the full amount, the rest of the balance down to the minimum, or not at all', () => {
     const acc = { balance: 300, day: 'd' };
     expect(withdraw(acc, 200, 40)).toEqual({ acc: { balance: 100, day: 'd' }, amount: 200 });
     expect(withdraw({ ...acc, balance: 120 }, 200, 40).amount).toBe(120);
     expect(withdraw({ ...acc, balance: 30 }, 200, 40)).toEqual({ acc: { ...acc, balance: 30 }, amount: 0 });
     expect(deposit(acc, 55).balance).toBe(355);
-  });
-
-  it('refills at the next UTC midnight', () => {
-    expect(new Date(nextRefill(Date.UTC(2026, 9, 30, 15, 0))).toISOString()).toBe('2026-10-31T00:00:00.000Z');
   });
 
   it('identifies players by a hash of their secret key, not the key itself', async () => {
