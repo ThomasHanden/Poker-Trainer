@@ -169,7 +169,11 @@ export function PlayLobbyPage() {
         <h2 id="pub-title">Public tables</h2>
         <p className="note">
           Open to anyone, and you never wait for a game: when you sit down, bots (marked <span className="bot-tag inline">Bot</span>) fill the empty seats and
-          the first hand starts in a few seconds. Bots step aside between hands to make room for people.
+          the first hand starts in a few seconds.
+        </p>
+        <p className="note">
+          <strong>You can always take a bot’s seat.</strong> People come first: if every seat is taken, press <em>Take seat from…</em> under the table, and
+          the bot hands you its seat as soon as the hand it is playing ends.
         </p>
         <ul className="live-tables">
           {PUBLIC_TABLES.map((room) => {
