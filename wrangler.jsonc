@@ -4,6 +4,10 @@
   "name": "felt-tables",
   "main": "party/server.ts",
   "compatibility_date": "2026-10-01",
+  "vars": {
+    // public tables: bots fill open seats up to this many players while someone is seated (0 = no bots)
+    "BOT_SEATS": "4"
+  },
   "durable_objects": {
     "bindings": [
       { "name": "PokerTable", "class_name": "PokerTable" },

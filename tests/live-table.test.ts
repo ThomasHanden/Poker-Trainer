@@ -281,7 +281,7 @@ describe('public tables', () => {
     expect(t.nextHandAt).not.toBeNull();
     runTimer(t, clock);
     expect(t.inHand()).toBe(true);
-    expect(t.summary()).toEqual({ players: 2, maxSeats: MAX_SEATS, playing: true });
+    expect(t.summary()).toEqual({ players: 2, bots: 0, maxSeats: MAX_SEATS, playing: true });
   });
 
   it('can be set to wait for someone to press Deal instead', () => {

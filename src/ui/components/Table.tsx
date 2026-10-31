@@ -131,8 +131,10 @@ export interface Seating {
   slotOf: (i: number) => number;
   /** empty seats; onSit makes them a "Sit here" button */
   open: { slot: number; onSit?: () => void }[];
-  /** seated but not in the hand shown */
-  idle: { slot: number; name: string; stack: number; you: boolean; note: string }[];
+  /** seated but not in the hand shown; bot is a bot's style, or null for a person */
+  idle: { slot: number; name: string; stack: number; you: boolean; note: string; bot: string | null }[];
+  /** whether a hand.players index is a bot, labelled Bot on its seat */
+  isBot: (i: number) => boolean;
 }
 
 
@@ -254,6 +256,7 @@ export function Table({
           const faceUp = p.hole.length === 2 && show;
           // dealt face up (yours) or face down, then flipped when shown at showdown
           const anim = faceUp && !p.isHero ? 'reveal' : 'deal';
+          const bot = !!seating?.isBot(i);
           const cards = p.folded ? null : (
             <div key={`${deal}-${faceUp ? 'up' : 'down'}`} className={`seat-cards ${p.isHero ? 'big' : ''} ${faceUp ? '' : 'backs'} ${anim}`}>
               {[0, 1].map((r) => (
@@ -272,7 +275,7 @@ export function Table({
               <div
                 className={`seat ${p.folded ? 'folded' : ''} ${isTurn ? 'acting' : ''} ${p.isHero ? 'hero' : ''} ${g.low ? 'low' : 'high'} ${winners.has(i) ? 'winner' : ''}`}
                 style={g.seat}
-                aria-label={`${p.isHero ? 'You' : p.position}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmt(p.stack)}`}
+                aria-label={`${p.isHero ? 'You' : p.position}${bot ? `, ${p.name}, a bot` : ''}${p.folded ? ', folded' : ''}${p.allIn ? ', all-in' : ''}, stack ${fmt(p.stack)}`}
               >
                 {g.low && cards}
                 <div className="plate">
@@ -284,6 +287,7 @@ export function Table({
                   <span className="plate-pos">
                     {p.position}
                     {p.isHero ? ' · You' : showNames ? <span className="plate-name"> · {p.name}</span> : prof && !p.folded ? <span className="plate-prof"> · {PROFILES[prof].short}</span> : null}
+                    {bot && <BotTag />}
                   </span>
                   <span className="plate-stack">{p.allIn && !state.complete ? 'All-in' : fmt(p.stack)}</span>
                   {isTurn && timer && (
@@ -329,10 +333,11 @@ export function Table({
         {seating?.idle.map((s) => {
           const g = geoAt(slotT(s.slot), s.you);
           return (
-            <div key={`idle-${s.slot}`} className={`seat idle ${s.you ? 'hero' : ''} ${g.low ? 'low' : 'high'}`} style={g.seat}>
+            <div key={`idle-${s.slot}`} className={`seat idle ${s.you ? 'hero' : ''} ${g.low ? 'low' : 'high'}`} style={g.seat} aria-label={s.bot ? `${s.name}, a bot` : undefined}>
               <div className="plate">
                 <span className="plate-pos">
                   {s.you ? 'You' : <span className="plate-name">{s.name}</span>}
+                  {s.bot && <BotTag />}
                 </span>
                 <span className="plate-stack">{fmt(s.stack)}</span>
               </div>
@@ -360,6 +365,15 @@ export function Table({
         })}
       </div>
     </div>
+  );
+}
+
+/** Marks a seat played by the computer on live tables. */
+function BotTag() {
+  return (
+    <span className="bot-tag" title="A computer player">
+      Bot
+    </span>
   );
 }
 

@@ -5,10 +5,22 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { Server, routePartykitRequest, type Connection, type ConnectionContext, type WSMessage } from 'partyserver';
-import { LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, stakesFor } from '../src/multiplayer/table';
+import { BOT_SEATS, LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
 import { KEY_PATTERN, deposit, nextRefill, playerId, refresh, utcDay, withdraw, type Account } from '../src/multiplayer/bank';
 
-type Env = { PokerTable: DurableObjectNamespace<PokerTable>; Bank: DurableObjectNamespace<Bank> };
+type Env = {
+  PokerTable: DurableObjectNamespace<PokerTable>;
+  Bank: DurableObjectNamespace<Bank>;
+  /** wrangler.jsonc vars: how many seats bots fill at public tables (0 turns bots off) */
+  BOT_SEATS?: string;
+};
+
+/** Bots only sit at public tables, filling up to BOT_SEATS players. */
+function botSeatsFor(room: string, env: Env): number {
+  if (!isPublicTable(room)) return 0;
+  const n = Number(env.BOT_SEATS ?? BOT_SEATS);
+  return Number.isInteger(n) && n >= 0 && n <= MAX_SEATS ? n : BOT_SEATS;
+}
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };
 
@@ -40,12 +52,14 @@ const bankOf = (env: Env) => env.Bank.get(env.Bank.idFromName('bank'));
 export class PokerTable extends Server<Env> {
   table = new LiveTable();
   timer: ReturnType<typeof setTimeout> | null = null;
+  /** players whose buy-in is on its way from the bank, so a double click cannot buy in twice */
+  buyingIn = new Set<string>();
 
   async onStart() {
-    // every table deals by itself once two players are sitting
-    this.table = new LiveTable({ stakes: stakesFor(this.name) });
+    // every table deals by itself once two players are sitting (or one person, and bots, at a public table)
+    this.table = new LiveTable({ stakes: stakesFor(this.name), botSeats: botSeatsFor(this.name, this.env) });
     // The game lives in memory, so a restart (a deploy, or Cloudflare moving the table) loses it.
-    // Give everyone who was seated their chips back; an unfinished hand is called off.
+    // Give everyone who was seated (or waiting for a bot's seat) their chips back; an unfinished hand is called off.
     const saved = await this.ctx.storage.get<{ id: string; stack: number }[]>('seats');
     if (saved?.length) {
       for (const s of saved) await bankOf(this.env).deposit(s.id, s.stack);
@@ -96,26 +110,35 @@ export class PokerTable extends Server<Env> {
     await this.update();
   }
 
-  /** Buy in from the bank for the amount chosen and sit in the chosen seat (or, already seated, just stay). */
+  /**
+   * Buy in from the bank for the amount chosen and sit in the chosen seat, or wait for it if a bot is
+   * playing a hand there (or, already seated or waiting, just stay).
+   */
   async sit(pid: string, rawName: unknown, rawSeat: unknown, rawBuyIn: unknown): Promise<string | null> {
     const name = cleanName(rawName);
-    if (this.table.isSeated(pid)) return this.table.sit(pid, name);
-    if (this.table.seats.length >= MAX_SEATS) return 'The table is full';
+    if (this.table.isSeated(pid) || this.table.reservationOf(pid)) return this.table.sit(pid, name);
+    if (this.buyingIn.has(pid)) return null; // the first request is still at the bank
     const seatProblem = this.table.seatProblem(rawSeat);
     if (seatProblem) return seatProblem;
     const { min, max } = buyInFor(this.table.stakes);
     const want = checkBuyIn(this.table.stakes, rawBuyIn);
     if (want === null) return `Buy in for between ${fmtChips(min)} and ${fmtChips(max)} chips.`;
     const bank = bankOf(this.env);
-    const amount = await bank.withdraw(pid, want, want);
-    if (!amount) {
+    this.buyingIn.add(pid);
+    try {
+      const amount = await bank.withdraw(pid, want, want);
+      if (!amount) {
+        await this.sendBank(pid);
+        return `You do not have ${fmtChips(want)} chips. You get more at midnight (UTC).`;
+      }
+      // other messages can arrive while we wait for the bank, so the table checks the seat again
+      const err = this.table.sit(pid, name, amount, rawSeat as number);
+      if (err) await bank.deposit(pid, amount); // the seat went while we were at the bank
       await this.sendBank(pid);
-      return `You do not have ${fmtChips(want)} chips. You get more at midnight (UTC).`;
+      return err;
+    } finally {
+      this.buyingIn.delete(pid);
     }
-    const err = this.table.sit(pid, name, amount, rawSeat as number);
-    if (err) await bank.deposit(pid, amount); // the seat went while we were at the bank
-    await this.sendBank(pid);
-    return err;
   }
 
   async sendBank(pid: string) {
@@ -141,9 +164,10 @@ export class PokerTable extends Server<Env> {
     }
     const outs = this.table.takeCashouts();
     for (const c of outs) await bankOf(this.env).deposit(c.id, c.amount);
+    // what the table holds for people, paid back if it restarts (bots' chips are nobody's)
     await this.ctx.storage.put(
       'seats',
-      this.table.seats.map((s) => ({ id: s.id, stack: s.stack })),
+      this.table.heldChips().map((c) => ({ id: c.id, stack: c.amount })),
     );
     for (const pid of new Set(outs.map((c) => c.id))) await this.sendBank(pid);
   }

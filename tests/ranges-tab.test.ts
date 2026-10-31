@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_CHARTS, allChartsIncludingComputed, chartPlayRange, chartTotals, getChart, reachWeight } from '../src/ranges/presets';
 import { ALL_CLASSES, comboCount, combosOf, expandRange, parseRange } from '../src/ranges/hands';
-import { solvePushFold, PUSHFOLD_STACKS } from '../src/ranges/pushfold';
+import { solvePushFold, computePushFold, PUSHFOLD_STACKS } from '../src/ranges/pushfold';
 import { classEquity, compatiblePairs } from '../src/ranges/preflopEquity';
 import { explainPreflopHand } from '../src/scenarios/templates/helpers';
 import { EQUITY_EXAMPLES } from '../src/ranges/equityExamples';
@@ -124,6 +124,16 @@ describe('push/fold model', () => {
         }
         expect(gain / 1326).toBeLessThan(0.01);
       });
+
+  it('the generated table (src/data/pushfold.json) matches the solver; rerun npm run gen:pushfold if not', () => {
+    for (const ante of [0, 1])
+      for (const S of PUSHFOLD_STACKS) {
+        const fresh = computePushFold(S, ante);
+        const sol = solvePushFold(S, ante);
+        expect(sol.shove, `${S}bb ante ${ante} shove`).toEqual(fresh.shove);
+        expect(sol.call, `${S}bb ante ${ante} call`).toEqual(fresh.call);
+      }
+  });
 
   it('an ante makes both players looser, and deeper stacks make them tighter', () => {
     for (const S of PUSHFOLD_STACKS) {

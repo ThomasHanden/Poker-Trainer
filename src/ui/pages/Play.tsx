@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useEffect, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Table, DecisionFacts, HistoryList, dealMs, type Seating } from '../components/Table';
@@ -15,12 +15,15 @@ import {
   TURN_MS,
   buyInFor,
   fmtChips,
+  isPublicTable,
   stakesFor,
   tableLabel,
   type Stakes,
   type TableSummary,
 } from '../../multiplayer/table';
 import { DAILY } from '../../multiplayer/bank';
+import { isBotId } from '../../multiplayer/bots';
+import { track, trackFirst, trackOnce, waitBucket } from '../analytics';
 import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
 import { describeScore } from '../../engine/evaluator';
 
@@ -85,6 +88,16 @@ function NotConfigured() {
   );
 }
 
+/** "1 player · 3 bots · in a hand". Bots are counted separately, never as players. */
+function occupancy(s: TableSummary): string {
+  const bots = s.bots ?? 0; // table servers from before bots leave it out
+  if (!s.players && !bots) return 'empty';
+  const parts = [`${s.players} ${s.players === 1 ? 'player' : 'players'}`];
+  if (bots) parts.push(`${bots} ${bots === 1 ? 'bot' : 'bots'}`);
+  if (s.playing) parts.push('in a hand');
+  return parts.join(' · ');
+}
+
 /** How full each public table is, refreshed while the lobby is open and visible. */
 function usePublicTables(): Record<string, TableSummary | null | undefined> {
   const [info, setInfo] = useState<Record<string, TableSummary | null>>({});
@@ -145,7 +158,7 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money No-Limit Hold’em against real people. You get {fmtChips(DAILY)} chips a day. Each table has a minimum and maximum buy-in, and you choose how much
+            Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables. You get {fmtChips(DAILY)} chips a day. Each table has a minimum and maximum buy-in, and you choose how much
             to bring; your stack comes back to you when you leave. Run out, and you are done until tomorrow.
           </p>
         </div>
@@ -154,7 +167,10 @@ export function PlayLobbyPage() {
       <BankLine bank={bank} />
       <section className="live-card live-public" aria-labelledby="pub-title">
         <h2 id="pub-title">Public tables</h2>
-        <p className="note">Open to anyone. Hands start on their own once two players sit down.</p>
+        <p className="note">
+          Open to anyone, and you never wait for a game: when you sit down, bots (marked <span className="bot-tag inline">Bot</span>) fill the empty seats and
+          the first hand starts in a few seconds. Bots step aside between hands to make room for people.
+        </p>
         <ul className="live-tables">
           {PUBLIC_TABLES.map((room) => {
             const s = tables[room];
@@ -164,7 +180,7 @@ export function PlayLobbyPage() {
               <li key={room}>
                 <span className="lt-name">{tableLabel(room)}</span>
                 <span className="lt-count note">
-                  Buy-in {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : `${s.players}/${s.maxSeats} seated${s.playing ? ' · in a hand' : ''}`}
+                  Buy-in {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : occupancy(s)}
                 </span>
                 <Link className={`btn small ${full ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${full ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
                   {full ? 'Watch' : 'Join'}
@@ -281,9 +297,11 @@ export function PlayTablePage() {
   const [name, setName] = useState(loadName);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const kind = isPublicTable(room) ? 'public' : 'private';
 
   const h = view?.hand ?? null;
   const me = view?.me ?? -1;
+  const holder = (slot: number) => view?.seats.find((s) => s.seat === slot);
   const mySeat = view?.seats.find((s) => s.id === view.you);
   const live = !!h && !h.complete;
   const myTurn = live && me >= 0 && h!.toAct === me;
@@ -291,15 +309,39 @@ export function PlayTablePage() {
   const dealIn = useSecondsUntil(view?.nextHandAt ?? null, offset);
   const ready = view ? view.seats.filter((s) => !s.away && !s.leaving).length : 0;
 
-  // the seat you clicked: the buy-in window is open for it until you sit down or cancel
+  // the seat you clicked: the buy-in window is open for it until you sit down (or start waiting) or cancel
   const [picking, setPicking] = useState<number | null>(null);
   const seated = !!mySeat;
+  const waiting = view?.waiting ?? null;
   useEffect(() => {
-    if (seated) {
+    if (seated || waiting) {
       setPicking(null);
       rememberTable(room);
     }
-  }, [seated, room]);
+  }, [seated, waiting, room]);
+
+  // analytics: only for seats asked for on this page, so a reload does not count again
+  const asked = useRef<{ at: number; bot: boolean } | null>(null);
+  const dealtAfterAsking = useRef(false);
+  useEffect(() => trackOnce(`open:${room}`, 'Live Table Opened', { table: kind }), [room, kind]);
+  useEffect(() => {
+    if (!seated || !asked.current) return;
+    track('Seat Assigned', { table: kind, via: asked.current.bot ? 'bot seat' : 'open seat' });
+    if (asked.current.bot) track('Bot Seat Replacement Completed', { table: kind, wait: waitBucket(Date.now() - asked.current.at) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seated]);
+  const dealtIn = !!view?.hand && !view.hand.complete && view.me >= 0;
+  useEffect(() => {
+    if (!dealtIn || !asked.current || dealtAfterAsking.current) return;
+    dealtAfterAsking.current = true;
+    track('First Live Hand Dealt', { table: kind, wait: waitBucket(Date.now() - asked.current.at) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealtIn]);
+  const finishedMine = !!view?.hand?.complete && view.me >= 0;
+  useEffect(() => {
+    if (finishedMine) trackFirst('First Live Hand Completed', { table: kind });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishedMine]);
   useEffect(() => {
     if (picking === null) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPicking(null);
@@ -353,6 +395,11 @@ export function PlayTablePage() {
     e.preventDefault();
     if (!buyValid || picking === null) return;
     saveName(name.trim());
+    const bot = !!holder(picking)?.bot;
+    if (!asked.current) {
+      asked.current = { at: Date.now(), bot };
+      track('Seat Requested', { table: kind, seat: bot ? 'bot seat' : 'open seat' });
+    }
     sit(name, picking, (buyChips as number) * CHIP);
   };
 
@@ -365,6 +412,8 @@ export function PlayTablePage() {
     );
 
   const toActName = live ? h!.players[h!.toAct]?.name : '';
+  const botToAct = live && isBotId(view?.handIds[h!.toAct] ?? '');
+  const botTable = (view?.botSeats ?? 0) > 0;
   const results = h?.complete && h.result ? resultLines(h, me) : [];
   const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
@@ -373,7 +422,6 @@ export function PlayTablePage() {
   const slots = view?.maxSeats ?? MAX_SEATS;
   const handSeats = view?.handSeats ?? [];
   const handIds = view?.handIds ?? [];
-  const holder = (slot: number) => view?.seats.find((s) => s.seat === slot);
   const slotOf = (i: number) => {
     const slot = handSeats[i];
     if (holder(slot)?.id === handIds[i]) return slot;
@@ -388,7 +436,7 @@ export function PlayTablePage() {
     slotOf,
     open: Array.from({ length: slots }, (_, slot) => slot)
       .filter((slot) => !used.has(slot))
-      .map((slot) => ({ slot, onSit: mySeat ? undefined : () => setPicking(slot) })),
+      .map((slot) => ({ slot, onSit: mySeat || waiting ? undefined : () => setPicking(slot) })),
     idle: (view?.seats ?? [])
       .filter((s) => !shown.has(s.id))
       .map((s) => ({
@@ -396,10 +444,18 @@ export function PlayTablePage() {
         name: s.name,
         stack: s.stack,
         you: s.id === view?.you,
-        note: s.leaving ? 'Leaving' : s.away ? 'Away' : live ? 'Next hand' : 'Waiting',
+        note: s.reserved ? 'Leaving' : s.leaving ? 'Leaving' : s.away ? 'Away' : live ? 'Next hand' : 'Waiting',
+        bot: s.bot,
       })),
+    isBot: (i) => isBotId(handIds[i] ?? ''),
   };
-  const pickedTaken = picking !== null && !!holder(picking) && !mySeat;
+  // the seat you clicked may be a bot's, which you can have; a person's (or one someone is waiting for) you cannot
+  const picked = picking === null ? undefined : holder(picking);
+  const pickedBot = picked?.bot ? picked : undefined;
+  const pickedTaken = !!picked && (!picked.bot || picked.reserved) && !mySeat && !waiting;
+  // with no open seat left, people can still take a bot's seat
+  const botSeatsFree = !mySeat && !waiting && !seating.open.length ? (view?.seats ?? []).filter((s) => s.bot && !s.reserved) : [];
+  const waitingFor = waiting ? holder(waiting.seat) : undefined;
 
   return (
     <div className={`page practice live ${(myTurn && !dealing) || canPre ? 'has-dock' : ''}`}>
@@ -428,7 +484,7 @@ export function PlayTablePage() {
           <button
             className="btn ghost"
             onClick={() => {
-              if (mySeat) leave();
+              if (mySeat || waiting) leave();
               nav('/play');
             }}
           >
@@ -450,6 +506,18 @@ export function PlayTablePage() {
       {error && picking === null && (
         <div className="banner warn" role="alert">
           {error}
+        </div>
+      )}
+
+      {waiting && (
+        <div className="banner info live-waiting" role="status">
+          <span>
+            You take seat {waiting.seat + 1}
+            {waitingFor?.bot ? ` from ${waitingFor.name} (a bot)` : ''} as soon as this hand ends. Your {fmtChips(waiting.buyIn)} chips are set aside until then.
+          </span>{' '}
+          <button className="linklike" onClick={() => leave()}>
+            Cancel
+          </button>
         </div>
       )}
 
@@ -476,7 +544,7 @@ export function PlayTablePage() {
             showNames
             handKey={view.handNo}
             live
-            turnEndsAt={view.turnEndsAt === null || dealing ? null : view.turnEndsAt - offset}
+            turnEndsAt={view.turnEndsAt === null || dealing || botToAct ? null : view.turnEndsAt - offset}
             turnMs={TURN_MS}
             money={fmtChips}
             seating={seating}
@@ -487,26 +555,45 @@ export function PlayTablePage() {
               : live
                 ? myTurn
                   ? `Your turn · ${turnLeft ?? ''}s`
-                  : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
+                  : botToAct
+                    ? `${toActName} (bot) is thinking…`
+                    : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
                 : results.map((line) => (
                     <span key={line} className="live-result">
                       {line}
                     </span>
                   ))}
             {!live && dealIn !== null && <span className="live-next">{h ? 'Next hand' : 'First hand'} in {dealIn}s</span>}
-            {!live && ready < 2 && (
+            {!live && ready < 2 && !waiting && (
               <span className="live-next">
                 {mySeat
                   ? 'Waiting for another player. The first hand starts as soon as someone sits down.'
                   : seating.open.length
-                    ? 'Pick an open seat to play.'
+                    ? botTable
+                      ? 'Pick an open seat to play. Bots fill the other seats, so the first hand starts in a few seconds.'
+                      : 'Pick an open seat to play.'
                     : 'The table is full.'}
               </span>
             )}
-            {!mySeat && (live || (ready >= 2 && dealIn !== null)) && (
-              <span className="live-next">{seating.open.length ? 'You are watching. Pick an open seat to join the next hand.' : 'You are watching. The table is full.'}</span>
+            {!mySeat && !waiting && (live || (ready >= 2 && dealIn !== null)) && (
+              <span className="live-next">
+                {seating.open.length
+                  ? 'You are watching. Pick an open seat to join the next hand.'
+                  : botSeatsFree.length
+                    ? 'You are watching. Every seat is taken, but you can take a bot’s seat below.'
+                    : 'You are watching. The table is full.'}
+              </span>
             )}
           </p>
+          {botSeatsFree.length > 0 && (
+            <div className="live-takeover" role="group" aria-label="Take a bot’s seat">
+              {botSeatsFree.map((s) => (
+                <button key={s.seat} className="btn small" onClick={() => setPicking(s.seat)}>
+                  Take seat {s.seat + 1} from {s.name}
+                </button>
+              ))}
+            </div>
+          )}
           {busted && (
             <p className="note live-bust">
               {canBuyIn
@@ -543,6 +630,12 @@ export function PlayTablePage() {
               />
             </section>
           )}
+          {botTable && (
+            <p className="note live-bots-note">
+              <span className="bot-tag inline">Bot</span> seats are computer players using the practice styles (TAG, Nit, Station and others). They join only while
+              someone is playing, see only their own cards, and give their seats to people between hands. Their chips are their own, never anyone’s bank.
+            </p>
+          )}
           {h && (
             <details className="more live-history">
               <summary>Hand history</summary>
@@ -555,7 +648,10 @@ export function PlayTablePage() {
       {picking !== null && !mySeat && (
         <div className="live-modal" role="presentation" onClick={(e) => e.target === e.currentTarget && setPicking(null)}>
           <section className="live-modal-box live-sit" role="dialog" aria-modal="true" aria-labelledby="sit-title">
-            <h2 id="sit-title">Take seat {picking + 1}</h2>
+            <h2 id="sit-title">
+              Take seat {picking + 1}
+              {pickedBot ? ` from ${pickedBot.name}` : ''}
+            </h2>
             {pickedTaken ? (
               <>
                 <p>Someone just took that seat. Pick another one.</p>
@@ -638,7 +734,15 @@ export function PlayTablePage() {
                     Cancel
                   </button>
                 </div>
-                {live && <p className="note">You will be dealt in from the next hand.</p>}
+                {pickedBot ? (
+                  <p className="note">
+                    {live
+                      ? `${pickedBot.name} is a bot. It plays out this hand with its own cards, then stands up and you sit down. Your chips are set aside until then, and you can cancel.`
+                      : `${pickedBot.name} is a bot. It stands up and you sit down straight away.`}
+                  </p>
+                ) : (
+                  live && <p className="note">You will be dealt in from the next hand.</p>
+                )}
               </form>
             )}
           </section>

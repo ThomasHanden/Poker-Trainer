@@ -4,6 +4,8 @@
 
 import { fullDeck } from '../engine/cards';
 import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
+import type { ProfileId } from '../opponents/profiles';
+import { BOT_BUY_IN_BB, BOT_PREFIX, BOT_STYLES, BOT_THINK_MS, botStyleName, botView, practicePolicy, type BotPolicy } from './bots';
 
 /**
  * Live tables count in half-chips so 0.5/1 blinds are whole numbers for the engine: every amount
@@ -31,6 +33,14 @@ export const NEXT_HAND_MS = 6_000;
 export const RECONNECT_MS = 20_000;
 /** Timed-out turns in a row before a player is stood up. */
 export const MAX_TIMEOUTS = 2;
+/**
+ * Public tables: while at least one person is seated, bots fill open seats until this many are
+ * taken. People always come first: bots stand up between hands to make room. The table server
+ * can change it with its BOT_SEATS setting.
+ */
+export const BOT_SEATS = 4;
+/** Longest anyone waits for a bot's seat before the request lapses and their buy-in goes back. */
+export const RESERVE_MS = 10 * 60_000;
 
 /** Always-open tables anyone can join from the lobby; hands deal themselves. Half play 0.5/1, half 1/2. */
 export const PUBLIC_TABLES = ['public-1', 'public-2', 'public-3', 'public-4'];
@@ -66,7 +76,10 @@ export interface Cashout {
 export type ClientMessage =
   /** seat: which seat (0 to MAX_SEATS - 1); buyIn: chips to bring, in table units (both ignored when already seated) */
   | { type: 'sit'; name: string; seat?: number; buyIn?: number }
+  /** stand up, or stop waiting for a bot's seat */
   | { type: 'leave' }
+  /** stop waiting for a bot's seat (the buy-in goes back to the bank) */
+  | { type: 'cancel' }
   | { type: 'start' }
   | { type: 'action'; action: PlayerAction };
 
@@ -82,6 +95,10 @@ export interface SeatView {
   leaving: boolean;
   /** dealt into the current hand */
   playing: boolean;
+  /** a bot's style, e.g. "TAG", or null for a person */
+  bot: string | null;
+  /** a bot whose seat someone is waiting to take when this hand ends */
+  reserved: boolean;
 }
 
 export interface TableView {
@@ -91,6 +108,10 @@ export interface TableView {
   maxSeats: number;
   /** hands deal themselves (public tables); otherwise someone presses Deal for the first hand */
   autoDeal: boolean;
+  /** bots fill open seats up to this many players while someone is seated; 0 = no bots */
+  botSeats: number;
+  /** the bot's seat the viewer is waiting to take, and the buy-in set aside for it */
+  waiting: { seat: number; buyIn: number } | null;
   stakes: Stakes;
   /** the current (or last finished) hand, with the deck and other players' cards removed */
   hand: HandState | null;
@@ -114,7 +135,9 @@ export type ServerMessage =
 
 /** What the lobby shows for a table. */
 export interface TableSummary {
+  /** people only: bots are never counted here */
   players: number;
+  bots: number;
   maxSeats: number;
   playing: boolean;
 }
@@ -128,6 +151,19 @@ interface Seat {
   /** when the player's connection dropped, or null while connected */
   offlineSince: number | null;
   timeouts: number;
+  /** a bot's playing style; people have none */
+  bot?: ProfileId;
+  /** someone waiting to take this bot's seat when the current hand ends */
+  reservedBy?: Reservation;
+}
+
+/** A person waiting for a bot's seat, with their buy-in already drawn from the bank. */
+interface Reservation {
+  id: string;
+  name: string;
+  buyIn: number;
+  at: number;
+  offlineSince: number | null;
 }
 
 const ACTION_TYPES = ['fold', 'check', 'call', 'bet', 'raise', 'allin'];
@@ -162,6 +198,16 @@ export interface LiveTableOptions {
   autoDeal?: boolean;
   clock?: () => number;
   shuffleDeck?: <T>(a: T[]) => T[];
+  /** fill open seats with bots up to this many players (see BOT_SEATS); default 0, no bots */
+  botSeats?: number;
+  /** what bots do; tests swap it to check what bots are shown */
+  botPolicy?: BotPolicy;
+  /** a number in [0, 1) for bot choices and thinking time */
+  random?: () => number;
+}
+
+function cryptoRandom(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
 }
 
 export class LiveTable {
@@ -172,8 +218,11 @@ export class LiveTable {
   handNo = 0;
   turnEndsAt: number | null = null;
   nextHandAt: number | null = null;
+  /** when the bot to act makes its move */
+  botAt: number | null = null;
   readonly autoDeal: boolean;
   readonly stakes: Stakes;
+  readonly botSeats: number;
   /** the next hand's button goes to the first occupied seat at or after this seat number */
   private buttonSeat = 0;
   private handSeats: number[] = [];
@@ -181,12 +230,18 @@ export class LiveTable {
   private clock: () => number;
   private shuffleDeck: <T>(a: T[]) => T[];
   private cashouts: Cashout[] = [];
+  private botPolicy: BotPolicy;
+  private random: () => number;
+  private botsMade = 0;
 
   constructor(opts: LiveTableOptions = {}) {
     this.stakes = opts.stakes ?? LOW_STAKES;
     this.autoDeal = opts.autoDeal ?? true;
     this.clock = opts.clock ?? Date.now;
     this.shuffleDeck = opts.shuffleDeck ?? shuffle;
+    this.botSeats = Math.max(0, Math.min(MAX_SEATS, Math.floor(opts.botSeats ?? 0)));
+    this.botPolicy = opts.botPolicy ?? practicePolicy;
+    this.random = opts.random ?? cryptoRandom;
   }
 
   inHand(): boolean {
@@ -195,6 +250,22 @@ export class LiveTable {
 
   isSeated(id: string): boolean {
     return !!this.seatOf(id);
+  }
+
+  /** The bot's seat this person is waiting for, if any. */
+  reservationOf(id: string): { seat: number; buyIn: number } | null {
+    const s = this.seats.find((x) => x.reservedBy?.id === id);
+    return s ? { seat: s.seat, buyIn: s.reservedBy!.buyIn } : null;
+  }
+
+  /** Chips the table holds for people (stacks, and buy-ins set aside for a bot's seat); bots' chips are not anyone's. */
+  heldChips(): Cashout[] {
+    const out: Cashout[] = [];
+    for (const s of this.seats) {
+      if (!s.bot) out.push({ id: s.id, amount: s.stack });
+      else if (s.reservedBy) out.push({ id: s.reservedBy.id, amount: s.reservedBy.buyIn });
+    }
+    return out;
   }
 
   /** Chips owed to players who stood up since the last call; the server pays them into the bank. */
@@ -215,8 +286,13 @@ export class LiveTable {
       case 'leave':
         this.leave(id);
         return null;
+      case 'cancel':
+        this.cancelReservation(id);
+        this.refreshNextHand();
+        return null;
       case 'start':
-        return this.start();
+        // only someone playing can deal early (it also stands up anyone away)
+        return this.seatOf(id)?.bot === undefined && this.isSeated(id) ? this.start() : 'Sit down first';
       case 'action': {
         const a = cleanAction(m.action);
         if (!a) return 'Bad action';
@@ -231,6 +307,8 @@ export class LiveTable {
   }
 
   setOnline(id: string, on: boolean) {
+    const r = this.seats.find((s) => s.reservedBy?.id === id)?.reservedBy;
+    if (r) r.offlineSince = on ? null : (r.offlineSince ?? this.clock());
     const seat = this.seatOf(id);
     if (!seat) return;
     if (on) {
@@ -243,37 +321,57 @@ export class LiveTable {
   }
 
   summary(): TableSummary {
-    return { players: this.seats.length, maxSeats: MAX_SEATS, playing: this.inHand() };
+    const bots = this.seats.filter((s) => s.bot).length;
+    return { players: this.seats.length - bots, bots, maxSeats: MAX_SEATS, playing: this.inHand() };
   }
 
-  /** Why a player cannot take this seat, or null if it is free. */
+  /** Why a player cannot take this seat, or null if they can: it is empty, or a bot holds it for them. */
   seatProblem(seatNo: unknown): string | null {
+    // a bot's seat still counts as one you can have
+    if (this.seats.length >= MAX_SEATS && this.seats.every((x) => !x.bot || x.reservedBy)) return 'The table is full';
     if (typeof seatNo !== 'number' || !Number.isInteger(seatNo) || seatNo < 0 || seatNo >= MAX_SEATS) return 'Pick a seat';
-    if (this.seats.some((s) => s.seat === seatNo)) return 'Someone just took that seat. Pick another one.';
+    const s = this.seats.find((x) => x.seat === seatNo);
+    if (s && !s.bot) return 'Someone just took that seat. Pick another one.';
+    if (s?.reservedBy) return 'Someone is already waiting for that seat. Pick another one.';
     return null;
   }
 
-  /** Take a seat with a buy-in already drawn from the bank, or (already seated) change name and stay. */
+  /**
+   * Take a seat with a buy-in already drawn from the bank, or (already seated or waiting) change name
+   * and stay. A bot's seat is taken between hands: during a hand the bot plays it out first.
+   */
   sit(id: string, name: string, buyIn = 0, seatNo?: number): string | null {
     const seat = this.seatOf(id);
-    if (seat) {
-      seat.name = name;
-      seat.leaving = false;
-      seat.offlineSince = null;
+    const waiting = this.seats.find((s) => s.reservedBy?.id === id)?.reservedBy;
+    if (seat || waiting) {
+      // a second buy-in for the same player is refused, so the server hands it back
+      if (buyIn > 0) return seat ? 'You are already sitting at this table' : 'You are already waiting for a seat';
+      if (waiting) waiting.name = name;
+      if (seat) {
+        seat.name = name;
+        seat.leaving = false;
+        seat.offlineSince = null;
+      }
     } else {
-      if (this.seats.length >= MAX_SEATS) return 'The table is full';
       const chosen = seatNo ?? this.firstFreeSeat();
       const problem = this.seatProblem(chosen);
       if (problem) return problem;
       if (buyIn <= 0) return 'You need chips to sit down';
-      this.seats.push({ id, seat: chosen, name, stack: buyIn, leaving: false, offlineSince: null, timeouts: 0 });
-      this.seats.sort((a, b) => a.seat - b.seat); // clockwise by seat number
+      const bot = this.seats.find((s) => s.seat === chosen);
+      if (bot) {
+        bot.reservedBy = { id, name, buyIn, at: this.clock(), offlineSince: null };
+      } else {
+        this.seats.push({ id, seat: chosen, name, stack: buyIn, leaving: false, offlineSince: null, timeouts: 0 });
+        this.seats.sort((a, b) => a.seat - b.seat); // clockwise by seat number
+      }
     }
+    this.settleSeats();
     this.refreshNextHand();
     return null;
   }
 
   leave(id: string) {
+    if (this.cancelReservation(id)) return this.refreshNextHand();
     const seat = this.seatOf(id);
     if (!seat) return;
     const k = this.order.indexOf(id);
@@ -281,14 +379,19 @@ export class LiveTable {
     if (this.inHand() && k >= 0) this.forfeitSeat(id);
     // an all-in player's hand plays on to showdown; they stand up when it ends
     if (!(this.inHand() && k >= 0 && !this.hand!.players[k].folded)) this.removeSeat(id);
+    this.settleSeats();
+    this.refreshNextHand();
   }
 
   start(): string | null {
     if (this.inHand()) return 'A hand is already being played';
     this.nextHandAt = null;
     for (const s of [...this.seats]) if (s.leaving || s.offlineSince !== null) this.removeSeat(s.id);
+    this.settleSeats();
     const n = this.seats.length;
     if (n < 2) return 'You need at least two players';
+    // bots never play a hand by themselves
+    if (this.seats.every((s) => s.bot)) return 'You need at least two players';
     // the button goes to the first occupied seat at or after buttonSeat, going clockwise
     const button = Math.max(0, this.seats.findIndex((s) => s.seat >= this.buttonSeat));
     // players[] runs UTG ... BTN, SB, BB (clockwise); rotate the seats so the button seat lands on BTN.
@@ -324,30 +427,49 @@ export class LiveTable {
 
   /** The next time tick() has work to do, or null. */
   nextDeadline(): number | null {
-    if (this.inHand()) return this.turnEndsAt;
-    const times = [this.nextHandAt, ...this.seats.map((s) => (s.offlineSince === null ? null : s.offlineSince + RECONNECT_MS))];
+    const waits = this.seats.flatMap((s) => (s.reservedBy ? [reservationLapses(s.reservedBy)] : []));
+    const times = this.inHand()
+      ? [this.turnEndsAt, this.botAt, ...waits]
+      : [this.nextHandAt, ...waits, ...this.seats.map((s) => (s.offlineSince === null ? null : s.offlineSince + RECONNECT_MS))];
     const due = times.filter((t): t is number => t !== null);
     return due.length ? Math.min(...due) : null;
   }
 
-  /** Run whatever is due: an expired turn, a dropped player's seat, or the next deal. Returns true if anything changed. */
+  /**
+   * Run whatever is due: a bot's move, an expired turn, a lapsed wait for a seat, a dropped player's
+   * seat, or the next deal. Returns true if anything changed.
+   */
   tick(): boolean {
     const now = this.clock();
+    let lapsed = false;
+    for (const s of this.seats) {
+      if (s.reservedBy && now >= reservationLapses(s.reservedBy)) lapsed = this.cancelReservation(s.reservedBy.id);
+    }
+    if (lapsed) this.refreshNextHand();
     const h = this.hand;
     if (h && !h.complete) {
-      if (this.turnEndsAt === null || now < this.turnEndsAt) return false;
+      // the move is tied to this exact turn: anything that changes the hand reschedules or clears it
+      if (this.botAt !== null && now >= this.botAt) {
+        this.botAct();
+        return true;
+      }
+      if (this.turnEndsAt === null || now < this.turnEndsAt) return lapsed;
       const id = this.order[h.toAct];
       const seat = this.seatOf(id);
       if (seat && !seat.leaving && seat.offlineSince === null && ++seat.timeouts >= MAX_TIMEOUTS) seat.leaving = true;
       this.autoAct(id);
       return true;
     }
-    let changed = false;
+    let changed = lapsed;
     for (const s of [...this.seats]) {
       if (s.offlineSince !== null && now >= s.offlineSince + RECONNECT_MS) {
         this.removeSeat(s.id);
         changed = true;
       }
+    }
+    if (changed) {
+      this.settleSeats();
+      this.refreshNextHand();
     }
     if (this.nextHandAt !== null && now >= this.nextHandAt) {
       this.start();
@@ -371,9 +493,13 @@ export class LiveTable {
         away: s.offlineSince !== null,
         leaving: s.leaving,
         playing: this.inHand() && this.order.includes(s.id),
+        bot: s.bot ? botStyleName(s.bot) : null,
+        reserved: !!s.reservedBy,
       })),
       maxSeats: MAX_SEATS,
       autoDeal: this.autoDeal,
+      botSeats: this.botSeats,
+      waiting: this.reservationOf(id),
       stakes: this.stakes,
       hand: h && {
         ...h,
@@ -414,13 +540,33 @@ export class LiveTable {
 
   private afterChange() {
     const h = this.hand!;
+    this.botAt = null;
     if (h.complete) {
       if (this.settled !== this.handNo) this.finishHand();
       return;
     }
     const seat = this.seatOf(this.order[h.toAct]);
-    const away = !seat || seat.leaving || seat.offlineSince !== null;
+    const away = !seat || (seat.leaving && !seat.bot) || seat.offlineSince !== null;
     this.turnEndsAt = this.clock() + (away ? AWAY_TURN_MS : TURN_MS);
+    if (seat?.bot) this.botAt = this.clock() + this.thinkMs(h);
+  }
+
+  /** A bot thinks for a moment, longer while the cards are still going out; with nobody left to see, it hurries. */
+  private thinkMs(h: HandState): number {
+    if (this.seats.every((s) => s.bot || s.leaving)) return 0;
+    const { min, max, afterDeal } = BOT_THINK_MS;
+    const firstMove = h.history.every((r) => r.type.startsWith('post-'));
+    return Math.round(min + this.random() * (max - min)) + (firstMove ? afterDeal : 0);
+  }
+
+  /** The bot to act moves, through the same checks as anyone else; a move the rules refuse becomes check or fold. */
+  private botAct() {
+    const h = this.hand!;
+    const id = this.order[h.toAct];
+    const style = this.seatOf(id)?.bot;
+    this.botAt = null;
+    if (!style) return;
+    if (this.act(id, this.botPolicy(botView(h), style, this.random())) !== null) this.autoAct(id);
   }
 
   private finishHand() {
@@ -435,14 +581,16 @@ export class LiveTable {
     this.buttonSeat = (this.handSeats[h.buttonIndex] + 1) % MAX_SEATS;
     // no free rebuys: a player who lost their stack stands up and can buy in again from their bank
     for (const s of this.seats.filter((x) => x.leaving || x.stack <= 0)) this.removeSeat(s.id);
+    this.settleSeats();
     this.refreshNextHand();
   }
 
   /** Schedule or cancel the next deal to match who is at the table. */
   private refreshNextHand() {
     if (this.inHand()) return;
-    const ready = this.seats.filter((s) => !s.leaving && s.offlineSince === null).length;
-    if (ready < 2) this.nextHandAt = null;
+    const ready = this.seats.filter((s) => !s.leaving && s.offlineSince === null);
+    // bots never play a hand by themselves
+    if (ready.length < 2 || ready.every((s) => s.bot)) this.nextHandAt = null;
     else if (this.nextHandAt === null && (this.hand || this.autoDeal)) this.nextHandAt = this.clock() + NEXT_HAND_MS;
   }
 
@@ -453,15 +601,75 @@ export class LiveTable {
     }
   }
 
-  /** Stand a player up and pay out what they have in front of them. */
+  /** Stand a player up and pay out what they have in front of them (a bot's chips just go). */
   private removeSeat(id: string) {
     const k = this.seats.findIndex((s) => s.id === id);
     if (k < 0) return;
     // mid-hand (only possible once they have folded) their chips are what is left after this hand's bets
     const j = this.inHand() ? this.order.indexOf(id) : -1;
-    this.cashouts.push({ id, amount: j >= 0 ? this.hand!.players[j].stack : this.seats[k].stack });
+    if (!this.seats[k].bot) this.cashouts.push({ id, amount: j >= 0 ? this.hand!.players[j].stack : this.seats[k].stack });
     this.seats.splice(k, 1);
     this.refreshNextHand();
+  }
+
+  /** Stop waiting for a bot's seat; the buy-in set aside goes back. Returns false if they were not waiting. */
+  private cancelReservation(id: string): boolean {
+    const s = this.seats.find((x) => x.reservedBy?.id === id);
+    if (!s) return false;
+    this.cashouts.push({ id, amount: s.reservedBy!.buyIn });
+    s.reservedBy = undefined;
+    this.settleSeats();
+    return true;
+  }
+
+  /**
+   * Keep the bots in step with the people. Between hands: people waiting for a bot's seat take it,
+   * spare bots stand up and open seats are filled up to botSeats. During a hand nobody moves, but
+   * bots that will stand up afterwards are marked as leaving.
+   */
+  private settleSeats() {
+    if (!this.inHand()) {
+      this.seats = this.seats.map((s) => {
+        const r = s.reservedBy;
+        return r ? { id: r.id, seat: s.seat, name: r.name, stack: r.buyIn, leaving: false, offlineSince: r.offlineSince, timeouts: 0 } : s;
+      });
+    }
+    const people = this.seats.filter((s) => !s.bot || s.reservedBy).length;
+    // bots already on their way out go first
+    const bots = this.seats.filter((s) => s.bot && !s.reservedBy).sort((a, b) => Number(a.leaving) - Number(b.leaving));
+    const want = people ? Math.max(0, this.botSeats - people) : 0;
+    const spare = bots.slice(want);
+    if (this.inHand()) {
+      for (const b of bots) b.leaving = spare.includes(b);
+      return;
+    }
+    for (const b of spare) this.removeSeat(b.id);
+    for (let k = bots.length; k < want && this.seats.length < MAX_SEATS; k++) this.addBot();
+  }
+
+  /**
+   * Sit a bot in the open seat farthest from everyone (then farthest from the people, keeping the seats
+   * beside them free for friends), playing a style nobody else at the table has.
+   */
+  private addBot() {
+    const dist = (a: number, b: number) => Math.min(Math.abs(a - b), MAX_SEATS - Math.abs(a - b));
+    const gap = (n: number, from: Seat[]) => Math.min(...from.map((s) => dist(s.seat, n)));
+    const people = this.seats.filter((s) => !s.bot);
+    const score = (n: number) => gap(n, this.seats) * MAX_SEATS + gap(n, people);
+    const open = Array.from({ length: MAX_SEATS }, (_, n) => n).filter((n) => !this.seats.some((s) => s.seat === n));
+    const seat = open.reduce((best, n) => (score(n) > score(best) ? n : best));
+    const style = BOT_STYLES.find((st) => !this.seats.some((s) => s.bot === st)) ?? BOT_STYLES[this.botsMade % BOT_STYLES.length];
+    this.seats.push({
+      id: `${BOT_PREFIX}${++this.botsMade}`,
+      seat,
+      name: botStyleName(style),
+      stack: BOT_BUY_IN_BB * this.stakes.bb,
+      leaving: false,
+      offlineSince: null,
+      timeouts: 0,
+      bot: style,
+    });
+    this.seats.sort((a, b) => a.seat - b.seat);
   }
 
   private firstFreeSeat(): number {
@@ -472,4 +680,9 @@ export class LiveTable {
   private seatOf(id: string): Seat | undefined {
     return this.seats.find((s) => s.id === id);
   }
+}
+
+/** When a wait for a bot's seat runs out: after RESERVE_MS, or sooner if the person has gone. */
+function reservationLapses(r: Reservation): number {
+  return Math.min(r.at + RESERVE_MS, r.offlineSince === null ? Infinity : r.offlineSince + RECONNECT_MS);
 }

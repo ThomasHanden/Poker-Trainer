@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "gen:equity": "vite-node scripts/gen-preflop-equity.ts",
+    "gen:pushfold": "vite-node scripts/gen-pushfold.ts",
     "validate:content": "vitest run tests/content.test.ts tests/scenarios.test.ts",
     "party:dev": "wrangler dev",
     "party:deploy": "wrangler deploy"
