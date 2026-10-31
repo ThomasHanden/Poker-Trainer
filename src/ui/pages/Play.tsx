@@ -578,7 +578,8 @@ export function PlayTablePage() {
           </div>
         </div>
         <div className="ph-side live-invite">
-          {chat && (
+          {/* everyone at the table sees the button; the chat itself is only for seated players */}
+          {view && (
             <button className={`btn live-chat-btn ${chatOpen ? 'on' : ''}`} aria-expanded={chatOpen} aria-controls="table-chat" onClick={() => setChatOpen(!chatOpen)}>
               Chat
               {unread > 0 && !chatOpen && (
