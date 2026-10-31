@@ -380,7 +380,7 @@ export function PlayTablePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, dealing, sent, pre]);
 
-  const invite = `${location.origin}${location.pathname}#/play/${room}`;
+  const invite = `${location.origin}/play/${room}`;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(invite);

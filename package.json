@@ -6,7 +6,7 @@
   "description": "No-Limit Hold'em decision trainer: practice scenarios, honest reviews, theory library, range explorer and progress tracking.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && NODE_ENV=production vite-node scripts/prerender.tsx",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc -b",
     "test": "vitest run",
@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "gen:equity": "vite-node scripts/gen-preflop-equity.ts",
     "gen:pushfold": "vite-node scripts/gen-pushfold.ts",
+    "gen:og": "node scripts/og/gen-og-image.mjs",
     "validate:content": "vitest run tests/content.test.ts tests/scenarios.test.ts",
     "party:dev": "wrangler dev",
     "party:deploy": "wrangler deploy"

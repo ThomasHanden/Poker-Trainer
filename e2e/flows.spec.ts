@@ -21,7 +21,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
   page.on('pageerror', (e) => errors.push(e.message));
 
   // 1. start a scenario
-  await page.goto('/#/practice');
+  await page.goto('/practice');
   await page.getByTestId('new-scenario').click();
   await expect(page.locator('.action-bar, [data-testid=review]').first()).toBeVisible({ timeout: 30_000 });
 
@@ -50,7 +50,7 @@ test('core training flow: scenario → decisions → review → lesson → relat
   await expect(page.locator('.action-bar, [data-testid=review]').first()).toBeVisible({ timeout: 30_000 });
 
   // 6. save and reopen a custom range
-  await page.goto('/#/ranges?tab=editor');
+  await page.goto('/ranges?tab=editor');
   await page.locator('[data-hand="AA"]').click();
   await page.locator('[data-hand="AKs"]').click();
   await page.locator('[data-hand="KK"]').click();
@@ -60,21 +60,21 @@ test('core training flow: scenario → decisions → review → lesson → relat
 
   // 7-8. reload and verify persistence of range and hand history
   await page.reload();
-  await page.goto('/#/ranges?tab=editor');
+  await page.goto('/ranges?tab=editor');
   await page.getByTestId('saved-ranges').getByRole('button', { name: 'E2E premiums', exact: true }).click();
   await expect(page.getByTestId('range-stats')).toContainText('16.0 combos');
-  await page.goto('/#/review');
+  await page.goto('/review');
   await expect(page.locator('.review-list li').first()).toBeVisible();
   expect(await page.locator('.review-list li').count()).toBeGreaterThanOrEqual(1);
   await page.locator('.review-row').first().click();
   await expect(page.locator('[data-testid=review]')).toBeVisible({ timeout: 60_000 });
-  await page.goto('/#/progress');
+  await page.goto('/progress');
   await expect(page.locator('.tile').first()).toContainText(/\d/);
   expect(errors).toEqual([]);
 });
 
 test('illegal amounts are rejected in the sizing UI', async ({ page }) => {
-  await page.goto('/#/practice?template=fl-defend-cbet');
+  await page.goto('/practice?template=fl-defend-cbet');
   await expect(page.locator('.action-bar')).toBeVisible({ timeout: 30_000 });
   await page.locator('.btn.act.raise').click();
   await page.locator('#bet-amount').fill('0.5');
@@ -85,7 +85,7 @@ test('illegal amounts are rejected in the sizing UI', async ({ page }) => {
 });
 
 test('unsupported settings are explained, not generated', async ({ page }) => {
-  await page.goto('/#/practice');
+  await page.goto('/practice');
   await page.locator('label:has-text("Game format") .select-btn').click();
   await page.getByRole('option', { name: 'Tournament', exact: true }).click();
   await page.locator('details.more > summary').click();
@@ -97,7 +97,7 @@ test('unsupported settings are explained, not generated', async ({ page }) => {
 });
 
 test('main pages have no horizontal overflow', async ({ page }) => {
-  for (const path of ['/#/', '/#/practice', '/#/learn', '/#/learn/pot-odds', '/#/ranges', '/#/ranges?tab=editor', '/#/ranges?tab=compare', '/#/ranges?tab=drills', '/#/ranges?tab=equity', '/#/review', '/#/progress']) {
+  for (const path of ['/', '/practice', '/learn', '/learn/pot-odds', '/ranges', '/ranges?tab=editor', '/ranges?tab=compare', '/ranges?tab=drills', '/ranges?tab=equity', '/review', '/progress']) {
     await page.goto(path);
     await page.waitForTimeout(300);
     const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
@@ -106,7 +106,7 @@ test('main pages have no horizontal overflow', async ({ page }) => {
 });
 
 test('full hands mode deals a complete hand from preflop', async ({ page }) => {
-  await page.goto('/#/practice');
+  await page.goto('/practice');
   await page.getByTestId('mode-full').click();
   await expect(page.getByTestId('mode-full')).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('new-scenario').click();
@@ -120,7 +120,7 @@ test('full hands mode deals a complete hand from preflop', async ({ page }) => {
 });
 
 test('daily puzzles can be completed and show in your stats', async ({ page }) => {
-  await page.goto('/#/');
+  await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.getByTestId('pz-start').click();
@@ -146,5 +146,43 @@ test('daily puzzles can be completed and show in your stats', async ({ page }) =
   await expect(page.getByTestId('pz-result')).toBeVisible();
   await expect(page.locator('.sb-table tbody tr')).toHaveCount(2);
   await page.getByRole('button', { name: 'Go to practice →' }).click();
-  await expect(page).toHaveURL(/#\/practice/);
+  await expect(page).toHaveURL(/\/practice$/);
+});
+
+test('old #/ links open the same page at its real address', async ({ page }) => {
+  await page.goto('/#/learn/pot-odds');
+  await expect(page).toHaveURL(/\/learn\/pot-odds$/);
+  await expect(page.locator('h1')).toHaveText('Pot odds');
+  await page.goto('/#/practice?template=fl-defend-cbet');
+  await expect(page).toHaveURL(/\/practice\?template=fl-defend-cbet$/);
+});
+
+test('direct visits and reloads work on nested pages, and titles follow navigation', async ({ page }) => {
+  await page.goto('/learn/pot-odds');
+  await page.reload();
+  await expect(page.locator('h1')).toHaveText('Pot odds');
+  await expect(page).toHaveTitle('Pot odds · Felt School');
+  await page.getByRole('link', { name: '← Library' }).click();
+  await expect(page).toHaveTitle('Learn poker theory · Felt School');
+  await page.goto('/learn/no-such-lesson');
+  await expect(page.locator('h1')).toHaveText('Lesson not found');
+});
+
+test('public pages are complete in the first HTML response, with link-preview metadata', async ({ request }) => {
+  const html = await (await request.get('/learn/pot-odds')).text();
+  expect(html).toContain('<title>Pot odds · Felt School</title>');
+  expect(html).toContain('<meta name="description" content="The price of a call');
+  expect(html).toMatch(/<link rel="canonical" href="https?:\/\/[^"]+\/learn\/pot-odds"/);
+  expect(html).toMatch(/<meta property="og:image" content="https?:\/\/[^"]+\/og-image\.png"/);
+  expect(html).toContain('<meta name="twitter:card" content="summary_large_image"');
+  expect(html).toContain('<h1>Pot odds</h1>'); // the lesson itself, not an empty app shell
+  expect(html).toContain('"@type":"LearningResource"');
+  const library = await (await request.get('/learn')).text();
+  expect(library).toContain('href="/learn/pot-odds"'); // crawlable links to every lesson
+  const img = await request.get('/og-image.png');
+  expect(img.status()).toBe(200);
+  expect(img.headers()['content-type']).toBe('image/png');
+  const sitemap = await (await request.get('/sitemap.xml')).text();
+  expect(sitemap).toContain('/learn/pot-odds</loc>');
+  expect(sitemap).not.toContain('/review');
 });

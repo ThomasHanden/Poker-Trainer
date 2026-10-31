@@ -9,7 +9,7 @@ Requirements: Node 18+ (developed on Node 22).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # production build into dist/ (static files; works from any static host, uses hash routing)
+npm run build      # production build into dist/: static files plus a pre-rendered HTML page for every public page (see docs/SITE.md)
 npm run preview    # serve the production build on http://localhost:4173
 ```
 
@@ -47,12 +47,15 @@ src/evaluation/   decision context, rollouts (model EV), guidance builders, scor
 src/content/      lessons (81), concepts, glossary, sources, coverage
 src/persistence/  versioned localStorage, export/import/migrate
 src/workers/      Web Worker for generation/evaluation/equity (main-thread fallback)
-src/ui/           React UI (pages + components), HashRouter
-scripts/          preflop equity table generator
+src/multiplayer/  live tables: seats, timers, bots, what each player may see (run by party/server.ts)
+src/seo.ts        page titles, descriptions and the sitemap's page list
+src/ui/           React UI (pages + components), real paths (old #/ links redirect)
+party/            Cloudflare Worker for live tables and daily chips (deployed separately)
+scripts/          preflop equity and push/fold table generators, build-time prerendering, preview image
 tests/, e2e/      Vitest and Playwright suites
 ```
 
-Docs: [RULES](docs/RULES.md) · [EVALUATION & limitations](docs/EVALUATION.md) · [RANGE_FORMAT](docs/RANGE_FORMAT.md) · [Adding scenarios](docs/ADDING_SCENARIOS.md) · [Adding lessons](docs/ADDING_LESSONS.md) · [Adding ranges](docs/ADDING_RANGES.md) · [COVERAGE](docs/COVERAGE.md) · [SOURCES](docs/SOURCES.md) · [CONTINUATION checklist](docs/CONTINUATION.md)
+Docs: [LIVE TABLES & bots](docs/LIVE_TABLES.md) · [Addresses, search & link previews](docs/SITE.md) · [RULES](docs/RULES.md) · [EVALUATION & limitations](docs/EVALUATION.md) · [RANGE_FORMAT](docs/RANGE_FORMAT.md) · [Adding scenarios](docs/ADDING_SCENARIOS.md) · [Adding lessons](docs/ADDING_LESSONS.md) · [Adding ranges](docs/ADDING_RANGES.md) · [COVERAGE](docs/COVERAGE.md) · [SOURCES](docs/SOURCES.md) · [CONTINUATION checklist](docs/CONTINUATION.md)
 
 ## Honesty statement
 

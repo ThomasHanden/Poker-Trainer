@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/:page(practice|learn|ranges|play|review|progress)", "destination": "/:page.html" },
+    { "source": "/learn/:lesson", "destination": "/learn/:lesson.html" },
+    { "source": "/play/:room", "destination": "/app.html" },
+    { "source": "/review/:hand", "destination": "/app.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

@@ -128,7 +128,10 @@ export function LessonPage() {
   if (!l)
     return (
       <div className="page">
-        <p>Lesson not found. <Link to="/learn">Back to the library</Link></p>
+        <h1>Lesson not found</h1>
+        <p>
+          There is no lesson at this address. <Link to="/learn">Back to the library</Link>
+        </p>
       </div>
     );
   const prog = data.lessons[l.id];
