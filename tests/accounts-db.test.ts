@@ -197,3 +197,44 @@ describe('deleting an account', () => {
   });
 });
 
+
+describe('account names', () => {
+  const nameOf = async (id: string) => (await rows<{ display_name: string }>(`select display_name from public.profiles where id = $1`, [id]))[0]?.display_name;
+
+  it('each name belongs to one account, whatever the capitals', async () => {
+    const annName = await nameOf(ANN);
+    const err = await as(BOB, () => fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [annName.toUpperCase(), BOB])));
+    expect(err).toMatch(/profiles_display_name_unique/);
+    expect(await nameOf(BOB)).toBe('Player');
+  });
+
+  it('a new account gets its own name if it is allowed and free, otherwise one with a number added', async () => {
+    const annName = await nameOf(ANN);
+    const [DAN, ED, FAY] = ['44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666'];
+    await db.query(`insert into auth.users (id, raw_user_meta_data) values ($1, $2), ($3, $4), ($5, $6)`, [
+      DAN, { given_name: annName.toLowerCase() }, // taken
+      ED, { given_name: 'n1gger' }, // not allowed
+      FAY, { display_name: 'Bot 3' }, // a bot's name
+    ]);
+    expect(await nameOf(DAN)).toMatch(new RegExp(`^${annName} \\d{4}$`, 'i'));
+    expect(await nameOf(ED)).toMatch(/^Player \d{4}$/); // "Player" itself is Bob's
+    expect(await nameOf(FAY)).toMatch(/^Player \d{4}$/);
+    const all = await rows<{ n: string }>(`select lower(display_name) as n from public.profiles`);
+    expect(new Set(all.map((r) => r.n)).size).toBe(all.length);
+  });
+
+  it('names with slurs, or that look like a bot, are refused; swearing is fine', async () => {
+    await as(BOB, async () => {
+      for (const bad of ['f4ggot', 'N.I.G.G.E.R', 'xXtrannyXx', 'Bot 2', 'bot'])
+        expect(await fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [bad, BOB])), bad).toMatch(/display_name_allowed/);
+      for (const ok of ['Shithead', 'Botond', 'Bot3', 'Player'])
+        expect(await fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [ok, BOB])), ok).toBeNull();
+    });
+  });
+
+  it('reads a name’s letters exactly as the site does', async () => {
+    const { nameLetters } = await import('../src/multiplayer/moderation');
+    for (const s of ['N.1.G-g 3r!', 'Ñïgg@', 'José Ä', 'b0t 5', '$p!c|', 'Ann  Marie'])
+      expect((await rows<{ l: string }>(`select public.name_letters($1) as l`, [s]))[0].l, s).toBe(nameLetters(s));
+  });
+});

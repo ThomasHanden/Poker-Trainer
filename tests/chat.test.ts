@@ -93,3 +93,11 @@ describe('typing in chat never triggers a poker action', () => {
     expect(isTyping(null)).toBe(false);
   });
 });
+
+describe('chat moderation', () => {
+  it('stars out a slur, keeps the swearing', () => {
+    const { chat } = room();
+    const r = chat.post('p1', 'Ann', 'you f4ggot, what the fuck', cid());
+    expect(r).toMatchObject({ message: { text: 'you f*****, what the fuck' } });
+  });
+});

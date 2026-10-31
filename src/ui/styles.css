@@ -7242,3 +7242,11 @@ label > span:first-child:not(.select-value) {
 .privacy li + li {
   margin-top: 6px;
 }
+/* account names can be longer than names typed at the table: shorten them on the seat */
+.felt.live .plate-name {
+  display: inline-block;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}

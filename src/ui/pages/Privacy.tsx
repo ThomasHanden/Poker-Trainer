@@ -21,11 +21,12 @@ export function PrivacyPage() {
           Your browser makes a random secret key that your play chips belong to. Our table server only ever sees a scrambled (hashed) form of it, and stores your
           chip balance and daily claim under that.
         </li>
-        <li>While you play, the table keeps your seat, the name you chose and your stack. Other players at the table see your name, your chips and your actions.</li>
+        <li>While you play, the table keeps your seat, your name and your stack. Other players at the table see your name, your chips and your actions.</li>
         <li>
           Table chat is seen by the players seated at that table. It is kept in the table’s memory only: the last 50 messages, for up to an hour, and it is gone
           when the table restarts.
         </li>
+        <li>Names and chat are checked for slurs: a name with one is refused, and in chat it is starred out. Swearing is allowed.</li>
       </ul>
 
       <h2>With an account</h2>
@@ -35,8 +36,8 @@ export function PrivacyPage() {
           first name as your starting display name, and never see your Google password.
         </li>
         <li>
-          <strong>Your display name</strong>, which you can change on your Account page. It is shown at live tables. Your email address is never shown to other
-          players.
+          <strong>Your display name</strong>, which you can change on your Account page. Each name belongs to one account, and you play under it at live
+          tables. Your email address is never shown to other players.
         </li>
         <li>
           <strong>Your progress:</strong> lesson progress, saved ranges, settings, practice hands and daily puzzle results, so they are on every device you sign in

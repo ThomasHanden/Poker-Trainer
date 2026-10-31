@@ -450,3 +450,17 @@ describe('picking a seat', () => {
     expect(buttons).toEqual([0, 2, 5, 0]);
   });
 });
+
+describe('names at a table', () => {
+  it('no two people at a table share a name (ignoring capitals); blank names become Player 2, 3…', () => {
+    const t = new LiveTable({ autoDeal: false });
+    expect(t.sit('ann', 'Ann', START_STACK, 0)).toBeNull();
+    expect(t.sit('bob', 'ANN', START_STACK, 1)).toMatch(/already called ANN/);
+    expect(t.sit('bob', 'Player', START_STACK, 1)).toBeNull();
+    expect(t.sit('cat', 'Player', START_STACK, 2)).toBeNull();
+    expect(t.sit('dan', 'player', START_STACK, 3)).toBeNull();
+    expect(t.seats.map((s) => s.name)).toEqual(['Ann', 'Player', 'Player 2', 'Player 3']);
+    // keeping your own name when you sit again is fine
+    expect(t.sit('ann', 'Ann')).toBeNull();
+  });
+});

@@ -25,6 +25,7 @@ import {
 import { DAILY_MAX, DAILY_MIN, nextUtcMidnight } from '../../multiplayer/bank';
 import { isBotId } from '../../multiplayer/bots';
 import { useAuth } from '../../auth/AuthContext';
+import { nameProblem } from '../../multiplayer/moderation';
 import { track, trackFirst, trackOnce, waitBucket } from '../analytics';
 import { legalActions, type HandState, type PlayerAction } from '../../engine/rules';
 import { describeScore } from '../../engine/evaluator';
@@ -503,16 +504,23 @@ export function PlayTablePage() {
     }
   };
 
+  const [nameError, setNameError] = useState<string | null>(null);
   const sitDown = (e: FormEvent) => {
     e.preventDefault();
     if (!buyValid || picking === null) return;
-    saveName(name.trim());
+    // signed in: you sit under your account name (the server uses it whatever is sent)
+    if (!account) {
+      const problem = nameProblem(name);
+      setNameError(problem);
+      if (problem) return;
+      saveName(name.trim());
+    }
     const bot = !!holder(picking)?.bot;
     if (!asked.current) {
       asked.current = { at: Date.now(), bot };
       track('Seat Requested', { table: kind, seat: bot ? 'bot seat' : 'open seat' });
     }
-    sit(name, picking, (buyChips as number) * CHIP);
+    sit(account ? account.displayName : name, picking, (buyChips as number) * CHIP);
   };
 
   if (!PARTY_HOST)
@@ -827,10 +835,34 @@ export function PlayTablePage() {
                 <p className="live-have">
                   You have <strong>{bank ? fmtChips(bank.balance) : '…'}</strong> chips
                 </p>
-                <div className="row">
-                  <label htmlFor="live-name">Your name</label>
-                  <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" autoFocus={!name} />
-                </div>
+                {account ? (
+                  <p className="live-have">
+                    You play as <strong>{account.displayName || '…'}</strong>. <Link to="/account">Change your name</Link>
+                  </p>
+                ) : (
+                  <div className="row">
+                    <label htmlFor="live-name">Your name</label>
+                    <input
+                      id="live-name"
+                      className="live-input"
+                      value={name}
+                      maxLength={NAME_MAX}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setNameError(null);
+                      }}
+                      autoComplete="nickname"
+                      autoFocus={!name}
+                      aria-invalid={!!nameError}
+                      aria-describedby={nameError ? 'live-name-err' : undefined}
+                    />
+                    {nameError && (
+                      <span id="live-name-err" className="error" role="alert">
+                        {nameError}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="live-buyin-row">
                   <label htmlFor="buyin-amount">Buy in for</label>
                   <span className="live-amt-box">

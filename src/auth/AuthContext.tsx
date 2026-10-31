@@ -7,6 +7,7 @@ import type { AuthError, Session } from '@supabase/supabase-js';
 import { fetchSignInMethods, supabase, type SignInMethods } from './supabase';
 import { setLiveAccount } from '../ui/useLiveTable';
 import { track } from '../ui/analytics';
+import { nameProblem } from '../multiplayer/moderation';
 
 export type AuthStatus = 'off' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -247,9 +248,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (raw: string) => {
       const name = cleanDisplayName(raw);
       if (!name) return { ok: false as const, message: `Use 1 to ${DISPLAY_NAME_MAX} characters.` };
+      if (/^bot\b/i.test(name)) return { ok: false as const, message: 'Names starting with “Bot” are kept for the live tables’ bots.' };
+      const problem = nameProblem(name);
+      if (problem) return { ok: false as const, message: problem };
       if (!supabase || !userId) return fail(null);
+      // the database has the last word: one account per name, no slurs
       const { error } = await supabase.from('profiles').update({ display_name: name }).eq('id', userId);
-      if (error) return { ok: false as const, message: /fetch|network/i.test(error.message) ? 'Could not reach your account. Try again.' : 'That name could not be saved.' };
+      if (error)
+        return {
+          ok: false as const,
+          message:
+            error.code === '23505'
+              ? 'Someone already has that name. Try another.'
+              : error.code === '23514'
+                ? 'That name is not allowed. Choose a different one.'
+                : /fetch|network/i.test(error.message)
+                  ? 'Could not reach your account. Try again.'
+                  : 'That name could not be saved.',
+        };
       setName(name);
       return { ok: true as const };
     },

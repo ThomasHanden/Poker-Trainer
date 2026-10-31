@@ -114,3 +114,19 @@ describe('moving guest chips into an account', () => {
     expect(moveGuestChips({ balance: 0 }, 'g', { balance: 5 }, 'u')).toEqual({ error: 'There are no guest chips to move.' });
   });
 });
+
+describe('account names at the tables', () => {
+  it('are read from Supabase with the player’s own token', async () => {
+    const { fetchDisplayName } = await import('../src/multiplayer/accounts');
+    const seen: { url: string; auth: string | null }[] = [];
+    const answer = (status: number, body: unknown) =>
+      (async (url: string, init?: RequestInit) => {
+        seen.push({ url, auth: new Headers(init?.headers).get('Authorization') });
+        return new Response(JSON.stringify(body), { status });
+      }) as unknown as typeof fetch;
+    expect(await fetchDisplayName('tok', CFG, answer(200, [{ display_name: 'Ann' }]))).toBe('Ann');
+    expect(seen[0]).toEqual({ url: 'https://proj.supabase.co/rest/v1/profiles?select=display_name', auth: 'Bearer tok' });
+    expect(await fetchDisplayName('tok', CFG, answer(401, { message: 'JWT expired' }))).toBeNull();
+    expect(await fetchDisplayName('tok', CFG, answer(200, []))).toBeNull();
+  });
+});

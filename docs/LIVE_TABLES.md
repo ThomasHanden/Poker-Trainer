@@ -45,6 +45,8 @@ changed.
 | Each table has its own chat over the same WebSocket as the game, sent only to connections that asked for it (`chat=1`), so older pages never receive messages they do not understand. | `syncChat()`, `onConnect()` |
 | Only seated people can read or send. Watchers get nothing; standing up sends `chat-closed` and stops delivery. Bots never chat. | `syncChat()`, `onChat()` |
 | The sender's id and name come from their seat on the server, never from the message. | `onChat()`, `ChatRoom.post()` |
+| Slurs are starred out ("f*****"); swearing is allowed (`censorChat` in `moderation.ts`, using the obscenity library's slurs plus a few more). Names with a slur are refused, for guests and accounts. | `ChatRoom.post()`, `nameProblem()` |
+| No two people at a table share a name (ignoring capitals); a blank name becomes "Player 2", "Player 3"… Signed-in players sit under their account name, which the server reads from Supabase. | `LiveTable.sit()`, `fetchDisplayName()` |
 | Plain text: control and direction-override characters are removed, the page renders text (never HTML). Up to 300 characters as people count them (an emoji is one), and 1,200 UTF-16 units. | `cleanChatText()` |
 | 5 messages per 10 seconds per player. | `CHAT_RATE` |
 | Each message carries a browser-made id (`cid`); a retry with the same id is not posted twice. The page shows *Sending…* until the server echoes it, and *Not delivered* (with Try again) after an error or 8 seconds. | `ChatRoom.post()`, `sendChat()` |

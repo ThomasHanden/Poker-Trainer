@@ -8,7 +8,8 @@ import { Server, routePartykitRequest, type Connection, type ConnectionContext, 
 import { BOT_SEATS, LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
 import { KEY_PATTERN, claimDaily, deposit, moveGuestChips, playerId, rollDaily, status, upgrade, utcDay, withdraw, type Account, type BankStatus } from '../src/multiplayer/bank';
 import { ChatRoom } from '../src/multiplayer/chat';
-import { accountPlayerId, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
+import { accountPlayerId, fetchDisplayName, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
+import { nameProblem } from '../src/multiplayer/moderation';
 
 type Env = {
   PokerTable: DurableObjectNamespace<PokerTable>;
@@ -88,7 +89,13 @@ const bankOf = (env: Env) => env.Bank.get(env.Bank.idFromName('bank'));
  * Each connection's player, and whether its page understands chat (older pages are never sent any).
  * A signed-in connection is `pending` (no player yet) until its token has been checked.
  */
-type ConnState = { pid: string; chat: boolean; pending?: boolean };
+type ConnState = {
+  pid: string;
+  chat: boolean;
+  pending?: boolean;
+  /** a signed-in player's account name: they sit under it, not whatever the browser sends */
+  name?: string;
+};
 
 export class PokerTable extends Server<Env> {
   table = new LiveTable();
@@ -140,8 +147,8 @@ export class PokerTable extends Server<Env> {
   }
 
   /** A connection now known to be this player: they are online, and get the table and their bank. */
-  async joined(conn: Connection, pid: string, chat: boolean) {
-    conn.setState({ pid, chat } satisfies ConnState);
+  async joined(conn: Connection, pid: string, chat: boolean, name?: string) {
+    conn.setState({ pid, chat, ...(name ? { name } : {}) } satisfies ConnState);
     this.table.setOnline(pid, true);
     await this.update();
     await this.sendBank(pid);
@@ -165,12 +172,13 @@ export class PokerTable extends Server<Env> {
         conn.send(JSON.stringify({ type: 'auth-error', message: 'Your sign-in could not be confirmed. Sign in again.' }));
         return conn.close(4003, 'Sign-in not confirmed');
       }
-      return this.joined(conn, pid, st.chat);
+      const name = await fetchDisplayName(m.token as string, authConfig(this.env));
+      return this.joined(conn, pid, st.chat, name ?? undefined);
     }
     const pid = st?.pid;
     if (!pid) return;
     if (m?.type === 'chat') return this.onChat(conn, pid, m.cid, m.text);
-    const err = m?.type === 'sit' ? await this.sit(pid, m.name, m.seat, m.buyIn) : this.table.handle(pid, msg);
+    const err = m?.type === 'sit' ? await this.sit(pid, st?.name ?? m.name, m.seat, m.buyIn, !!st?.name) : this.table.handle(pid, msg);
     if (err) conn.send(JSON.stringify({ type: 'error', message: err }));
     await this.update();
   }
@@ -189,8 +197,10 @@ export class PokerTable extends Server<Env> {
    * Buy in from the bank for the amount chosen and sit in the chosen seat, or wait for it if a bot is
    * playing a hand there (or, already seated or waiting, just stay).
    */
-  async sit(pid: string, rawName: unknown, rawSeat: unknown, rawBuyIn: unknown): Promise<string | null> {
-    const name = cleanName(rawName);
+  async sit(pid: string, rawName: unknown, rawSeat: unknown, rawBuyIn: unknown, accountName = false): Promise<string | null> {
+    // a signed-in player sits under their account name (unique, and checked by the database)
+    const name = accountName ? String(rawName) : cleanName(rawName);
+    if (nameProblem(name)) return accountName ? 'Your account name is not allowed at the tables. Change it on your Account page.' : 'That name is not allowed. Choose a different one.';
     if (this.table.isSeated(pid) || this.table.reservationOf(pid)) return this.table.sit(pid, name);
     if (this.buyingIn.has(pid)) return null; // the first request is still at the bank
     const seatProblem = this.table.seatProblem(rawSeat);

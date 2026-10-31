@@ -18,7 +18,7 @@ entry point is hidden.
 | Saved ranges, practice settings, display preferences | `progress` | Same. A range deleted on one device stays deleted. Settings changed on this device win; otherwise the account's are kept. |
 | Practice hands (and so all practice statistics) | `practice_hands`, one row per hand id | Saving the same hand again never makes a second copy; a bookmark change wins only if it is newer. |
 | Daily puzzle results (and so streaks) | `puzzle_runs`, one row per run id | The first result for a run id stays: replaying or importing cannot improve it. |
-| Display name | `profiles` | Checked by the database: 1–24 characters, no control characters. |
+| Display name | `profiles` | Checked by the database: 1–24 characters, no control characters, one account per name (ignoring capitals), no slurs (swearing is fine), and not "Bot …". New accounts get their Google first name if it is allowed and free, else "Player", with a number added if taken. Signed-in players sit at live tables under this name (the table server reads it with their own token). |
 | Live-table chips and the daily claim | The live-table server's bank (`party/server.ts`), keyed by an id derived from the account | Unchanged rules: one claim per UTC day, chips move only through claims, buy-ins and cash-outs. |
 
 Kept per device on purpose: the scenario-freshness list, an unfinished puzzle, muted chat players,

@@ -261,6 +261,19 @@ export class LiveTable {
     return !!this.seatOf(id);
   }
 
+  /**
+   * The name to sit under: refused if someone else at the table (seated or waiting for a seat)
+   * already has it, except the default "Player", which gets a number instead.
+   */
+  private freeName(id: string, name: string): string | null {
+    const taken = new Set(
+      this.seats.flatMap((s) => [s.id !== id ? s.name : null, s.reservedBy && s.reservedBy.id !== id ? s.reservedBy.name : null]).filter((n): n is string => !!n).map((n) => n.toLowerCase()),
+    );
+    if (!taken.has(name.toLowerCase())) return name;
+    if (name.toLowerCase() !== 'player') return null;
+    for (let n = 2; ; n++) if (!taken.has(`player ${n}`)) return `Player ${n}`;
+  }
+
   /** A seated person's table name (for chat), or undefined. */
   personName(id: string): string | undefined {
     const s = this.seatOf(id);
@@ -355,7 +368,9 @@ export class LiveTable {
    * Take a seat with a buy-in already drawn from the bank, or (already seated or waiting) change name
    * and stay. A bot's seat is taken between hands: during a hand the bot plays it out first.
    */
-  sit(id: string, name: string, buyIn = 0, seatNo?: number): string | null {
+  sit(id: string, wanted: string, buyIn = 0, seatNo?: number): string | null {
+    const name = this.freeName(id, wanted);
+    if (name === null) return `Someone at this table is already called ${wanted}. Choose another name.`;
     const seat = this.seatOf(id);
     const waiting = this.seats.find((s) => s.reservedBy?.id === id)?.reservedBy;
     if (seat || waiting) {

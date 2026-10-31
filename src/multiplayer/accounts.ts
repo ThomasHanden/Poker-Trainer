@@ -53,6 +53,23 @@ export async function verifyAccessToken(
   }
 }
 
+/**
+ * The account's display name, read from Supabase with the player's own token (row-level security
+ * returns only their profile), so a signed-in player cannot sit under any other name. Null if it
+ * cannot be read.
+ */
+export async function fetchDisplayName(token: string, cfg: AccountAuthConfig, f: typeof fetch = fetch): Promise<string | null> {
+  if (!cfg.supabaseUrl) return null;
+  try {
+    const r = await f(`${cfg.supabaseUrl.replace(/\/+$/, '')}/rest/v1/profiles?select=display_name`, { headers: { apikey: cfg.publishableKey, Authorization: `Bearer ${token}` } });
+    if (!r.ok) return null;
+    const rows = (await r.json()) as { display_name?: unknown }[];
+    return typeof rows[0]?.display_name === 'string' ? rows[0].display_name : null;
+  } catch {
+    return null;
+  }
+}
+
 async function askSupabase(token: string, issuer: string, publishableKey: string, f: typeof fetch): Promise<string | null> {
   const r = await f(`${issuer}/user`, { headers: { apikey: publishableKey, Authorization: `Bearer ${token}` } });
   if (!r.ok) return null;

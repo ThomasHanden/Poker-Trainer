@@ -1,7 +1,10 @@
 // Table chat: plain-text messages between the people seated at a live table. The table server
 // (party/server.ts) decides who may read and send; this keeps the messages, checks them and limits
-// how fast each player can post. Messages live in memory with the table: the last CHAT_HISTORY,
-// none older than CHAT_RETENTION_MS, and they are gone when the table restarts. Bots never chat.
+// how fast each player can post. Slurs are starred out (moderation.ts); swearing is allowed.
+// Messages live in memory with the table: the last CHAT_HISTORY, none older than
+// CHAT_RETENTION_MS, and they are gone when the table restarts. Bots never chat.
+
+import { censorChat } from './moderation';
 
 /** Longest message, in characters as people count them (an emoji is one, however it is encoded). */
 export const CHAT_MAX_CHARS = 300;
@@ -89,7 +92,7 @@ export class ChatRoom {
     const clean = cleanChatText(rawText);
     if ('error' in clean) return clean;
     this.posted.set(from, [...recent, now]);
-    return { message: this.add({ kind: 'player', from, name, text: clean.text, cid }), repeat: false };
+    return { message: this.add({ kind: 'player', from, name, text: censorChat(clean.text), cid }), repeat: false };
   }
 
   /** A notice from the table, such as someone sitting down; shown apart from what people say. */
