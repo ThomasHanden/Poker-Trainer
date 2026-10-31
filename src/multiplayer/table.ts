@@ -18,9 +18,9 @@ export interface Stakes {
 }
 export const LOW_STAKES: Stakes = { sb: 1, bb: 2, label: '0.5/1' };
 export const HIGH_STAKES: Stakes = { sb: 2, bb: 4, label: '1/2' };
-/** Sitting down buys in for this many big blinds, or as many as you have down to the minimum. */
-export const BUY_IN_BB = 100;
-export const MIN_BUY_IN_BB = 20;
+/** Buy-ins: players choose an amount between these, in big blinds (40–100bb, as most online sites). */
+export const MAX_BUY_IN_BB = 100;
+export const MIN_BUY_IN_BB = 40;
 export const MAX_SEATS = 6;
 export const NAME_MAX = 12;
 export const TURN_MS = 30_000;
@@ -43,7 +43,14 @@ export const tableLabel = (room: string) => {
   const name = `${stakesFor(room).label} NLH`;
   return isPublicTable(room) ? `${name} #${room.slice('public-'.length)}` : `${name} · ${room.replace(HIGH_PREFIX, '')}`;
 };
-export const buyInFor = (st: Stakes) => ({ max: BUY_IN_BB * st.bb, min: MIN_BUY_IN_BB * st.bb });
+export const buyInFor = (st: Stakes) => ({ min: MIN_BUY_IN_BB * st.bb, max: MAX_BUY_IN_BB * st.bb });
+
+/** The buy-in a player asked for, if it is a whole number of chips inside the table's range; otherwise null. */
+export function checkBuyIn(st: Stakes, requested: unknown): number | null {
+  const { min, max } = buyInFor(st);
+  if (typeof requested !== 'number' || !Number.isInteger(requested) || requested % CHIP !== 0) return null;
+  return requested >= min && requested <= max ? requested : null;
+}
 
 /** An amount in table units as chips, e.g. 1 → "0.5", 2500 → "1,250". */
 export function fmtChips(units: number): string {
@@ -57,7 +64,8 @@ export interface Cashout {
 }
 
 export type ClientMessage =
-  | { type: 'sit'; name: string }
+  /** buyIn: chips to bring, in table units (ignored when already seated) */
+  | { type: 'sit'; name: string; buyIn?: number }
   | { type: 'leave' }
   | { type: 'start' }
   | { type: 'action'; action: PlayerAction };

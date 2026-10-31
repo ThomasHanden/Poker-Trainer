@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LiveTable, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
+import { LiveTable, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, checkBuyIn, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
 import { DAILY, refresh, withdraw, deposit, nextRefill, playerId } from '../src/multiplayer/bank';
 import { totalChips } from '../src/engine/rules';
 
@@ -307,8 +307,21 @@ describe('chips and buy-ins', () => {
     expect(fmtChips(1)).toBe('0.5');
     expect(fmtChips(2)).toBe('1');
     expect(fmtChips(2500)).toBe('1,250');
-    expect(buyInFor(LOW_STAKES)).toEqual({ max: 200, min: 40 }); // 100 and 20 chips
-    expect(buyInFor(HIGH_STAKES)).toEqual({ max: 400, min: 80 }); // 200 and 40 chips
+    expect(buyInFor(LOW_STAKES)).toEqual({ min: 80, max: 200 }); // 40 to 100 chips
+    expect(buyInFor(HIGH_STAKES)).toEqual({ min: 160, max: 400 }); // 80 to 200 chips
+  });
+
+  it('only accepts a buy-in of whole chips inside the table range', () => {
+    expect(checkBuyIn(LOW_STAKES, 80)).toBe(80);
+    expect(checkBuyIn(LOW_STAKES, 150)).toBe(150);
+    expect(checkBuyIn(LOW_STAKES, 200)).toBe(200);
+    expect(checkBuyIn(LOW_STAKES, 78)).toBeNull(); // below the minimum
+    expect(checkBuyIn(LOW_STAKES, 202)).toBeNull(); // above the maximum
+    expect(checkBuyIn(LOW_STAKES, 151)).toBeNull(); // half a chip
+    expect(checkBuyIn(LOW_STAKES, 100.5)).toBeNull();
+    expect(checkBuyIn(LOW_STAKES, '200')).toBeNull();
+    expect(checkBuyIn(HIGH_STAKES, 160)).toBe(160);
+    expect(checkBuyIn(HIGH_STAKES, 120)).toBeNull();
   });
 
   it('a 1/2 table posts 1 and 2 chip blinds', () => {

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Table, DecisionFacts, HistoryList, dealMs } from '../components/Table';
@@ -144,8 +144,8 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money No-Limit Hold’em against real people. You get {fmtChips(DAILY)} chips a day. Sitting down buys in for 100 big blinds, and your stack comes back to you when you
-            leave. Run out, and you are done until tomorrow.
+            Free play-money No-Limit Hold’em against real people. You get {fmtChips(DAILY)} chips a day. Each table has a minimum and maximum buy-in, and you choose how much
+            to bring; your stack comes back to you when you leave. Run out, and you are done until tomorrow.
           </p>
         </div>
       </header>
@@ -163,7 +163,7 @@ export function PlayLobbyPage() {
               <li key={room}>
                 <span className="lt-name">{tableLabel(room)}</span>
                 <span className="lt-count note">
-                  Buy-in {fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : `${s.players}/${s.maxSeats} seated${s.playing ? ' · in a hand' : ''}`}
+                  Buy-in {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : `${s.players}/${s.maxSeats} seated${s.playing ? ' · in a hand' : ''}`}
                 </span>
                 <Link className={`btn small ${full ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${full ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
                   {full ? 'Watch' : 'Join'}
@@ -249,9 +249,13 @@ export function PlayTablePage() {
   const { view, bank, error, status, offset, sit, leave, start, act } = useLiveTable(room);
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
-  // what sitting down would buy in for: a full stack, or what is left today down to the minimum
+  // buy-in choice, in whole chips: from the table minimum up to its maximum or what you have, whichever is less
   const canBuyIn = !bank || bank.balance >= buyIn.min;
-  const buyInAmount = bank ? Math.min(buyIn.max, bank.balance) : buyIn.max;
+  const minChips = buyIn.min / CHIP;
+  const maxChips = Math.floor((bank ? Math.min(buyIn.max, bank.balance) : buyIn.max) / CHIP);
+  const [buyChips, setBuyChips] = useState<number | ''>(maxChips);
+  useEffect(() => setBuyChips(maxChips), [maxChips]);
+  const buyValid = typeof buyChips === 'number' && Number.isInteger(buyChips) && buyChips >= minChips && buyChips <= maxChips;
   const [name, setName] = useState(loadName);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
@@ -316,8 +320,9 @@ export function PlayTablePage() {
 
   const sitDown = (e: FormEvent) => {
     e.preventDefault();
+    if (!buyValid) return;
     saveName(name.trim());
-    sit(name);
+    sit(name, (buyChips as number) * CHIP);
   };
 
   if (!PARTY_HOST)
@@ -410,16 +415,53 @@ export function PlayTablePage() {
               {refillTime(bank!.refillsAt)}.
             </p>
           ) : (
-            <form className="row" onSubmit={sitDown}>
-              <label htmlFor="live-name">Your name</label>
-              <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
-              <button className="btn primary" type="submit">
-                Sit down · buy in {fmtChips(buyInAmount)}
-              </button>
-              <span className="note">
-                {bank ? `You have ${fmtChips(bank.balance)} chips. ` : ''}
-                {live ? 'You will be dealt in from the next hand.' : ''}
-              </span>
+            <form className="live-buyin" onSubmit={sitDown}>
+              <div className="row">
+                <label htmlFor="live-name">Your name</label>
+                <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
+              </div>
+              <div className="row live-buyin-row">
+                <label htmlFor="buyin-amount">Buy-in</label>
+                <button type="button" className={`btn small ${buyChips === minChips ? 'primary' : ''}`} onClick={() => setBuyChips(minChips)}>
+                  Min {minChips}
+                </button>
+                <input
+                  type="range"
+                  className="size-slider"
+                  aria-label="Buy-in amount"
+                  min={minChips}
+                  max={maxChips}
+                  step={1}
+                  value={buyValid ? buyChips : maxChips}
+                  style={{ '--fill': `${maxChips > minChips && buyValid ? (100 * ((buyChips as number) - minChips)) / (maxChips - minChips) : 100}%` } as CSSProperties}
+                  onChange={(e) => setBuyChips(Number(e.target.value))}
+                />
+                <button type="button" className={`btn small ${buyChips === maxChips ? 'primary' : ''}`} onClick={() => setBuyChips(maxChips)}>
+                  Max {maxChips}
+                </button>
+                <input
+                  id="buyin-amount"
+                  className="live-input live-amt"
+                  type="number"
+                  inputMode="numeric"
+                  min={minChips}
+                  max={maxChips}
+                  step={1}
+                  value={buyChips}
+                  aria-invalid={!buyValid}
+                  onChange={(e) => setBuyChips(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+              <div className="row">
+                <button className="btn primary" type="submit" disabled={!buyValid}>
+                  Sit down with {buyValid ? buyChips : '…'} chips
+                </button>
+                <span className="note">
+                  {buyValid ? '' : `Choose between ${minChips} and ${maxChips}. `}
+                  {bank ? `You have ${fmtChips(bank.balance)} chips. ` : ''}
+                  {live ? 'You will be dealt in from the next hand.' : ''}
+                </span>
+              </div>
             </form>
           )}
         </section>
@@ -492,7 +534,7 @@ export function PlayTablePage() {
           {busted && (
             <p className="note live-bust">
               {canBuyIn
-                ? `You lost your stack. Sit down again to buy in for ${fmtChips(buyInAmount)} (you have ${fmtChips(bank?.balance ?? 0)} chips left today).`
+                ? `You lost your stack. Buy in again above (${fmtChips(buyIn.min)}–${fmtChips(buyIn.max)}); you have ${fmtChips(bank?.balance ?? 0)} chips left today.`
                 : `You lost your stack, and that is your chips for today. More at ${bank ? refillTime(bank.refillsAt) : 'midnight'}.`}
             </p>
           )}
