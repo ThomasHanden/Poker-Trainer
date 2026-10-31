@@ -1,6 +1,7 @@
 # Accounts
 
-Players can sign in with Google or with an email and password. Accounts are optional: lessons,
+Players sign in with Google. (Email-and-password accounts are built but switched off: see "Email
+accounts" below.) Accounts are optional: lessons,
 practice, puzzles and live tables all work for guests exactly as before. Signing in keeps progress
 on every device.
 
@@ -80,28 +81,20 @@ organisation "Milton".
 - The project signs tokens with published ES256 keys, so the table server checks them itself.
 - `wrangler.jsonc` and `.env.local` have the project address and publishable key (both public).
 
-### Still to do
+### Email accounts (switched off)
 
-1. **Google sign-in** (Google Cloud Console, about 5 minutes):
-   1. https://console.cloud.google.com → create a project (or pick one).
-   2. **Google Auth Platform → Branding**: app name *Felt School*, your support email; add the
-      authorised domains `feltschool.vercel.app` and `uiqbxzeemhojjmpoechp.supabase.co` (Google refuses plain `supabase.co`: it is a shared domain, like `vercel.app`). **Audience**: External, then
-      Publish. **Data access**: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`.
-   3. **Clients → Create client → Web application**:
-      - Authorised JavaScript origins: `https://feltschool.vercel.app` and `http://localhost:5173`
-      - Authorised redirect URIs: `https://uiqbxzeemhojjmpoechp.supabase.co/auth/v1/callback`
-   4. Copy the Client ID and Client secret into Supabase → **Authentication → Sign In / Providers →
-      Google**, switch it on and Save.
-2. **Vercel → Project → Settings → Environment Variables** (Production and Preview), then redeploy:
-   - `VITE_SUPABASE_URL` = `https://uiqbxzeemhojjmpoechp.supabase.co`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_HFZkRP585bnony3bWIVOTQ_-a5Ggsbl`
-3. **Table server**: `npm run party:deploy` (it already has the values). Do this before the Vercel
-   variables go live, so signed-in players can sit down from the first minute.
-4. **Email for everyone** (before inviting players to sign up with email): Supabase's built-in
-   sender only delivers to members of your Supabase organisation, a few per hour. Add a sender in
-   **Authentication → Emails → SMTP Settings** (for example Resend or Postmark, which need a domain
-   you own, or a Gmail address with an app password for small numbers). Google sign-in does not
-   need this.
+Sign-in is Google only: `[auth.email] enable_signup = false` in `supabase/config.toml`, so the
+project never sends sign-up or reset emails, and the site shows only the sign-in methods Supabase
+reports as switched on (`/auth/v1/settings`). To offer email and password later: set up an email
+sender (Authentication → Emails → SMTP Settings), set `enable_signup = true`, run
+`config push`, and the email form, password reset and password settings appear by themselves.
+
+### Google sign-in (done)
+
+The Google client is set up and switched on in Supabase. Google's sign-in screen currently says
+"continue to uiqbxzeemhojjmpoechp.supabase.co"; it shows "Felt School" once Google has verified the
+brand (Google Cloud → Google Auth Platform → Verification Center: free, a few days, and it asks you
+to prove you own `feltschool.vercel.app`, usually with a tag added to the site).
 
 ## Code map
 

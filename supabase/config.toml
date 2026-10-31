@@ -22,8 +22,10 @@ minimum_password_length = 8
 enable_manual_linking = false
 
 [auth.email]
-enable_signup = true
-# new email accounts must confirm their address before they can sign in
+# Google sign-in only: email-and-password accounts are off, so no sign-up or reset emails are sent.
+# To offer them later, set an email sender (SMTP) in the dashboard first, then set this to true.
+enable_signup = false
+# if email accounts are turned on, they must confirm their address before they can sign in
 enable_confirmations = true
 # changing a password needs a recent sign-in (otherwise a reset link)
 secure_password_change = true

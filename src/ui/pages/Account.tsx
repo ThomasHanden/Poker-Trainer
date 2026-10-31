@@ -116,6 +116,24 @@ export function LoginPage() {
   }, [mode]);
 
   if (auth.status === 'off') return <NotSetUp />;
+  const methods = auth.methods;
+  if (!methods)
+    return (
+      <div className="page auth-page">
+        <p className="loading" role="status">
+          Loading…
+        </p>
+      </div>
+    );
+  if (!methods.google && !methods.email)
+    return (
+      <div className="page auth-page">
+        <h1>Sign in</h1>
+        <p>Signing in is not available right now. Lessons, practice and live tables all work without an account.</p>
+      </div>
+    );
+  // without email accounts there is only one way in, and it also creates the account
+  const googleOnly = !methods.email;
 
   const google = async () => {
     setBusy('google');
@@ -204,68 +222,80 @@ export function LoginPage() {
         </div>
       ) : (
         <div className="auth-card">
-          {mode !== 'reset' && (
+          {mode !== 'reset' && methods.google && (
             <>
               <button className="btn auth-google" onClick={google} disabled={busy !== null}>
                 <GoogleMark />
-                {busy === 'google' ? 'Opening Google…' : mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+                {busy === 'google' ? 'Opening Google…' : googleOnly ? 'Continue with Google' : mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
               </button>
-              <p className="auth-or">
-                <span>or with email</span>
-              </p>
+              {googleOnly && <p className="note">No account yet? Continuing with Google creates one. We only get your name, email address and profile picture from Google.</p>}
+              {error && googleOnly && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              {!googleOnly && (
+                <p className="auth-or">
+                  <span>or with email</span>
+                </p>
+              )}
             </>
           )}
-          <form onSubmit={submit} noValidate>
-            {mode === 'signup' && (
-              <Field label="Display name (optional)" value={name} onChange={setName} autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} hint="What other players see. You can change it later." />
-            )}
-            <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
-            {mode !== 'reset' && (
-              <Field
-                label="Password"
-                type="password"
-                value={password}
-                onChange={setPassword}
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                hint={mode === 'signup' ? `At least ${PASSWORD_MIN} characters.` : undefined}
-              />
-            )}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-            {unconfirmed && (
-              <button type="button" className="linklike" onClick={resend}>
-                Send the confirmation link again
-              </button>
-            )}
-            <button className="btn primary auth-submit" type="submit" disabled={busy !== null || !email.trim() || (mode !== 'reset' && !password)}>
-              {busy === 'form' ? 'One moment…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Email me a reset link'}
-            </button>
-          </form>
-          <p className="auth-switch">
-            {mode === 'signin' ? (
-              <>
-                <button className="linklike" onClick={() => setMode('reset')}>
-                  Forgot your password?
+          {!googleOnly && (
+            <form onSubmit={submit} noValidate>
+              {mode === 'signup' && (
+                <Field label="Display name (optional)" value={name} onChange={setName} autoComplete="nickname" maxLength={DISPLAY_NAME_MAX} hint="What other players see. You can change it later." />
+              )}
+              <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
+              {mode !== 'reset' && (
+                <Field
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  hint={mode === 'signup' ? `At least ${PASSWORD_MIN} characters.` : undefined}
+                />
+              )}
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              {unconfirmed && (
+                <button type="button" className="linklike" onClick={resend}>
+                  Send the confirmation link again
                 </button>
+              )}
+              <button className="btn primary auth-submit" type="submit" disabled={busy !== null || !email.trim() || (mode !== 'reset' && !password)}>
+                {busy === 'form' ? 'One moment…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Email me a reset link'}
+              </button>
+            </form>
+          )}
+          {!googleOnly && (
+            <p className="auth-switch">
+              {mode === 'signin' ? (
+                <>
+                  <button className="linklike" onClick={() => setMode('reset')}>
+                    Forgot your password?
+                  </button>
+                  <span>
+                    New here?{' '}
+                    <button className="linklike" onClick={() => setMode('signup')}>
+                      Create an account
+                    </button>
+                  </span>
+                </>
+              ) : (
                 <span>
-                  New here?{' '}
-                  <button className="linklike" onClick={() => setMode('signup')}>
-                    Create an account
+                  {mode === 'signup' ? 'Already have an account? ' : ''}
+                  <button className="linklike" onClick={() => setMode('signin')}>
+                    {mode === 'signup' ? 'Sign in' : 'Back to sign in'}
                   </button>
                 </span>
-              </>
-            ) : (
-              <span>
-                {mode === 'signup' ? 'Already have an account? ' : ''}
-                <button className="linklike" onClick={() => setMode('signin')}>
-                  {mode === 'signup' ? 'Sign in' : 'Back to sign in'}
-                </button>
-              </span>
-            )}
-          </p>
+              )}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -665,7 +695,7 @@ export function AccountPage() {
           <dt>Email</dt>
           <dd>{account.email ?? '—'}</dd>
           <dt>Signs in with</dt>
-          <dd>{[google && 'Google', hasPassword && 'email and password'].filter(Boolean).join(' and ') || '—'}</dd>
+          <dd>{[google && 'Google', hasPassword && auth.methods?.email && 'email and password'].filter(Boolean).join(' and ') || '—'}</dd>
         </dl>
         <form onSubmit={saveName} noValidate>
           <Field
@@ -693,47 +723,50 @@ export function AccountPage() {
         </form>
       </section>
 
-      <section className="auth-card" aria-labelledby="password-title">
-        <h2 id="password-title">Password</h2>
-        {hasPassword ? (
-          <form onSubmit={changePw} noValidate>
-            <Field
-              label="New password"
-              type="password"
-              value={pw}
-              onChange={(v) => {
-                setPw(v);
-                setPwMsg(null);
-              }}
-              autoComplete="new-password"
-              hint={`At least ${PASSWORD_MIN} characters.`}
-              error={pwMsg && !pwMsg.ok ? pwMsg.text : null}
-            />
-            <div className="row">
-              <button className="btn" type="submit" disabled={pwBusy || !pw}>
-                {pwBusy ? 'Saving…' : 'Change password'}
-              </button>
-              {pwMsg?.ok && (
-                <span className="note" role="status">
-                  {pwMsg.text}
-                </span>
-              )}
-            </div>
-          </form>
-        ) : (
-          <p>You sign in with Google. To sign in with a password as well, ask for a link to set one.</p>
-        )}
-        <p>
-          <button className="linklike" onClick={emailReset}>
-            {hasPassword ? 'Email me a password reset link instead' : 'Email me a link to set a password'}
-          </button>
-        </p>
-        {resetMsg && (
-          <p className="note" role="status">
-            {resetMsg}
+      {auth.methods?.email && (
+        <section className="auth-card" aria-labelledby="password-title">
+          <h2 id="password-title">Password</h2>
+          {hasPassword ? (
+            <form onSubmit={changePw} noValidate>
+              <Field
+                label="New password"
+                type="password"
+                value={pw}
+                onChange={(v) => {
+                  setPw(v);
+                  setPwMsg(null);
+                }}
+                autoComplete="new-password"
+                hint={`At least ${PASSWORD_MIN} characters.`}
+                error={pwMsg && !pwMsg.ok ? pwMsg.text : null}
+              />
+              <div className="row">
+                <button className="btn" type="submit" disabled={pwBusy || !pw}>
+                  {pwBusy ? 'Saving…' : 'Change password'}
+                </button>
+                {pwMsg?.ok && (
+                  <span className="note" role="status">
+                    {pwMsg.text}
+                  </span>
+                )}
+              </div>
+            </form>
+          ) : (
+            <p>You sign in with Google. To sign in with a password as well, ask for a link to set one.</p>
+          )}
+          <p>
+            <button className="linklike" onClick={emailReset}>
+              {hasPassword ? 'Email me a password reset link instead' : 'Email me a link to set a password'}
+            </button>
           </p>
-        )}
-      </section>
+          {resetMsg && (
+            <p className="note" role="status">
+              {resetMsg}
+            </p>
+          )}
+        </section>
+
+      )}
 
       <GuestChips />
 

@@ -21,3 +21,26 @@ export const supabase: SupabaseClient | null =
     : null;
 
 export const accountsEnabled = () => !!supabase;
+
+/** Which sign-in methods the project has switched on. */
+export interface SignInMethods {
+  google: boolean;
+  email: boolean;
+}
+
+/** Read Supabase's public settings (the same switches as in its dashboard). */
+export function methodsFrom(settings: unknown): SignInMethods {
+  const ext = (settings as { external?: Record<string, unknown> } | null)?.external ?? {};
+  return { google: ext.google === true, email: ext.email === true };
+}
+
+/** The sign-in methods on offer, from the project itself, so the site never shows one that is switched off. */
+export async function fetchSignInMethods(): Promise<SignInMethods | null> {
+  if (!url || !key) return null;
+  try {
+    const r = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
+    return r.ok ? methodsFrom(await r.json()) : null;
+  } catch {
+    return null;
+  }
+}

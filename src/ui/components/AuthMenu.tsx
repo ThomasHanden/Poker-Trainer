@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useStore } from '../store';
 
 export function AuthMenu() {
-  const { status, account, signOut } = useAuth();
+  const { status, account, signOut, methods } = useAuth();
   const { unsaved } = useStore();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -33,7 +33,8 @@ export function AuthMenu() {
 
   if (status === 'off' || status === 'loading') return null;
   if (!account) {
-    if (loc.pathname === '/login') return null;
+    // nothing to offer if no sign-in method is switched on
+    if (loc.pathname === '/login' || (methods && !methods.google && !methods.email)) return null;
     const next = `${loc.pathname}${loc.search}`;
     return (
       <Link className="btn small auth-signin" to={`/login?next=${encodeURIComponent(next)}`}>

@@ -4,7 +4,7 @@
 // that worked before.
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthError, Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { fetchSignInMethods, supabase, type SignInMethods } from './supabase';
 import { setLiveAccount } from '../ui/useLiveTable';
 import { track } from '../ui/analytics';
 
@@ -29,6 +29,8 @@ interface AuthValue {
   clearNotice(): void;
   /** they arrived from a password reset link and should choose a new password */
   recovering: boolean;
+  /** the sign-in methods switched on in Supabase (null until known) */
+  methods: SignInMethods | null;
   signInWithGoogle(next?: string): Promise<AuthResult>;
   signInWithPassword(email: string, password: string): Promise<AuthResult>;
   signUp(email: string, password: string, displayName: string): Promise<AuthResult & { confirm?: boolean }>;
@@ -111,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [displayName, setName] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [methods, setMethods] = useState<SignInMethods | null>(null);
   const leaving = useRef(false);
   const hooks = useRef(new Set<() => Promise<void>>());
   const userId = session?.user.id ?? null;
@@ -130,6 +133,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus(next ? 'signed-in' : 'signed-out');
     });
     return () => data.subscription.unsubscribe();
+  }, []);
+
+  // only offer the sign-in methods that are switched on (Google only, for now); if the settings
+  // cannot be read, Google is the one that is set up
+  useEffect(() => {
+    if (!supabase) return;
+    let current = true;
+    void fetchSignInMethods().then((m) => current && setMethods(m ?? { google: true, email: false }));
+    return () => {
+      current = false;
+    };
   }, []);
 
   // the display name lives in the profile (the database checks it); reload it for each account
@@ -273,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       notice,
       clearNotice: () => setNotice(null),
       recovering,
+      methods,
       signInWithGoogle,
       signInWithPassword,
       signUp,
@@ -284,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteAccount,
       beforeSignOut,
     }),
-    [status, account, notice, recovering, signInWithGoogle, signInWithPassword, signUp, resendConfirmation, sendPasswordReset, updatePassword, setDisplayName, signOut, deleteAccount, beforeSignOut],
+    [status, account, notice, recovering, methods, signInWithGoogle, signInWithPassword, signUp, resendConfirmation, sendPasswordReset, updatePassword, setDisplayName, signOut, deleteAccount, beforeSignOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

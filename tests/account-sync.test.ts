@@ -278,3 +278,13 @@ describe('after signing in', () => {
     for (const bad of ['//evil.com', '/\\evil.com', 'https://evil.com', 'evil.com', '']) expect(isSitePath(bad), bad).toBe(false);
   });
 });
+
+describe('sign-in methods', () => {
+  it('only the methods switched on in Supabase are offered', async () => {
+    const { methodsFrom } = await import('../src/auth/supabase');
+    expect(methodsFrom({ external: { google: true, email: false, github: true } })).toEqual({ google: true, email: false });
+    expect(methodsFrom({ external: { email: true } })).toEqual({ google: false, email: true });
+    expect(methodsFrom(null)).toEqual({ google: false, email: false });
+    expect(methodsFrom({ external: { google: 'yes' } })).toEqual({ google: false, email: false });
+  });
+});

@@ -31,9 +31,8 @@ export function PrivacyPage() {
       <h2>With an account</h2>
       <ul>
         <li>
-          <strong>Sign-in:</strong> your email address and how you sign in. If you use a password, our sign-in provider stores it in scrambled form; we never see
-          it. If you sign in with Google, Google shares your name, email address and profile picture with our sign-in provider, and we use your first name as your
-          starting display name.
+          <strong>Sign-in:</strong> you sign in with Google, which shares your name, email address and profile picture with our sign-in provider. We use your
+          first name as your starting display name, and never see your Google password.
         </li>
         <li>
           <strong>Your display name</strong>, which you can change on your Account page. It is shown at live tables. Your email address is never shown to other
