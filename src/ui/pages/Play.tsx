@@ -420,44 +420,53 @@ export function PlayTablePage() {
                 <label htmlFor="live-name">Your name</label>
                 <input id="live-name" className="live-input" value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
               </div>
-              <div className="row live-buyin-row">
-                <label htmlFor="buyin-amount">Buy-in</label>
-                <button type="button" className={`btn small ${buyChips === minChips ? 'primary' : ''}`} onClick={() => setBuyChips(minChips)}>
-                  Min {minChips}
-                </button>
-                <input
-                  type="range"
-                  className="size-slider"
-                  aria-label="Buy-in amount"
-                  min={minChips}
-                  max={maxChips}
-                  step={1}
-                  value={buyValid ? buyChips : maxChips}
-                  style={{ '--fill': `${maxChips > minChips && buyValid ? (100 * ((buyChips as number) - minChips)) / (maxChips - minChips) : 100}%` } as CSSProperties}
-                  onChange={(e) => setBuyChips(Number(e.target.value))}
-                />
-                <button type="button" className={`btn small ${buyChips === maxChips ? 'primary' : ''}`} onClick={() => setBuyChips(maxChips)}>
-                  Max {maxChips}
-                </button>
-                <input
-                  id="buyin-amount"
-                  className="live-input live-amt"
-                  type="number"
-                  inputMode="numeric"
-                  min={minChips}
-                  max={maxChips}
-                  step={1}
-                  value={buyChips}
-                  aria-invalid={!buyValid}
-                  onChange={(e) => setBuyChips(e.target.value === '' ? '' : Number(e.target.value))}
-                />
+              <div className="live-buyin-row">
+                <label htmlFor="buyin-amount">Buy in for</label>
+                <span className="live-amt-box">
+                  <input
+                    id="buyin-amount"
+                    type="number"
+                    inputMode="numeric"
+                    min={minChips}
+                    max={maxChips}
+                    step={1}
+                    value={buyChips}
+                    aria-invalid={!buyValid}
+                    aria-describedby="buyin-range"
+                    onChange={(e) => setBuyChips(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                  <span className="unit">chips</span>
+                </span>
+                <span className="live-quick">
+                  <button type="button" className={`btn small ${buyChips === minChips ? 'primary' : ''}`} onClick={() => setBuyChips(minChips)}>
+                    Min {minChips}
+                  </button>
+                  <button type="button" className={`btn small ${buyChips === maxChips ? 'primary' : ''}`} onClick={() => setBuyChips(maxChips)}>
+                    Max {maxChips}
+                  </button>
+                </span>
               </div>
+              <input
+                type="range"
+                className="size-slider live-buyin-slider"
+                aria-label="Buy-in amount"
+                min={minChips}
+                max={maxChips}
+                step={1}
+                value={buyValid ? buyChips : maxChips}
+                style={{ '--fill': `${maxChips > minChips && buyValid ? (100 * ((buyChips as number) - minChips)) / (maxChips - minChips) : 100}%` } as CSSProperties}
+                onChange={(e) => setBuyChips(Number(e.target.value))}
+              />
+              <p id="buyin-range" className={`note live-range ${buyValid ? '' : 'bad'}`}>
+                {buyValid ? '' : `Type an amount from ${minChips} to ${maxChips}. `}
+                This table: {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} chips
+                {maxChips < buyIn.max / CHIP ? ` (you have ${fmtChips(bank!.balance)}, so up to ${maxChips})` : ''}.
+              </p>
               <div className="row">
                 <button className="btn primary" type="submit" disabled={!buyValid}>
                   Sit down with {buyValid ? buyChips : '…'} chips
                 </button>
                 <span className="note">
-                  {buyValid ? '' : `Choose between ${minChips} and ${maxChips}. `}
                   {bank ? `You have ${fmtChips(bank.balance)} chips. ` : ''}
                   {live ? 'You will be dealt in from the next hand.' : ''}
                 </span>

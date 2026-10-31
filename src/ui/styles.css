@@ -6620,38 +6620,71 @@ label > span:first-child:not(.select-value) {
   font-weight: 600;
 }
 .live-buyin-row {
-  display: grid;
-  grid-template-columns: 5.5em auto minmax(120px, 1fr) auto 8ch;
-  grid-template-areas: 'label min slider max amount';
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px 10px;
 }
-.live-buyin-row label {
-  grid-area: label;
+/* the amount you type is the main control; the slider underneath is a shortcut */
+.live-amt-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
-.live-buyin-row .btn:first-of-type {
-  grid-area: min;
+.live-amt-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.live-buyin-row .size-slider {
-  grid-area: slider;
+/* scoped under .live-buyin to outrank the shared "softer form controls" input rules */
+.live-buyin .live-amt-box input[type='number'] {
+  width: 6.5ch;
+  height: 42px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 4px 8px 12px;
+}
+.live-buyin .live-amt-box input[type='number']:hover,
+.live-buyin .live-amt-box input[type='number']:focus,
+.live-buyin .live-amt-box input[type='number']:focus-visible {
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+.live-amt-box input::-webkit-outer-spin-button,
+.live-amt-box input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.live-quick {
+  display: inline-flex;
+  gap: 8px;
+}
+.live-amt-box input[aria-invalid='true'] {
+  color: var(--bad);
+}
+.live-amt-box .unit {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.live-buyin-slider {
   width: 100%;
+  max-width: 420px;
 }
-.live-buyin-row .btn:last-of-type {
-  grid-area: max;
+.live-range {
+  margin: -4px 0 0;
 }
-.live-buyin-row .live-amt {
-  grid-area: amount;
-  width: 100%;
-}
-@media (max-width: 560px) {
-  .live-buyin-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'label amount amount'
-      'min slider max';
-  }
-  .live-buyin-row .live-amt {
-    justify-self: start;
-    width: 10ch;
-  }
+.live-range.bad {
+  color: var(--bad);
 }

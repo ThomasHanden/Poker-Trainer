@@ -18,9 +18,9 @@ export interface Stakes {
 }
 export const LOW_STAKES: Stakes = { sb: 1, bb: 2, label: '0.5/1' };
 export const HIGH_STAKES: Stakes = { sb: 2, bb: 4, label: '1/2' };
-/** Buy-ins: players choose an amount between these, in big blinds (40–100bb, as most online sites). */
-export const MAX_BUY_IN_BB = 100;
-export const MIN_BUY_IN_BB = 40;
+/** Buy-ins: players choose an amount between these, in big blinds. */
+export const MAX_BUY_IN_BB = 150;
+export const MIN_BUY_IN_BB = 30;
 export const MAX_SEATS = 6;
 export const NAME_MAX = 12;
 export const TURN_MS = 30_000;
