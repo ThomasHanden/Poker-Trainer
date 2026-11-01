@@ -1,10 +1,13 @@
-// Table chat on live tables: what the seated players say, a message box with a small emoji picker,
-// and muting people (kept in this browser only). Messages are shown as text, never as HTML.
+// Table chat on live tables: what the seated players say as message bubbles, a message box with
+// an emoji picker, and muting people (kept in this browser only). Messages are shown as text, never as HTML.
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CHAT_MAX_CHARS, chatLength } from '../../multiplayer/chat';
 import type { ChatLine } from '../useLiveTable';
+import { EmojiPicker } from './EmojiPicker';
 
-const EMOJI = ['😀', '😂', '😅', '😎', '🤔', '😬', '😮', '😭', '😡', '😴', '🤯', '🥶', '👍', '👎', '👏', '🙏', '💪', '👋', '🔥', '💯', '🎉', '🍀', '❤️', '🃏', '♠️', '♥️', '♦️', '♣️'];
+/** Messages from the same person this close together share one name and time. */
+const GROUP_MS = 3 * 60_000;
+const NAME_HUES = [150, 25, 210, 280, 340, 45, 190, 0];
 const MUTED_KEY = 'live-muted';
 
 /** People you have muted, by player id; remembered in this browser. */
@@ -32,6 +35,17 @@ export function useMutes() {
 }
 
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+/** A steady colour for each player's name, so you can tell people apart at a glance. */
+function nameHue(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return NAME_HUES[Math.abs(h) % NAME_HUES.length];
+}
+
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[\u200D\uFE0F\u20E3\s]|\p{Emoji_Modifier})+$/u;
+/** One to three emoji and nothing else: drawn large, without a bubble. */
+const bigEmoji = (text: string) => EMOJI_ONLY.test(text) && chatLength(text.replace(/\s/g, '')) <= 3;
 
 export function LiveChat({
   id,
@@ -146,18 +160,36 @@ export function LiveChat({
             }}
           >
             {shown.length === 0 && <li className="chat-sys">No messages yet. Say hello.</li>}
-            {shown.map((l) =>
-              l.kind === 'system' ? (
-                <li key={`s${l.id}`} className="chat-sys">
-                  {l.text}
-                </li>
-              ) : (
-                <li key={l.cid ?? `m${l.id}`} className={`chat-line ${l.from === me || l.state ? 'mine' : ''}`}>
-                  <span className="chat-meta">
-                    <span className="chat-name">{l.from === me || l.state ? 'You' : l.name}</span>
-                    <time dateTime={new Date(l.at).toISOString()}>{time(l.at)}</time>
+            {shown.map((l, i) => {
+              if (l.kind === 'system')
+                return (
+                  <li key={`s${l.id}`} className="chat-sys">
+                    <span>{l.text}</span>
+                  </li>
+                );
+              const mine = l.from === me || !!l.state;
+              const prev = shown[i - 1];
+              const next = shown[i + 1];
+              const sameAs = (o?: ChatLine) => !!o && o.kind === 'player' && (o.from === me || !!o.state) === mine && (mine || o.from === l.from);
+              const first = !sameAs(prev) || l.at - prev!.at > GROUP_MS;
+              const last = !sameAs(next) || next!.at - l.at > GROUP_MS;
+              const big = bigEmoji(l.text);
+              return (
+                <li
+                  key={l.cid ?? `m${l.id}`}
+                  className={`chat-line ${mine ? 'mine' : ''} ${first ? 'first' : ''} ${last ? 'last' : ''} ${l.state ?? ''}`}
+                  style={mine ? undefined : ({ '--name-hue': nameHue(l.from ?? '') } as React.CSSProperties)}
+                >
+                  {first && (
+                    <span className="chat-meta">
+                      {!mine && <span className="chat-name">{l.name}</span>}
+                      <time dateTime={new Date(l.at).toISOString()}>{time(l.at)}</time>
+                    </span>
+                  )}
+                  <span className={big ? 'chat-text big' : 'chat-text'}>
+                    {mine && <span className="sr-only">You: </span>}
+                    {l.text}
                   </span>
-                  <span className="chat-text">{l.text}</span>
                   {l.state === 'sending' && <span className="chat-state">Sending…</span>}
                   {l.state === 'failed' && (
                     <span className="chat-state bad" role="alert">
@@ -168,23 +200,15 @@ export function LiveChat({
                     </span>
                   )}
                 </li>
-              ),
-            )}
+              );
+            })}
           </ol>
           {below && (
             <button type="button" className="chat-jump" onClick={toBottom}>
               New messages ↓
             </button>
           )}
-          {picker && (
-            <div className="chat-emoji" role="group" aria-label="Emoji">
-              {EMOJI.map((em) => (
-                <button key={em} type="button" onClick={() => insert(em)} aria-label={`Insert ${em}`}>
-                  {em}
-                </button>
-              ))}
-            </div>
-          )}
+          {picker && <EmojiPicker onPick={insert} />}
           <form className="chat-form" onSubmit={send}>
             <button type="button" className="chat-emoji-btn" aria-label="Emoji" aria-expanded={picker} onClick={() => setPicker((p) => !p)}>
               🙂
@@ -204,8 +228,10 @@ export function LiveChat({
               aria-invalid={tooLong}
               aria-describedby={len > CHAT_MAX_CHARS - 50 ? `${id}-count` : undefined}
             />
-            <button type="submit" className="btn small primary" disabled={!len || tooLong}>
-              Send
+            <button type="submit" className="chat-send" aria-label="Send" disabled={!len || tooLong}>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           </form>
           {len > CHAT_MAX_CHARS - 50 && (
