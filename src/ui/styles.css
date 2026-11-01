@@ -5127,6 +5127,10 @@ details.sequence[open] {
 .home-band .btn {
   flex-shrink: 0;
 }
+/* the Mini games button scrolls here: clear the sticky header */
+.puzzles {
+  scroll-margin-top: 80px;
+}
 .home-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

@@ -208,6 +208,9 @@ test('first visit: choose where to start, or skip it for good', async ({ page })
   await expect(page.getByTestId('home-play-live')).toBeVisible();
   await expect(page.getByTestId('start-choice')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Start with the first lesson' })).toHaveAttribute('href', '/learn/rules-rankings');
+  // Mini games jumps down to the puzzles
+  await page.getByTestId('home-mini-games').click();
+  await expect(page.getByTestId('pz-start')).toBeInViewport();
 });
 
 test('I know the rules: a hand with help, one decision, its review, and the next hand from the bottom', async ({ page }) => {

@@ -112,6 +112,13 @@ export function HomePage() {
             <Link className="btn big" to="/practice">
               Practice
             </Link>
+            <button
+              className="btn big"
+              onClick={() => document.getElementById('daily')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              data-testid="home-mini-games"
+            >
+              Mini games ↓
+            </button>
           </div>
         )}
       </section>
