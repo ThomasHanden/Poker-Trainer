@@ -28,8 +28,8 @@ export function PrivacyPage() {
           It is kept in the table’s memory and is gone when the table restarts.
         </li>
         <li>
-          The hands you play at live tables are saved in your own browser (your live hand history), with your cards and any cards shown at the table. They are not
-          sent to us.
+          The hands you play at live tables are saved in your own browser (your live hand history), with your cards and any cards shown at the table, and so are
+          your reviews of them with the trainer. They are not sent to us.
         </li>
         <li>
           Table chat is seen by the players seated at that table. It is kept in the table’s memory only: the last 50 messages, for up to an hour, and it is gone

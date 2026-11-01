@@ -280,6 +280,8 @@ export interface TableView {
   rabbit: Card[];
   /** hand.players indexes who showed their cards after the hand */
   shownBy: number[];
+  /** this hand's own id (random), so a saved hand is never confused with another */
+  handId: string;
   /** the last hand's 7-2 bounty: who won it (hand.players index) and the total collected */
   bounty: { player: number; total: number } | null;
   /** how many people are watching without a seat (filled in by the server) */
@@ -424,6 +426,8 @@ export class LiveTable {
   /** the seat now drawing on its time bank, and when that started */
   private banking: { id: string; from: number; had: number } | null = null;
   private turnLength = TURN_MS;
+  /** the current (or last) hand's id */
+  private handId = '';
   /** run it twice: who has answered (hand.players index → yes/no), until the deadline */
   private runoutVote: { deadline: number; votes: Map<number, boolean> } | null = null;
 
@@ -675,6 +679,7 @@ export class LiveTable {
       doubleBoard,
       holdRunout: this.settings.runItTwice && !doubleBoard,
     });
+    this.handId = Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, '0')).join('');
     this.shown = new Set();
     this.rabbitCards = [];
     this.bountyWon = null;
@@ -816,6 +821,7 @@ export class LiveTable {
       requests: id === this.hostId ? this.requests : this.requests.filter((q) => q.id === id),
       rabbit: this.rabbitCards,
       shownBy: h?.complete ? [...this.shown] : [],
+      handId: this.handId,
       bounty: this.bountyWon,
       runout: this.runoutVote && h && !h.complete
         ? { deadline: this.runoutVote.deadline, votes: Object.fromEntries(h.players.map((p, i) => [i, p.folded ? undefined : (this.runoutVote!.votes.get(i) ?? null)]).filter(([, v]) => v !== undefined)) }

@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/:page(practice|learn|ranges|play|review|progress|privacy)", "destination": "/:page.html" },
     { "source": "/learn/:lesson", "destination": "/learn/:lesson.html" },
+    { "source": "/play/history/:id", "destination": "/app.html" },
     { "source": "/play/:room", "destination": "/app.html" },
     { "source": "/review/:hand", "destination": "/app.html" },
     { "source": "/:page(login|account|reset-password)", "destination": "/app.html" },

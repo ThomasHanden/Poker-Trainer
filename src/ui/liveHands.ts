@@ -1,12 +1,14 @@
 // Your live-table hands, kept in this browser (per account when signed in): every finished hand
 // you were dealt into, as you saw it (your cards, and other players' only when they were shown).
-// Used for the live hand history: replays, session stats and a text log you can download.
+// Used for the live hand history: replays, session stats, a text log you can download, and
+// reviews with the trainer. Hand records and reviews are kept apart: a review never changes a hand.
 
 import type { HandState, RecordType, Street } from '../engine/rules';
 import { cardToString } from '../engine/cards';
 import { describeScore } from '../engine/evaluator';
 import { currentOwner, ownedKey } from '../persistence/storage';
-import { fmtChips, tableLabel } from '../multiplayer/table';
+import { fmtChips, tableLabel, type Stakes, type TableSettings } from '../multiplayer/table';
+import { ANALYSIS_VERSION, type LiveReview } from '../review/liveReview';
 
 export interface LiveHand {
   /** room:handNo:startedAt, so the same hand is never kept twice */
@@ -17,7 +19,12 @@ export interface LiveHand {
   at: number;
   /** your index in hand.players */
   me: number;
+  /** the engine's record of the hand as you saw it: every action, the board, the result */
   hand: HandState;
+  /** the table server's id for the hand (hands saved before it existed have none) */
+  handId?: string;
+  /** the table's stakes and rules for this hand (not kept for older hands) */
+  rules?: { stakes: Stakes; settings: TableSettings };
 }
 
 const KEY = 'felt-school:live-hands';
@@ -52,8 +59,57 @@ export function saveLiveHand(h: LiveHand) {
 export function clearLiveHands() {
   try {
     localStorage.removeItem(ownedKey(KEY));
+    localStorage.removeItem(ownedKey(REVIEW_KEY));
   } catch {
     /* nothing kept */
+  }
+}
+
+export const findLiveHand = (id: string, who: string | null = currentOwner()) => loadLiveHands(who).find((h) => h.id === id) ?? null;
+
+// ---------------- reviews ----------------
+
+const REVIEW_KEY = 'felt-school:live-reviews';
+const REVIEW_MAX = 300;
+
+export interface SavedReview {
+  /** when you first opened the review */
+  reviewedAt: number;
+  review: LiveReview;
+}
+
+function loadReviews(who: string | null = currentOwner()): Record<string, SavedReview> {
+  try {
+    const v = JSON.parse(localStorage.getItem(ownedKey(REVIEW_KEY, who)) ?? '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** A saved review for a hand, if it was made by this version of the analysis (older ones are made again). */
+export function savedReview(handId: string, who: string | null = currentOwner()): SavedReview | null {
+  const r = loadReviews(who)[handId];
+  return r && r.review?.version === ANALYSIS_VERSION ? r : null;
+}
+
+/** Hands you have opened a review for (any version). */
+export function reviewedIds(who: string | null = currentOwner()): Set<string> {
+  return new Set(Object.keys(loadReviews(who)));
+}
+
+export function saveReview(review: LiveReview, who: string | null = currentOwner()) {
+  const all = loadReviews(who);
+  const earlier = all[review.handId];
+  all[review.handId] = { reviewedAt: earlier?.reviewedAt ?? Date.now(), review };
+  // keep the newest reviews only
+  const keep = Object.entries(all)
+    .sort((a, b) => b[1].reviewedAt - a[1].reviewedAt)
+    .slice(0, REVIEW_MAX);
+  try {
+    localStorage.setItem(ownedKey(REVIEW_KEY, who), JSON.stringify(Object.fromEntries(keep)));
+  } catch {
+    /* not kept: it is made again next time */
   }
 }
 

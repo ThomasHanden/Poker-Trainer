@@ -27,6 +27,46 @@ and is unit tested (`tests/live-table.test.ts`, `tests/live-bots.test.ts`,
 | Watchers | The number of people connected without a seat. | `PokerTable.update` |
 | In the browser | Sounds, amounts in chips or big blinds and the felt colour (Table options); your live hand history at `/play/history` with stats, replays and a downloadable text log (`src/ui/liveHands.ts`). | `LiveExtras.tsx`, `LiveHistory.tsx` |
 
+## Reviewing live hands with the trainer
+
+Every finished hand you were dealt into is saved in your browser (`src/ui/liveHands.ts`, per
+account when signed in) as the engine's own record of it, exactly as the table server showed it to
+you: config, starting stacks, every action with its amount, the board(s), the result, your cards,
+and other players' cards only if they were shown. Each hand has the server's random hand id and the
+table's stakes and rules.
+
+`/play/history` lists them (Recent hands, 20 at a time, with your cards, seat, board, result and
+whether you reviewed it); the table page has "Review with Trainer" after each of your hands and
+"Your recent hands" (both open a new tab, so you keep your seat). `/play/history/:id` is the review.
+
+How it works (`src/review/liveReview.ts`):
+
+- **Rebuild and check.** The hand is replayed from its record (with the cards that were shown) and
+  must reach exactly the recorded stacks and board; if not, it is refused as incomplete rather than
+  guessed at. Each of your decisions is then rebuilt with only your cards known and cut back to the
+  board at that moment: no later cards, no opponents' cards, no deck. Pot, amount to call, the
+  equity a call needs, stacks, SPR, players and position are measured from that state.
+- **Assess.** Each decision goes through the practice trainer's own evaluator
+  (`evaluateDecision`) with no scenario template, so it uses the generic guidance: preflop charts,
+  pot-odds maths when facing a bet, betting heuristics, and a simulation of the options against
+  opponent ranges inferred from their actions with the "unknown" opponent model. Live opponents are
+  real people, so ranges and equity are estimates and are labelled so; the outcome of the hand is
+  never used. Grades map to: Strong decision, Reasonable, Could improve, Likely mistake, Not
+  assessed. No percentage score is shown.
+- **Not assessed:** straddled hands, bomb pots and double boards (the evaluator does not model
+  them), and any spot the evaluator cannot handle. They can still be stepped through.
+- **Try again** assesses another legal action at the same moment on its own; the review then
+  carries on from what was really played.
+- **Saving.** Reviews are stored apart from hands (`felt-school:live-reviews`), keyed by hand id and
+  tagged with `ANALYSIS_VERSION` (review version + the trainer's `SCORING_VERSION`): a review made by
+  another version is made again instead of being shown as current. The analysis is deterministic
+  (seeded by the hand id), runs in the engine worker, and a failure leaves the hand untouched.
+- **Practise this spot** links to `/practice?concept=…` for the concepts the evaluator named, when
+  your practice settings can deal them, and to their lessons.
+
+Limits: hands are only in the browser they were played on (not synced to accounts); a hand is saved
+only if the page was open when it ended; no solver is involved.
+
 ## Who a player is
 
 There are no accounts yet. Each browser makes a random secret key (`playerKey()` in

@@ -10,6 +10,7 @@ import { parseRange, expandRange } from '../ranges/hands';
 import { Card, createRng } from '../engine/cards';
 import { classEquityVsRange } from '../ranges/preflopEquity';
 import * as practice from '../ranges/practice';
+import { assessAction, rebuildDecisions, reviewHand, type ReviewableHand } from '../review/liveReview';
 
 export type TaskRequest =
   | { kind: 'generate'; settings: PracticeSettings; opts: GenerateOptions }
@@ -18,7 +19,11 @@ export type TaskRequest =
   | { kind: 'rebuild'; scenarioId: string; settings: PracticeSettings; actions: PlayerAction[] }
   | { kind: 'equity'; hero: Card[]; ranges: string[]; board: Card[]; samples: number }
   | { kind: 'classEquity'; hand: string; range: string }
-  | { kind: 'rangeDrill'; drill: practice.DrillKind; seed: number };
+  | { kind: 'rangeDrill'; drill: practice.DrillKind; seed: number }
+  /** review a live-table hand with the trainer */
+  | { kind: 'liveReview'; hand: ReviewableHand }
+  /** Try again: assess another action at one decision of a live hand */
+  | { kind: 'liveTry'; hand: ReviewableHand; decision: number; action: PlayerAction };
 
 export interface RebuildResult {
   scenario?: Scenario;
@@ -53,5 +58,12 @@ export function runTask(req: TaskRequest): unknown {
       return classEquityVsRange(req.hand, parseRange(req.range));
     case 'rangeDrill':
       return practice.buildDrill(req.drill, req.seed);
+    case 'liveReview':
+      return reviewHand(req.hand);
+    case 'liveTry': {
+      const d = rebuildDecisions(req.hand).decisions[req.decision];
+      if (!d) throw new Error('That decision is not in this hand');
+      return assessAction(req.hand, d, req.action);
+    }
   }
 }

@@ -355,6 +355,7 @@ const VIEW_DEFAULTS: Omit<TableView, 'type' | 'you' | 'seats' | 'maxSeats' | 'au
   requests: [],
   rabbit: [],
   shownBy: [],
+  handId: '',
   bounty: null,
   runout: null,
 };

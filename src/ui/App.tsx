@@ -12,6 +12,7 @@ import { PlayLobbyPage, PlayTablePage } from './pages/Play';
 import { AccountPage, AuthCallbackPage, GuestImport, LoginPage, ResetPasswordPage } from './pages/Account';
 import { PrivacyPage } from './pages/Privacy';
 import { LiveHistoryPage } from './pages/LiveHistory';
+import { LiveReviewPage } from './pages/LiveReview';
 import { AuthMenu } from './components/AuthMenu';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
@@ -128,6 +129,7 @@ export function Shell() {
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/play" element={<PlayLobbyPage />} />
             <Route path="/play/history" element={<LiveHistoryPage />} />
+            <Route path="/play/history/:id" element={<LiveReviewPage />} />
             <Route path="/play/:room" element={<PlayTablePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />

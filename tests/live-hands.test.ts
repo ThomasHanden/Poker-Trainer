@@ -59,3 +59,49 @@ describe('live hand history', () => {
     expect(cardsShown[0]).toContain('(you)');
   });
 });
+
+import { vi } from 'vitest';
+import { findLiveHand, loadLiveHands, reviewedIds, saveLiveHand, saveReview, savedReview } from '../src/ui/liveHands';
+import { ANALYSIS_VERSION, type LiveReview } from '../src/review/liveReview';
+
+describe('keeping hands and reviews', () => {
+  const store = () => {
+    const m = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) });
+    return m;
+  };
+  const review = (handId: string, version = ANALYSIS_VERSION): LiveReview => ({ handId, version, createdAt: 1, decisions: [], summary: { keyPoint: 'k', good: [], improvements: [], concepts: [], assessed: 0 } });
+
+  it('saving the same hand twice keeps one copy; cards shown afterwards update it', () => {
+    store();
+    const h = playHand(1000);
+    saveLiveHand(h);
+    saveLiveHand(h);
+    expect(loadLiveHands(null)).toHaveLength(1);
+    const later = structuredClone(h);
+    later.hand.players[1].hole = later.hand.players[1].hole.length ? later.hand.players[1].hole : [0, 1];
+    saveLiveHand({ ...later, at: 9999 });
+    expect(loadLiveHands(null)).toHaveLength(1);
+    expect(findLiveHand(h.id, null)!.at).toBe(1000);
+  });
+
+  it('reviews are stored apart from hands, per account, and a review from an older version is made again', () => {
+    const m = store();
+    const h = playHand(1000);
+    saveLiveHand(h);
+    saveReview(review(h.id), null);
+    expect(savedReview(h.id, null)?.review.handId).toBe(h.id);
+    expect(reviewedIds(null).has(h.id)).toBe(true);
+    // the hand record itself is untouched by the review
+    expect(JSON.stringify(loadLiveHands(null)[0])).toBe(JSON.stringify(h));
+    expect([...m.keys()].sort()).toEqual(['felt-school:live-hands', 'felt-school:live-reviews']);
+    // another account on the same browser sees neither
+    expect(loadLiveHands('user-2')).toEqual([]);
+    expect(savedReview(h.id, 'user-2')).toBeNull();
+    // made by another version: not shown as current
+    saveReview(review(h.id, '0/old'), null);
+    expect(savedReview(h.id, null)).toBeNull();
+    expect(reviewedIds(null).has(h.id)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});

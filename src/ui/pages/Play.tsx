@@ -1,4 +1,4 @@
-import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Table, HistoryList, dealMs, fmtBB, type Reaction, type Seating } from '../components/Table';
@@ -6,7 +6,8 @@ import { ActionBar, type AmountUnit } from '../components/ActionBar';
 import { LiveChat, useMutes } from '../components/LiveChat';
 import { PARTY_HOST, claimDailyChips, fetchBankroll, LOBBY_POLL_MS, occupancy, rememberHostSettings, rememberTable, useLiveTable, usePublicTables, type Bankroll } from '../useLiveTable';
 import { HostPanel, LedgerPanel, ReactionBar, SettingsFields, TableOptions, describeSettings, useTablePrefs } from '../components/LiveExtras';
-import { saveLiveHand } from '../liveHands';
+import { loadLiveHands, reviewedIds, saveLiveHand } from '../liveHands';
+import { HandRow } from './LiveHistory';
 import { sounds } from '../sounds';
 import {
   CHIP,
@@ -390,6 +391,29 @@ function RunoutVote({ votes, me, names, deadline, offset, onVote }: { votes: Rec
   );
 }
 
+/** Your last few live hands, each a click from its review (in a new tab, so you keep your seat). */
+function RecentHands({ handNo, fourColor }: { handNo: number; fourColor: boolean }) {
+  // read again after every hand
+  const hands = useMemo(() => [...loadLiveHands()].sort((a, b) => b.at - a.at).slice(0, 5), [handNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reviewed = useMemo(() => reviewedIds(), [handNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!hands.length) return null;
+  return (
+    <details className="more live-history">
+      <summary>Your recent hands</summary>
+      <ul className="lh-hands">
+        {hands.map((h) => (
+          <HandRow key={h.id} h={h} reviewed={reviewed.has(h.id)} fourColor={fourColor} newTab />
+        ))}
+      </ul>
+      <p className="note">
+        <Link to="/play/history" target="_blank" rel="noopener">
+          All your live hands
+        </Link>
+      </p>
+    </details>
+  );
+}
+
 type PreAction = 'checkfold' | 'callany';
 
 /** Seconds left until a server time, updated twice a second. */
@@ -595,7 +619,16 @@ export function PlayTablePage() {
   // every finished hand you played goes into your live hand history (cards shown later are added)
   useEffect(() => {
     if (!view || !h?.complete || me < 0) return;
-    saveLiveHand({ id: `${room}:${view.handNo}:${h.players[me].hole.join('.')}`, room, handNo: view.handNo, at: Date.now(), me, hand: h });
+    saveLiveHand({
+      id: view.handId || `${room}:${view.handNo}:${h.players[me].hole.join('.')}`,
+      handId: view.handId || undefined,
+      room,
+      handNo: view.handNo,
+      at: Date.now(),
+      me,
+      hand: h,
+      rules: { stakes: view.stakes, settings: view.settings },
+    });
   }, [view, h, me, room]);
 
   // chat: open beside the table (desktop) or as a drawer (phones); it starts closed, and on a phone
@@ -786,6 +819,8 @@ export function PlayTablePage() {
   const sawMine = !!h?.result && (view?.shownBy.includes(me) || (h.result.reason === 'showdown' && h.result.showdownPlayers.includes(me)));
   const canShow = !!h?.complete && me >= 0 && !sawMine;
   const canRabbit = !!h?.complete && !!view?.settings.rabbitHunt && h.board.length < 5 && !view.rabbit.length && (me >= 0 || !!mySeat);
+  // the id this hand is saved under (see the effect that saves it)
+  const savedHandId = view?.handId || (h && me >= 0 ? `${room}:${view?.handNo}:${h.players[me].hole.join('.')}` : '');
   const nextIsBomb = !!view && view.settings.bombEvery > 0 && (view.handNo + 1) % view.settings.bombEvery === 0;
   // reactions by each seat: players in the hand by their place in it, others by their seat
   const reactionsOnTable = {
@@ -985,8 +1020,14 @@ export function PlayTablePage() {
                 </details>
               </div>
             )}
-            {h?.complete && (canShow || canRabbit) && (
+            {h?.complete && (canShow || canRabbit || me >= 0) && (
               <div className="row after-hand" role="group" aria-label="After the hand">
+                {me >= 0 && (
+                  // a new tab, so your seat stays where it is
+                  <Link className="btn small primary" to={`/play/history/${encodeURIComponent(savedHandId)}`} target="_blank" rel="noopener">
+                    Review with Trainer
+                  </Link>
+                )}
                 {canShow && (
                   <button className="btn small" onClick={show}>
                     Show my cards
@@ -1050,6 +1091,7 @@ export function PlayTablePage() {
               <HostPanel settings={view.settings} paused={view.paused} bombNext={view.bombNext} requests={view.requests} seats={view.seats} you={view.you} money={money} on={host} />
             )}
             <LedgerPanel lines={view.ledger} you={view.you} money={money} />
+            <RecentHands handNo={view.handNo} fourColor={data.prefs.fourColor} />
             {h && (
               <details className="more live-history">
                 <summary>Hand history</summary>
