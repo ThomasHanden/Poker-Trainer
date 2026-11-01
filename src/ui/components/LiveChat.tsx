@@ -1,10 +1,10 @@
 // Table chat on live tables: what the seated players say as message bubbles, a message box with
-// an emoji picker, and muting people (kept in this browser only). Messages are shown as text, never as HTML.
+// a small emoji picker, and muting people (kept in this browser only). Messages are shown as text, never as HTML.
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CHAT_MAX_CHARS, chatLength } from '../../multiplayer/chat';
 import type { ChatLine } from '../useLiveTable';
-import { EmojiPicker } from './EmojiPicker';
 
+const EMOJI = ['😀', '😂', '😅', '😎', '🤔', '😬', '😮', '😭', '😡', '😴', '🤯', '🥶', '👍', '👎', '👏', '🙏', '💪', '👋', '🔥', '💯', '🎉', '🍀', '❤️', '🃏', '♠️', '♥️', '♦️', '♣️'];
 /** Messages from the same person this close together share one name and time. */
 const GROUP_MS = 3 * 60_000;
 const NAME_HUES = [150, 25, 210, 280, 340, 45, 190, 0];
@@ -208,7 +208,15 @@ export function LiveChat({
               New messages ↓
             </button>
           )}
-          {picker && <EmojiPicker onPick={insert} />}
+          {picker && (
+            <div className="chat-emoji" role="group" aria-label="Emoji">
+              {EMOJI.map((em) => (
+                <button key={em} type="button" onClick={() => insert(em)} aria-label={`Insert ${em}`}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          )}
           <form className="chat-form" onSubmit={send}>
             <button type="button" className="chat-emoji-btn" aria-label="Emoji" aria-expanded={picker} onClick={() => setPicker((p) => !p)}>
               🙂
