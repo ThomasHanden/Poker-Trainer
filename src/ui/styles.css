@@ -8424,3 +8424,96 @@ label > span:first-child:not(.select-value) {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* ============================================================
+   Settings
+   ============================================================ */
+.settings-link {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.settings-link:hover,
+.settings-link:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.settings-link[aria-current='page'] {
+  color: var(--accent);
+}
+/* keyboard shortcut hints can be switched off (Settings) */
+[data-shortcuts='off'] .btn kbd {
+  display: none;
+}
+.settings-page {
+  max-width: 760px;
+}
+.set-group {
+  margin: 0 0 22px;
+  padding: 4px 18px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.set-group h2 {
+  margin: 14px 0 4px;
+  font-size: 1.05rem;
+}
+.set-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 18px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.set-group h2 + .set-row {
+  border-top: none;
+}
+.set-text label,
+.set-text > span {
+  display: block;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.set-text .note {
+  margin: 2px 0 0;
+}
+.set-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.set-control input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.set-preview {
+  grid-column: 1 / -1;
+}
+.set-more {
+  margin: 4px 0 10px;
+}
+.set-links {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+}
+.set-links li {
+  margin: 6px 0;
+}
+@media (max-width: 560px) {
+  .set-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .set-control {
+    justify-content: flex-start;
+  }
+}

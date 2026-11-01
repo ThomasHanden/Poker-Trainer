@@ -18,6 +18,9 @@ import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
 import { NOT_FOUND, pageMeta } from '../seo';
 import { noteVisit } from './analytics';
+import { legacySoundChoice, setSoundEnabled } from './sounds';
+import { SettingsPage } from './pages/Settings';
+import type { Felt } from '../persistence/storage';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -71,6 +74,40 @@ function AccountBanners() {
   );
 }
 
+/**
+ * Preferences that act on the whole site: sounds, the shortcut hints, and (once) table options
+ * saved by pages from before they were preferences.
+ */
+function PrefsEffects() {
+  const { data, update } = useStore();
+  useEffect(() => setSoundEnabled(data.prefs.sound !== false), [data.prefs.sound]);
+  useEffect(() => {
+    document.documentElement.dataset.shortcuts = data.prefs.showShortcuts === false ? 'off' : 'on';
+  }, [data.prefs.showShortcuts]);
+  useEffect(() => {
+    try {
+      const old = JSON.parse(localStorage.getItem('live-prefs') ?? 'null') as { bb?: boolean; felt?: Felt } | null;
+      const sound = legacySoundChoice();
+      if (!old && sound === null) return;
+      update((d) => ({
+        ...d,
+        prefs: {
+          ...d.prefs,
+          ...(d.prefs.sound === undefined && sound !== null ? { sound } : {}),
+          ...(d.prefs.amountsBB === undefined && old?.bb !== undefined ? { amountsBB: old.bb } : {}),
+          ...(d.prefs.felt === undefined && old?.felt ? { felt: old.felt } : {}),
+        },
+      }));
+      localStorage.removeItem('live-prefs');
+      localStorage.removeItem('live-sound');
+    } catch {
+      /* nothing to carry over */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 /** The page itself; the build also renders it to HTML for every public page (scripts/prerender.tsx). */
 export function Shell() {
   const { storageWarning, owner, sync } = useStore();
@@ -107,8 +144,17 @@ export function Shell() {
             </NavLink>
           ))}
         </nav>
+        <NavLink to="/settings" className="settings-link" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M19.14 12.94a7.14 7.14 0 0 0 .05-.94 7.14 7.14 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.14 7.14 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+            />
+          </svg>
+        </NavLink>
         <AuthMenu />
       </header>
+      <PrefsEffects />
       {storageWarning && (
         <div className="banner warn" role="status">
           {storageWarning}
@@ -136,6 +182,7 @@ export function Shell() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>

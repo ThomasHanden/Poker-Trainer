@@ -2,6 +2,9 @@
 // host), the host's controls, the session ledger, quick reactions and this browser's table options
 // (sound, amounts in chips or big blinds, felt colour).
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useStore } from '../store';
+import type { Felt } from '../../persistence/storage';
 import {
   BOMB_BB,
   BOMB_EVERY,
@@ -18,7 +21,6 @@ import {
   type SeatView,
   type TableSettings,
 } from '../../multiplayer/table';
-import { setSoundOn, soundOn } from '../sounds';
 
 type Money = (units: number) => string;
 
@@ -280,15 +282,14 @@ export function ReactionBar({ onReact }: { onReact: (emoji: string) => void }) {
   );
 }
 
-// ---------------- this browser's table options ----------------
+// ---------------- table options (your preferences, also on the Settings page) ----------------
 
-export const FELTS = [
+export const FELTS: [Felt, string][] = [
   ['green', 'Green'],
   ['blue', 'Blue'],
   ['red', 'Red'],
   ['charcoal', 'Charcoal'],
-] as const;
-export type Felt = (typeof FELTS)[number][0];
+];
 
 export interface TablePrefs {
   sound: boolean;
@@ -297,31 +298,33 @@ export interface TablePrefs {
   felt: Felt;
 }
 
-const PREFS_KEY = 'live-prefs';
-
-function readPrefs(): TablePrefs {
-  let saved: Partial<TablePrefs> = {};
-  try {
-    saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
-  } catch {
-    /* defaults */
-  }
-  return { sound: soundOn(), bb: saved.bb === true, felt: FELTS.some(([f]) => f === saved.felt) ? (saved.felt as Felt) : 'green' };
+/** The table options, read from and saved to your preferences (with your account when signed in). */
+export function useTablePrefs(): [TablePrefs, (p: Partial<TablePrefs>) => void] {
+  const { data, update } = useStore();
+  const prefs: TablePrefs = { sound: data.prefs.sound !== false, bb: data.prefs.amountsBB === true, felt: data.prefs.felt ?? 'green' };
+  const set = (p: Partial<TablePrefs>) =>
+    update((d) => ({
+      ...d,
+      prefs: {
+        ...d.prefs,
+        ...(p.sound !== undefined ? { sound: p.sound } : {}),
+        ...(p.bb !== undefined ? { amountsBB: p.bb } : {}),
+        ...(p.felt !== undefined ? { felt: p.felt } : {}),
+      },
+    }));
+  return [prefs, set];
 }
 
-export function useTablePrefs(): [TablePrefs, (p: Partial<TablePrefs>) => void] {
-  const [prefs, setPrefs] = useState(readPrefs);
-  const update = (p: Partial<TablePrefs>) => {
-    const next = { ...prefs, ...p };
-    setPrefs(next);
-    if (p.sound !== undefined) setSoundOn(p.sound);
-    try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ bb: next.bb, felt: next.felt }));
-    } catch {
-      /* only for this visit */
-    }
-  };
-  return [prefs, update];
+export function FeltPicker({ value, onChange }: { value: Felt; onChange: (f: Felt) => void }) {
+  return (
+    <div className="felt-swatches" role="radiogroup" aria-label="Felt colour">
+      {FELTS.map(([f, label]) => (
+        <button key={f} type="button" role="radio" aria-checked={value === f} className={`swatch felt-${f}`} onClick={() => onChange(f)} title={label}>
+          <span className="sr-only">{label}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function TableOptions({ prefs, onChange }: { prefs: TablePrefs; onChange: (p: Partial<TablePrefs>) => void }) {
@@ -338,17 +341,13 @@ export function TableOptions({ prefs, onChange }: { prefs: TablePrefs; onChange:
           <span>Show amounts in big blinds</span>
         </label>
         <div className="ts-field">
-          <span id="felt-label">Felt</span>
-          <div className="felt-swatches" role="radiogroup" aria-labelledby="felt-label">
-            {FELTS.map(([f, label]) => (
-              <button key={f} type="button" role="radio" aria-checked={prefs.felt === f} className={`swatch felt-${f}`} onClick={() => onChange({ felt: f })}>
-                <span className="sr-only">{label}</span>
-              </button>
-            ))}
-          </div>
+          <span>Felt</span>
+          <FeltPicker value={prefs.felt} onChange={(felt) => onChange({ felt })} />
         </div>
       </div>
-      <p className="note">Saved in this browser.</p>
+      <p className="note">
+        Saved with your other preferences. <Link to="/settings">All settings</Link>
+      </p>
     </details>
   );
 }

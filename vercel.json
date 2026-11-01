@@ -8,7 +8,7 @@
     { "source": "/play/history/:id", "destination": "/app.html" },
     { "source": "/play/:room", "destination": "/app.html" },
     { "source": "/review/:hand", "destination": "/app.html" },
-    { "source": "/:page(login|account|reset-password)", "destination": "/app.html" },
+    { "source": "/:page(login|account|reset-password|settings)", "destination": "/app.html" },
     { "source": "/auth/callback", "destination": "/app.html" }
   ],
   "headers": [

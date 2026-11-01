@@ -59,6 +59,7 @@ export function AuthMenu() {
           <Link ref={first} to="/account">
             Account
           </Link>
+          <Link to="/settings">Settings</Link>
           <button type="button" onClick={leave}>
             Sign out
           </button>

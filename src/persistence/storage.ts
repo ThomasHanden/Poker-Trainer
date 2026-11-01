@@ -13,6 +13,8 @@ export const MAX_HISTORY = 3000;
 
 /** How quickly opponents' actions play out on the table. */
 export type PlaySpeed = 'slow' | 'normal' | 'fast';
+/** Table felt colours. */
+export type Felt = 'green' | 'blue' | 'red' | 'charcoal';
 
 export interface DecisionSummary {
   street: Street;
@@ -74,7 +76,18 @@ export interface AppData {
   lessons: Record<string, LessonProgress>;
   ranges: SavedRange[];
   recent: { fingerprints: string[]; templates: string[] };
-  prefs: { fourColor: boolean; showShortcuts: boolean; fastMode?: boolean; playSpeed?: PlaySpeed };
+  prefs: {
+    fourColor: boolean;
+    /** show the keyboard shortcut hints on action buttons */
+    showShortcuts: boolean;
+    fastMode?: boolean;
+    playSpeed?: PlaySpeed;
+    /** table sounds (absent: on) */
+    sound?: boolean;
+    /** live tables: amounts in big blinds instead of chips */
+    amountsBB?: boolean;
+    felt?: Felt;
+  };
 }
 
 export function emptyData(): AppData {

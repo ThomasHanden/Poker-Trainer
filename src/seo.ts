@@ -41,6 +41,7 @@ const STATIC: Record<string, PageMeta> = {
   '/privacy': page('Privacy', 'What Felt School stores, why, where it is kept, and how to delete it.'),
   '/login': page('Sign in', 'Sign in to keep your Felt School progress on every device.', true),
   '/account': page('Your account', 'Your Felt School account.', true),
+  '/settings': page('Settings', 'Your Felt School preferences: cards, table, sound, practice and keyboard.', true),
   '/auth/callback': page('Signing in', 'Signing in to Felt School.', true),
   '/reset-password': page('Choose a new password', 'Choose a new password for your Felt School account.', true),
 };

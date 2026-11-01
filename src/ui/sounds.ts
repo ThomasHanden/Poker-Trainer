@@ -1,28 +1,28 @@
 // Table sounds, made in the browser with Web Audio (no sound files): a chime when it is your turn,
 // chips for bets, a tap for checks, a soft tick as cards are dealt and a rising note for a win.
-// On by default; the choice is remembered in this browser.
+// On by default; the choice is one of the player's preferences (Settings).
 
-const KEY = 'live-sound';
+let enabled = true;
+
+/** Sounds on or off: follows the player's preference (set by the app whenever it changes). */
+export function setSoundEnabled(on: boolean) {
+  enabled = on;
+}
+
+/** The on/off choice saved by pages from before sounds were a preference (read once, to carry it over). */
+export function legacySoundChoice(): boolean | null {
+  try {
+    const v = localStorage.getItem('live-sound');
+    return v === null ? null : v !== 'off';
+  } catch {
+    return null;
+  }
+}
+
 let ctx: AudioContext | null = null;
 
-export function soundOn(): boolean {
-  try {
-    return localStorage.getItem(KEY) !== 'off';
-  } catch {
-    return true;
-  }
-}
-
-export function setSoundOn(on: boolean) {
-  try {
-    localStorage.setItem(KEY, on ? 'on' : 'off');
-  } catch {
-    /* only for this visit */
-  }
-}
-
 function audio(): AudioContext | null {
-  if (typeof window === 'undefined' || !soundOn()) return null;
+  if (typeof window === 'undefined' || !enabled) return null;
   try {
     ctx ??= new AudioContext();
     if (ctx.state === 'suspended') void ctx.resume();
