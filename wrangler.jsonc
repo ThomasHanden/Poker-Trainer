@@ -11,22 +11,17 @@
     // keep live tables guest-only. Same values as VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY.
     "SUPABASE_URL": "https://uiqbxzeemhojjmpoechp.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_HFZkRP585bnony3bWIVOTQ_-a5Ggsbl"
-    // leaderboards also need the project's secret key, kept as a Cloudflare secret (never here):
-    //   npx wrangler secret put SUPABASE_SECRET_KEY
   },
   "durable_objects": {
     "bindings": [
       { "name": "PokerTable", "class_name": "PokerTable" },
       // everyone's daily chips (one instance)
-      { "name": "Bank", "class_name": "Bank" },
-      // each signed-in player's ranked daily five and survival runs (one instance per player)
-      { "name": "Puzzles", "class_name": "Puzzles" }
+      { "name": "Bank", "class_name": "Bank" }
     ]
   },
   // the free plan only allows SQLite-backed Durable Objects
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["PokerTable"] },
-    { "tag": "v2", "new_sqlite_classes": ["Bank"] },
-    { "tag": "v3", "new_sqlite_classes": ["Puzzles"] }
+    { "tag": "v2", "new_sqlite_classes": ["Bank"] }
   ]
 }

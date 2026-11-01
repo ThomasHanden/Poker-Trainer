@@ -1,10 +1,8 @@
 // Chips for live tables. Once per UTC day each player can claim a random 50–200 chips into their
 // bank; buy-ins come out of the bank and stacks go back into it when players stand up.
 // The Bank Durable Object (party/server.ts) stores one Account per player and applies these rules.
-// It also knows what each table holds for each player (TableHold), so a player's chips can be
-// counted once, wherever they are, for the chip leaderboard.
 
-import { CHIP, bestBuyIn, buyInFor, type Cashout, type Stakes } from './table';
+import { CHIP, bestBuyIn, buyInFor, type Stakes } from './table';
 
 /** The daily claim in whole chips: every amount from DAILY_MIN to DAILY_MAX is equally likely. */
 export const DAILY_MIN = 50;
@@ -21,28 +19,7 @@ export interface Account {
   guestMovedFrom?: string;
   /** a guest wallet: the account its chips were moved into */
   movedTo?: string;
-  /** chips this player has on live tables right now, in table units (the sum of every TableHold) */
-  atTables?: number;
-  /** goes up by one with every change, so the leaderboard never takes an older copy over a newer one */
-  v?: number;
 }
-
-/**
- * What one table holds for people, as of its latest report. A table reports after every change
- * (seq goes up each time), so an older report that arrives late is ignored.
- */
-export interface TableHold {
-  seq: number;
-  held: Record<string, number>;
-  /** the reports already applied, so one sent again (a retry) pays nothing twice */
-  recent?: number[];
-}
-
-/** All of a player's chips: the bank and the tables, each chip counted once. */
-export const totalChips = (acc: Account) => acc.balance + (acc.atTables ?? 0);
-
-/** The account after a change, with its version moved on. */
-const changed = (acc: Account, patch: Partial<Account>): Account => ({ ...acc, ...patch, v: (acc.v ?? 0) + 1 });
 
 /** What the player is shown. */
 export interface BankStatus {
@@ -102,8 +79,8 @@ export function moveGuestChips(
   if (guest.balance <= 0) return { error: 'There are no guest chips to move.' };
   const later = !account.claim ? guest.claim : !guest.claim ? account.claim : guest.claim.day > account.claim.day ? guest.claim : account.claim;
   return {
-    guest: changed(guest, { balance: 0, movedTo: accountId }),
-    account: changed(account, { balance: account.balance + guest.balance, guestMovedFrom: guestId, ...(later ? { claim: later } : {}) }),
+    guest: { ...guest, balance: 0, movedTo: accountId },
+    account: { ...account, balance: account.balance + guest.balance, guestMovedFrom: guestId, ...(later ? { claim: later } : {}) },
     moved: guest.balance,
   };
 }
@@ -125,102 +102,18 @@ export function rollDaily(rand32: () => number): number {
 export function claimDaily(acc: Account, day: string, roll: () => number): { acc: Account; amount: number; paid: boolean } {
   if (acc.claim?.day === day) return { acc, amount: acc.claim.amount, paid: false };
   const amount = roll() * CHIP;
-  return { acc: changed(acc, { balance: acc.balance + amount, claim: { day, amount } }), amount, paid: true };
+  return { acc: { ...acc, balance: acc.balance + amount, claim: { day, amount } }, amount, paid: true };
 }
 
 /** Take a buy-in: as much as `want`, or everything left if that is less, but nothing below `min`. */
 export function withdraw(acc: Account, want: number, min: number): { acc: Account; amount: number } {
   const amount = Math.min(want, acc.balance);
   if (amount < min || amount <= 0) return { acc, amount: 0 };
-  return { acc: changed(acc, { balance: acc.balance - amount }), amount };
+  return { acc: { ...acc, balance: acc.balance - amount }, amount };
 }
 
 export function deposit(acc: Account, amount: number): Account {
-  return changed(acc, { balance: acc.balance + Math.max(0, Math.floor(amount)) });
-}
-
-const units = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0);
-
-/** A table's chips for each person, added up (a list may name someone twice). */
-function heldMap(list: Cashout[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const c of list) if (typeof c.id === 'string' && units(c.amount) > 0) out[c.id] = (out[c.id] ?? 0) + units(c.amount);
-  return out;
-}
-
-/**
- * A buy-in taken to a table: out of the bank and onto that table, in one step, so the player's
- * total never dips or doubles while they sit down.
- */
-export function buyIn(acc: Account, hold: TableHold | undefined, pid: string, want: number, min: number): { acc: Account; hold: TableHold; amount: number } {
-  const h = hold ?? { seq: 0, held: {} };
-  const w = withdraw(acc, want, min);
-  if (!w.amount) return { acc, hold: h, amount: 0 };
-  return {
-    acc: { ...w.acc, atTables: (acc.atTables ?? 0) + w.amount },
-    hold: { ...h, held: { ...h.held, [pid]: (h.held[pid] ?? 0) + w.amount } },
-    amount: w.amount,
-  };
-}
-
-/** A buy-in that never reached a seat (the seat went meanwhile) comes back off the table. */
-export function returnBuyIn(acc: Account, hold: TableHold | undefined, pid: string, amount: number): { acc: Account; hold: TableHold } {
-  const h = hold ?? { seq: 0, held: {} };
-  const back = Math.min(units(amount), h.held[pid] ?? 0);
-  const { [pid]: was = 0, ...rest } = h.held;
-  const left = was - back;
-  return {
-    acc: changed(acc, { balance: acc.balance + units(amount), atTables: Math.max(0, (acc.atTables ?? 0) - back) }),
-    hold: { ...h, held: left > 0 ? { ...rest, [pid]: left } : rest },
-  };
-}
-
-/**
- * A table's report: chips paid back to people who stood up, and what it now holds for everyone
- * still there. A report already applied (sent again after a lost reply) changes nothing. The
- * pay-outs of any other report count; its holdings replace the last report's only if it is newer,
- * so a late report cannot bring back chips already paid out. Returns the accounts it changed.
- */
-export function settleTable(
-  accounts: Map<string, Account>,
-  hold: TableHold | undefined,
-  seq: number,
-  cashouts: Cashout[],
-  held: Cashout[],
-): { accounts: Map<string, Account>; hold: TableHold } {
-  const out = new Map<string, Account>();
-  const before = hold ?? { seq: 0, held: {} };
-  if (before.recent?.includes(seq)) return { accounts: out, hold: before };
-  const h = { ...before, recent: [...(before.recent ?? []), seq].slice(-100) };
-  const get = (id: string) => out.get(id) ?? upgrade(accounts.get(id));
-  for (const [id, amount] of Object.entries(heldMap(cashouts))) {
-    const acc = get(id);
-    out.set(id, changed(acc, { balance: acc.balance + amount }));
-  }
-  if (!(seq > h.seq)) return { accounts: out, hold: h };
-  const now = heldMap(held);
-  for (const id of new Set([...Object.keys(h.held), ...Object.keys(now)])) {
-    const diff = (now[id] ?? 0) - (h.held[id] ?? 0);
-    if (!diff) continue;
-    const acc = get(id);
-    out.set(id, changed(acc, { atTables: Math.max(0, (acc.atTables ?? 0) + diff) }));
-  }
-  return { accounts: out, hold: { ...h, seq, held: now } };
-}
-
-/**
- * A table that restarted lost its game: everything it held goes back to each player's bank (an
- * unfinished hand is called off, so stacks are what they were before it). Doing this twice pays
- * nothing more, because the holdings are cleared.
- */
-export function releaseTable(accounts: Map<string, Account>, hold: TableHold | undefined): { accounts: Map<string, Account>; hold: TableHold | undefined } {
-  if (!hold) return { accounts: new Map(), hold };
-  const out = new Map<string, Account>();
-  for (const [id, amount] of Object.entries(hold.held)) {
-    const acc = upgrade(accounts.get(id));
-    out.set(id, changed(acc, { balance: acc.balance + amount, atTables: Math.max(0, (acc.atTables ?? 0) - amount) }));
-  }
-  return { accounts: out, hold: { ...hold, held: {} } };
+  return { ...acc, balance: acc.balance + Math.max(0, Math.floor(amount)) };
 }
 
 /** A player's key is a random secret kept in their browser; tables and the bank only ever see this hash of it. */

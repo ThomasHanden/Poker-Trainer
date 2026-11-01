@@ -10,6 +10,3 @@ playwright-report
 
 # Supabase CLI working files
 supabase/.temp
-
-# local Cloudflare secrets (npm run party:dev reads them)
-.dev.vars

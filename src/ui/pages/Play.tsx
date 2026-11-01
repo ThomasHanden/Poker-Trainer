@@ -1,6 +1,5 @@
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChipLeaderboard } from '../components/Leaderboard';
 import { useStore } from '../store';
 import { Table, HistoryList, dealMs, type Seating } from '../components/Table';
 import { ActionBar, type AmountUnit } from '../components/ActionBar';
@@ -79,12 +78,6 @@ function Wallet({ bank, onBank, compact = false }: { bank: Bankroll | null; onBa
     <section className={`live-wallet ${compact ? 'compact' : ''}`} aria-label="Your chips">
       <p className="live-bank">
         Your chips: <strong>{fmtChips(bank.balance)}</strong>
-        {!compact && (
-          <>
-            {' · '}
-            <a href="#chip-leaderboard">Chip leaderboard</a>
-          </>
-        )}
       </p>
       {bank.claimedToday === undefined ? null : bank.claimedToday ? (
         <div className="daily">
@@ -276,7 +269,6 @@ export function PlayLobbyPage() {
           })}
         </ul>
       </section>
-      <ChipLeaderboard />
       <h2 className="live-subhead">Private tables</h2>
       <div className="live-lobby">
         <section className="live-card">

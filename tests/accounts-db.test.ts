@@ -11,7 +11,6 @@ const BOB = '22222222-2222-4222-8222-222222222222';
 const SUPABASE_STUB = `
   create role anon nologin;
   create role authenticated nologin;
-  create role service_role nologin;
   create schema auth;
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}');
   create function auth.uid() returns uuid language sql stable as $$

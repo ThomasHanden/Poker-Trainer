@@ -48,11 +48,6 @@ export function PrivacyPage() {
           <strong>Your play chips</strong> and daily claims, stored by the table server under a number derived from your account, so other players never see your
           account details.
         </li>
-        <li>
-          <strong>Leaderboards:</strong> your display name and your results are shown publicly on the leaderboards (on the home and Play live pages), to anyone, signed in or not: your total play
-          chips (bank and tables), your ranked daily five scores and your survival runs (score, answers right, and the date). Your email address and account id are never
-          shown. Deleting your account takes you off every leaderboard.
-        </li>
         <li>Your browser keeps a sign-in session so you stay signed in. Signing out removes it, and your account’s progress, from that browser.</li>
       </ul>
 

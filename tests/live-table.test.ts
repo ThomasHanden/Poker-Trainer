@@ -385,7 +385,7 @@ describe('chips and buy-ins', () => {
 describe('bank', () => {
   it('buys in for up to the full amount, the rest of the balance down to the minimum, or not at all', () => {
     const acc = { balance: 300, day: 'd' };
-    expect(withdraw(acc, 200, 40)).toEqual({ acc: { balance: 100, day: 'd', v: 1 }, amount: 200 });
+    expect(withdraw(acc, 200, 40)).toEqual({ acc: { balance: 100, day: 'd' }, amount: 200 });
     expect(withdraw({ ...acc, balance: 120 }, 200, 40).amount).toBe(120);
     expect(withdraw({ ...acc, balance: 30 }, 200, 40)).toEqual({ acc: { ...acc, balance: 30 }, amount: 0 });
     expect(deposit(acc, 55).balance).toBe(355);
