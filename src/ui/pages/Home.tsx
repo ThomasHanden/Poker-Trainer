@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../../auth/AuthContext';
 import { LESSON_INDEX, SEQUENCES } from '../../content/lessons';
@@ -15,6 +15,7 @@ import { progressKnown } from '../../persistence/accountSync';
 import { LIVES, PuzzleRun, challengeKey, loadRuns, streak } from '../../puzzles/daily';
 import { PuzzleGame, fmtDate, type Mode } from '../components/PuzzleGame';
 import { rankedAvailable } from '../leaderboards';
+import { PuzzleLeaderboard } from '../components/Leaderboard';
 
 /** Where someone new to poker starts: the first lesson of the First steps track. */
 const FIRST_LESSON = SEQUENCES.find((s) => s.id === 'first-steps')?.lessons[0] ?? 'rules-rankings';
@@ -27,13 +28,10 @@ export function HomePage() {
   const [runs, setRuns] = useState<PuzzleRun[]>(loadRuns);
   // results arrive from the account after signing in
   useEffect(() => setRuns(loadRuns()), [owner, runsVersion]);
-  const [params] = useSearchParams();
-  const { hash } = useLocation();
-  // links from the leaderboards: /?play=survival#daily
-  const [mode, setMode] = useState<Mode>(params.get('play') === 'survival' ? 'survival' : 'daily');
-  useEffect(() => {
-    if (hash === '#daily') document.getElementById('daily')?.scrollIntoView({ block: 'start' });
-  }, [hash]);
+  const [mode, setMode] = useState<Mode>('daily');
+  /** goes up when a ranked run is saved, so the leaderboard beside the game shows it */
+  const [boardVersion, setBoardVersion] = useState(0);
+  const bumpBoard = useCallback(() => setBoardVersion((n) => n + 1), []);
   const dailyRun = runs.find((r) => r.id === `daily:${today}`);
   const [startChoice, setStartChoice] = useState<StartChoice | null>(loadStartChoice);
   // a signed-in account's progress is still on its way: decide nothing about it yet (no wrong suggestions
@@ -148,6 +146,7 @@ export function HomePage() {
               onSwitch={() => setMode('survival')}
               fourColor={data.prefs.fourColor}
               ranked={ranked}
+              onRanked={bumpBoard}
             />
           ) : (
             <PuzzleGame
@@ -159,11 +158,13 @@ export function HomePage() {
               onSwitch={() => setMode('daily')}
               fourColor={data.prefs.fourColor}
               ranked={ranked}
+              onRanked={bumpBoard}
             />
           )}
         </section>
 
-        <aside className="scoreboard" aria-labelledby="sb-title">
+        <aside className="scoreboard" aria-label="Leaderboard and personal bests">
+          <PuzzleLeaderboard mode={mode} refresh={boardVersion} />
           <h2 id="sb-title">Personal bests</h2>
           <dl className="sb-stats">
             <div>

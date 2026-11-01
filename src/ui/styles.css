@@ -7757,50 +7757,14 @@ label > span:first-child:not(.select-value) {
 }
 
 /* ============================================================
-   Leaderboards page, and ranked puzzle runs
+   Leaderboards (Play live page, and beside the mini games), and ranked puzzle runs
    ============================================================ */
-.lb-head {
-  padding: 28px 0 18px;
-}
-.lb-head h1 {
-  margin: 6px 0 8px;
-}
-.lb-head .lead {
-  margin: 0;
-}
-.lb-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 18px;
-}
-.lb-tabs button {
-  font: inherit;
-  font-weight: 600;
-  padding: 10px 16px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  background: none;
-  color: var(--text-2);
-  cursor: pointer;
-}
-.lb-tabs button:hover {
-  color: var(--text);
-}
-.lb-tabs button.on {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-}
-.lb-panel {
-  max-width: 760px;
-}
-.lb-intro p {
+.lb-card h2 {
   margin: 0 0 6px;
-  color: var(--text-2);
 }
 .lb-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: flex-end;
   justify-content: space-between;
@@ -7845,7 +7809,7 @@ label > span:first-child:not(.select-value) {
   border-radius: var(--radius);
   background: var(--surface);
 }
-.lb-standing h2 {
+.lb-card .lb-standing h3 {
   margin: 0 0 6px;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -8025,10 +7989,6 @@ label > span:first-child:not(.select-value) {
     flex-direction: column;
     align-items: stretch;
   }
-  .lb-tabs button {
-    flex: 1;
-    padding: 10px 6px;
-  }
   .lb-colhead,
   .lb-row {
     grid-template-columns: 2.4rem 2rem minmax(0, 1fr) auto;
@@ -8041,6 +8001,50 @@ label > span:first-child:not(.select-value) {
     width: 2rem;
     height: 2rem;
   }
+}
+
+/* beside the mini games: a narrow column, so the rows are tighter */
+.lb-side {
+  margin-bottom: 30px;
+}
+.lb-side .lb-controls {
+  align-items: center;
+  gap: 8px 12px;
+}
+.lb-side .lb-controls .note {
+  margin: 0;
+  flex: 1 1 160px;
+}
+.lb-side .lb-colhead,
+.lb-side .lb-row {
+  grid-template-columns: 2rem 1.9rem minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.lb-side .lb-row {
+  padding: 8px 10px;
+  min-height: 50px;
+}
+.lb-side .lb-avatar {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.85rem;
+}
+.lb-side .lb-row.top1 .lb-rank,
+.lb-side .lb-row.top2 .lb-rank,
+.lb-side .lb-row.top3 .lb-rank {
+  width: 1.7rem;
+  height: 1.7rem;
+  line-height: 1.7rem;
+}
+.lb-side .lb-score {
+  font-size: 1.05rem;
+}
+.lb-side .lb-me-rank {
+  font-size: 1.6rem;
+}
+.lb-card .lb-list {
+  max-height: 560px;
+  overflow-y: auto;
 }
 
 /* ranked runs on the home page */

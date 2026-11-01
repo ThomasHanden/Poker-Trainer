@@ -97,7 +97,7 @@ test('unsupported settings are explained, not generated', async ({ page }) => {
 });
 
 test('main pages have no horizontal overflow', async ({ page }) => {
-  for (const path of ['/', '/practice', '/learn', '/learn/pot-odds', '/ranges', '/ranges?tab=editor', '/ranges?tab=compare', '/ranges?tab=drills', '/ranges?tab=equity', '/review', '/progress', '/leaderboards']) {
+  for (const path of ['/', '/practice', '/learn', '/learn/pot-odds', '/ranges', '/ranges?tab=editor', '/ranges?tab=compare', '/ranges?tab=drills', '/ranges?tab=equity', '/review', '/progress']) {
     await page.goto(path);
     await page.waitForTimeout(300);
     const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
@@ -269,7 +269,7 @@ function fixtureRows(fn: string, off: number, lim: number, entries: number) {
   });
 }
 
-test('leaderboards: three boards, shared ranks, load more, and a failed request', async ({ page }) => {
+test('leaderboards: beside the mini games and on the Play live page, with shared ranks, load more and a failed request', async ({ page }) => {
   let failDaily = true;
   await page.route('**/rest/v1/rpc/lb_*', async (route) => {
     const fn = route.request().url().split('/rpc/')[1].split('?')[0];
@@ -279,33 +279,39 @@ test('leaderboards: three boards, shared ranks, load more, and a failed request'
     if (fn === 'lb_standing') return route.fulfill({ json: null });
     return route.fulfill({ json: fixtureRows(fn, args.off ?? 0, args.lim ?? 25, fn === 'lb_chips' ? 30 : 8) });
   });
-  await page.goto('/leaderboards');
-  await expect(page.getByRole('tab', { name: 'Live Play' })).toHaveAttribute('aria-selected', 'true');
-  const rows = page.locator('.lb-list .lb-row');
-  await expect(rows).toHaveCount(25);
-  await expect(rows.nth(1).locator('.lb-rank')).toHaveText('2');
-  await expect(rows.nth(2).locator('.lb-rank')).toHaveText('2');
-  await expect(rows.nth(3).locator('.lb-rank')).toHaveText('4');
-  await expect(page.locator('.lb-row.top1')).toHaveCount(1);
-  await expect(page.getByText('Sign in to get on the leaderboards.')).toBeVisible();
-  await page.getByRole('button', { name: 'Load 5 more' }).click();
-  await expect(rows).toHaveCount(30);
-  // keyboard: arrow keys move between boards
-  await page.getByRole('tab', { name: 'Live Play' }).focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Daily Five' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page).toHaveURL(/board=daily/);
-  await expect(page.getByRole('alert')).toContainText('could not be loaded');
+  // home: the board beside the mini games follows the game picked
+  await page.goto('/');
+  const side = page.locator('#leaderboard');
+  await expect(side.getByRole('heading', { name: 'Daily five leaderboard' })).toBeVisible();
+  await expect(side.getByRole('alert')).toContainText('could not be loaded');
   failDaily = false;
-  await page.getByRole('button', { name: 'Try again' }).click();
-  await expect(rows).toHaveCount(8);
-  await expect(page.getByText('4 of 5 right').first()).toBeVisible();
-  await page.getByRole('tab', { name: 'Survival' }).click();
-  await expect(page.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'This week' }).click();
-  await expect(page).toHaveURL(/period=week/);
-  await expect(rows).toHaveCount(8);
-  const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  await side.getByRole('button', { name: 'Try again' }).click();
+  const sideRows = side.locator('.lb-list .lb-row');
+  await expect(sideRows).toHaveCount(8);
+  await expect(sideRows.nth(1).locator('.lb-rank')).toHaveText('2');
+  await expect(sideRows.nth(2).locator('.lb-rank')).toHaveText('2');
+  await expect(sideRows.nth(3).locator('.lb-rank')).toHaveText('4');
+  await expect(side.getByText('4 of 5 right').first()).toBeVisible();
+  await expect(side.getByText('Sign in to get on the leaderboards.')).toBeVisible();
+  await page.getByTestId('mode-survival').click();
+  await expect(side.getByRole('heading', { name: 'Survival leaderboard' })).toBeVisible();
+  await expect(side.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
+  await side.getByRole('button', { name: 'This week' }).click();
+  await expect(sideRows).toHaveCount(8);
+  let [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   expect(sw).toBeLessThanOrEqual(cw + 1);
-  await page.screenshot({ path: `test-results/leaderboards-${test.info().project.name}.png`, fullPage: true });
+  await side.screenshot({ path: `test-results/leaderboard-home-${test.info().project.name}.png` });
+  // Play live: the chip board, a page at a time
+  await page.goto('/play');
+  const chips = page.locator('#chip-leaderboard');
+  const rows = chips.locator('.lb-list .lb-row');
+  await expect(rows).toHaveCount(25);
+  await expect(chips.locator('.lb-row.top1')).toHaveCount(1);
+  await chips.getByRole('button', { name: 'Load 5 more' }).click();
+  await expect(rows).toHaveCount(30);
+  [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  expect(sw).toBeLessThanOrEqual(cw + 1);
+  await chips.screenshot({ path: `test-results/leaderboard-play-${test.info().project.name}.png` });
+  // there is no separate leaderboards page or menu item
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leaderboards' })).toHaveCount(0);
 });

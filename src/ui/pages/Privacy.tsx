@@ -49,7 +49,7 @@ export function PrivacyPage() {
           account details.
         </li>
         <li>
-          <strong>Leaderboards:</strong> your display name and your results are shown publicly on the Leaderboards page, to anyone, signed in or not: your total play
+          <strong>Leaderboards:</strong> your display name and your results are shown publicly on the leaderboards (on the home and Play live pages), to anyone, signed in or not: your total play
           chips (bank and tables), your ranked daily five scores and your survival runs (score, answers right, and the date). Your email address and account id are never
           shown. Deleting your account takes you off every leaderboard.
         </li>

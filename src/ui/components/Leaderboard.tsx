@@ -1,21 +1,17 @@
-// Leaderboards: live-table chips, the daily five and survival. Anyone can browse; signed-in
-// players see where they stand, even beyond the first page. Lists load a page at a time from the
-// database, which works out every rank (src/ui/leaderboards.ts).
-import { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+// The leaderboards, shown where they are played: the chip board on the Play live page, and the
+// daily five and survival board beside the mini games on the home page. Anyone can look;
+// signed-in players see where they stand, even beyond the first page. Lists load a page at a time
+// from the database, which works out every rank (src/ui/leaderboards.ts).
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { fmtChips } from '../../multiplayer/table';
 import { challengeKey } from '../../puzzles/daily';
 import { weekBounds, weekKey } from '../../puzzles/ranked';
 import { PAGE_SIZE, fetchBoard, fetchDailyDays, fetchStanding, leaderboardsAvailable, type Board, type Row, type Standing } from '../leaderboards';
-import { fmtDate, untilNext } from '../components/PuzzleGame';
+import { fmtDate, untilNext } from './PuzzleGame';
 
-const BOARDS: { id: Board; label: string }[] = [
-  { id: 'live', label: 'Live Play' },
-  { id: 'daily', label: 'Daily Five' },
-  { id: 'survival', label: 'Survival' },
-];
-const isBoard = (b: string | null): b is Board => b === 'live' || b === 'daily' || b === 'survival';
+const LABEL: Record<Board, string> = { live: 'Chip', daily: 'Daily five', survival: 'Survival' };
 /** How often the chip board refreshes while it is open: balances move as hands settle. */
 const LIVE_REFRESH_MS = 30_000;
 
@@ -25,145 +21,88 @@ const weekLabel = (now: number) => {
   return `${utcDay(new Date(start).toISOString())} – ${utcDay(new Date(end - 1).toISOString())}`;
 };
 
-export function LeaderboardsPage() {
-  const [params, setParams] = useSearchParams();
-  const board: Board = isBoard(params.get('board')) ? (params.get('board') as Board) : 'live';
-  const today = challengeKey();
-  const day = /^\d{4}-\d{2}-\d{2}$/.test(params.get('day') ?? '') ? params.get('day')! : today;
-  const period = params.get('period') === 'week' ? 'week' : 'all';
-  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const choose = (b: Board, focus = false) => {
-    setParams(b === 'live' ? {} : { board: b }, { replace: true });
-    if (focus) tabs.current[BOARDS.findIndex((x) => x.id === b)]?.focus();
-  };
-  const onTabKey = (e: KeyboardEvent) => {
-    const k = BOARDS.findIndex((x) => x.id === board);
-    const to = e.key === 'ArrowRight' ? (k + 1) % 3 : e.key === 'ArrowLeft' ? (k + 2) % 3 : e.key === 'Home' ? 0 : e.key === 'End' ? 2 : -1;
-    if (to < 0) return;
-    e.preventDefault();
-    choose(BOARDS[to].id, true);
-  };
-  const set = (patch: Record<string, string>) => setParams({ board, ...(board === 'daily' ? { day } : {}), ...(board === 'survival' ? { period } : {}), ...patch }, { replace: true });
-
+/** The chip leaderboard, for the Play live page. */
+export function ChipLeaderboard() {
+  if (!leaderboardsAvailable()) return null;
   return (
-    <div className="page leaderboards">
-      <header className="lb-head">
-        <p className="eyebrow">Play money only</p>
-        <h1>Leaderboards</h1>
-        <p className="lead">Chips at the live tables and scores from the daily five and survival. Results count once a signed-in player’s hand settles or run finishes.</p>
-      </header>
-
-      {!leaderboardsAvailable() ? (
-        <p className="error-box">Leaderboards need accounts, which are not set up on this site yet.</p>
-      ) : (
-        <>
-          <div className="lb-tabs" role="tablist" aria-label="Leaderboard" onKeyDown={onTabKey}>
-            {BOARDS.map((b, k) => (
-              <button
-                key={b.id}
-                ref={(el) => (tabs.current[k] = el)}
-                role="tab"
-                id={`lb-tab-${b.id}`}
-                aria-selected={board === b.id}
-                aria-controls="lb-panel"
-                tabIndex={board === b.id ? 0 : -1}
-                className={board === b.id ? 'on' : ''}
-                onClick={() => choose(b.id)}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-          <section id="lb-panel" role="tabpanel" aria-labelledby={`lb-tab-${board}`} className="lb-panel">
-            {board === 'live' && <LiveIntro />}
-            {board === 'daily' && <DailyIntro day={day} today={today} onDay={(d) => set({ day: d })} />}
-            {board === 'survival' && <SurvivalIntro period={period} onPeriod={(p) => set({ period: p })} />}
-            <BoardView key={`${board}:${day}:${period}`} board={board} period={board === 'daily' ? day : board === 'survival' ? (period === 'all' ? 'all' : weekKey(Date.now())) : ''} today={day === today} />
-          </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-function LiveIntro() {
-  return (
-    <div className="lb-intro">
-      <p>
-        <strong>Total chips</strong>: what is in your bank plus what you have on live tables right now, each chip counted once. Buying in or standing up only moves chips, so it
-        never changes your total; winning and losing hands does.
-      </p>
+    <section className="live-card lb-card" id="chip-leaderboard" aria-labelledby="chip-lb-title">
+      <h2 id="chip-lb-title">Chip leaderboard</h2>
       <p className="note">
-        Everyone can claim 50–200 free chips a day, so regular players build up more. There is no real money, and no way to buy chips.
+        <strong>Total chips</strong>: your bank plus what you have on tables right now, each chip counted once. Buying in or standing up only moves chips; winning
+        and losing hands changes the total. Everyone can claim free chips daily, so regular players build up more.
       </p>
-    </div>
+      <BoardView board="live" period="" today />
+    </section>
   );
 }
 
-function DailyIntro({ day, today, onDay }: { day: string; today: string; onDay: (d: string) => void }) {
+/** The daily five or survival leaderboard (following the game picked beside it), for the home page. */
+export function PuzzleLeaderboard({ mode, refresh }: { mode: 'daily' | 'survival'; refresh: number }) {
+  const today = challengeKey();
+  const [day, setDay] = useState(today);
+  const [period, setPeriod] = useState<'all' | 'week'>('all');
   const [days, setDays] = useState<{ day: string; entries: number }[]>([]);
   const [, tick] = useState(0);
   useEffect(() => {
+    if (mode !== 'daily' || !leaderboardsAvailable()) return;
     fetchDailyDays().then(setDays, () => setDays([]));
     const t = setInterval(() => tick((n) => n + 1), 30_000);
     return () => clearInterval(t);
-  }, []);
+  }, [mode, refresh]);
+  if (!leaderboardsAvailable()) return null;
   const options = [today, ...days.map((d) => d.day).filter((d) => d !== today)];
-  if (!options.includes(day)) options.push(day);
   return (
-    <div className="lb-intro lb-controls">
-      <div>
-        <p>
-          Ranked by the day’s <strong>points</strong>, scored as in the game: 100 a right answer, up to 50 more for speed, and a combo for answers in a row. One ranked try a
-          day for each player.
-        </p>
-        <p className="note">
-          {day === today ? (
-            <>
-              Today’s challenge ({fmtDate(day)}, UTC). The next one starts at midnight UTC, in <strong>{untilNext()}</strong>.
-            </>
-          ) : (
-            <>Challenge of {fmtDate(day)} (UTC), now closed.</>
+    <section className="lb-card lb-side" id="leaderboard" aria-labelledby="pz-lb-title">
+      <h2 id="pz-lb-title">{mode === 'daily' ? 'Daily five leaderboard' : 'Survival leaderboard'}</h2>
+      {mode === 'daily' ? (
+        <div className="lb-controls">
+          <p className="note">
+            {day === today ? (
+              <>
+                Today’s points. New five in <strong>{untilNext()}</strong> (midnight UTC).
+              </>
+            ) : (
+              <>Points on {fmtDate(day)} (UTC).</>
+            )}
+          </p>
+          {options.length > 1 && (
+            <label className="lb-select">
+              <span className="sr-only">Challenge day</span>
+              <select value={day} onChange={(e) => setDay(e.target.value)}>
+                {options.map((d) => (
+                  <option key={d} value={d}>
+                    {d === today ? 'Today' : fmtDate(d)}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-        </p>
-      </div>
-      <label className="lb-select">
-        <span>Challenge</span>
-        <select value={day} onChange={(e) => onDay(e.target.value)}>
-          {options.map((d) => (
-            <option key={d} value={d}>
-              {d === today ? `Today, ${fmtDate(d)}` : fmtDate(d)}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+        </div>
+      ) : (
+        <div className="lb-controls">
+          <p className="note">{period === 'week' ? `Best run finished ${weekLabel(Date.now())} (Mon–Sun, UTC).` : 'Each player’s best run.'}</p>
+          <div className="lb-seg" role="group" aria-label="Period">
+            <button aria-pressed={period === 'all'} className={period === 'all' ? 'on' : ''} onClick={() => setPeriod('all')}>
+              All time
+            </button>
+            <button aria-pressed={period === 'week'} className={period === 'week' ? 'on' : ''} onClick={() => setPeriod('week')}>
+              This week
+            </button>
+          </div>
+        </div>
+      )}
+      <BoardView
+        key={`${mode}:${day}:${period}`}
+        board={mode}
+        period={mode === 'daily' ? day : period === 'all' ? 'all' : weekKey(Date.now())}
+        today={day === today}
+        refresh={refresh}
+      />
+    </section>
   );
 }
 
-function SurvivalIntro({ period, onPeriod }: { period: 'all' | 'week'; onPeriod: (p: 'all' | 'week') => void }) {
-  return (
-    <div className="lb-intro lb-controls">
-      <div>
-        <p>
-          Each player’s <strong>best run</strong>, by points, scored as in the game. A run ends at the third wrong answer; a worse run never replaces a best.
-        </p>
-        <p className="note">{period === 'week' ? `This week: ${weekLabel(Date.now())}, Monday to Sunday (UTC). Runs finished this week only.` : 'Every ranked run since leaderboards began.'}</p>
-      </div>
-      <div className="lb-seg" role="group" aria-label="Period">
-        <button aria-pressed={period === 'week'} className={period === 'week' ? 'on' : ''} onClick={() => onPeriod('week')}>
-          This week
-        </button>
-        <button aria-pressed={period === 'all'} className={period === 'all' ? 'on' : ''} onClick={() => onPeriod('all')}>
-          All time
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function BoardView({ board, period, today }: { board: Board; period: string; today: boolean }) {
+function BoardView({ board, period, today, refresh = 0 }: { board: Board; period: string; today: boolean; refresh?: number }) {
   const { status } = useAuth();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -189,7 +128,7 @@ function BoardView({ board, period, today }: { board: Board; period: string; tod
   }, [board, period, status]);
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refresh]);
 
   // chips move as hands settle: refresh the chip board while it is on screen
   useEffect(() => {
@@ -248,7 +187,7 @@ function BoardView({ board, period, today }: { board: Board; period: string; tod
             <span>Player</span>
             <span>{board === 'live' ? 'Chips' : 'Points'}</span>
           </div>
-          <ol className="lb-list" aria-label={`${BOARDS.find((b) => b.id === board)!.label} leaderboard, ${entries} ${entries === 1 ? 'player' : 'players'}`}>
+          <ol className="lb-list" aria-label={`${LABEL[board]} leaderboard, ${entries} ${entries === 1 ? 'player' : 'players'}`}>
             {rows.map((r, k) => (
               <LbRow key={`${r.name}:${k}`} board={board} row={r} />
             ))}
@@ -322,16 +261,6 @@ function YourStanding({
   failed: boolean;
   onRetry: () => void;
 }) {
-  const play =
-    board === 'live' ? (
-      <Link className="btn primary small" to="/play">
-        Play live
-      </Link>
-    ) : (
-      <Link className="btn primary small" to={`/?play=${board}#daily`}>
-        {board === 'daily' ? 'Play today’s five' : 'Play survival'}
-      </Link>
-    );
   let body: React.ReactNode;
   if (status === 'loading') body = <p className="note">Checking your sign-in…</p>;
   else if (status !== 'signed-in')
@@ -340,7 +269,7 @@ function YourStanding({
         <p>
           <strong>Sign in to get on the leaderboards.</strong> Anyone can look; only signed-in players’ results are ranked.
         </p>
-        <Link className="btn primary small" to="/login?next=%2Fleaderboards">
+        <Link className="btn primary small" to={`/login?next=${encodeURIComponent(board === 'live' ? '/play' : '/')}`}>
           Sign in
         </Link>
       </>
@@ -365,7 +294,6 @@ function YourStanding({
             <span className="lb-detail">{detail(board, standing)}</span>
           </span>
         </p>
-        {board !== 'daily' && play}
       </>
     );
   else
@@ -373,20 +301,19 @@ function YourStanding({
       <>
         <p>
           {board === 'live'
-            ? 'You are not on this board yet. Claim your free daily chips and sit down at a live table: your total shows here once you have chips.'
+            ? 'You are not on this board yet. Claim your free daily chips above and sit down at a table: your total shows here once you have chips.'
             : board === 'daily'
               ? today
                 ? 'You have not played today’s five yet. Finish it to get a rank.'
                 : 'You did not play this day’s five.'
               : 'No finished ranked run here yet. Finish a survival run to get on the board.'}
         </p>
-        {(board !== 'daily' || today) && play}
       </>
     );
   return (
-    <aside className="lb-standing" aria-label="Your standing">
-      <h2>Your standing</h2>
+    <div className="lb-standing" role="group" aria-label="Your standing">
+      <h3>Your standing</h3>
       <div className="lb-standing-body">{body}</div>
-    </aside>
+    </div>
   );
 }

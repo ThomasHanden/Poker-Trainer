@@ -1,7 +1,9 @@
 # Leaderboards
 
-Three boards at `/leaderboards`: **Live Play** (chips), **Daily Five** and **Survival**. Anyone can
-browse; only signed-in players are ranked. Display names are shown, never emails or account ids.
+Three boards, each shown where it is played (`src/ui/components/Leaderboard.tsx`): the **chip**
+board on the Play live page, and the **Daily Five** or **Survival** board beside the mini games on
+the home page (it follows the game picked; on phones it sits below the game). There is no separate
+leaderboards page. Anyone can browse; only signed-in players are ranked. Display names are shown, never emails or account ids.
 
 ## Who writes what
 
@@ -93,5 +95,5 @@ play unranked as before.
 - `tests/leaderboards-server.test.ts`: the real `Bank`, `Puzzles` and `PokerTable` code with
   in-memory storage and a fake database: a run from start to saved, ignored browser-sent scores,
   the database being down, lost replies.
-- `e2e/flows.spec.ts` ("leaderboards: …"): the page on desktop and phone with test rows served by
-  the test itself (nothing real is read), tabs and arrow keys, load more, a failed request and retry.
+- `e2e/flows.spec.ts` ("leaderboards: …"): both boards on desktop and phone with test rows served
+  by the test itself (nothing real is read): switching games, load more, a failed request and retry.

@@ -55,6 +55,8 @@ interface GameProps {
   fourColor: boolean;
   /** signed in, with the table server and leaderboards available */
   ranked: boolean;
+  /** a ranked run reached the leaderboard */
+  onRanked?: () => void;
 }
 
 export function PuzzleGame(props: GameProps) {
@@ -270,7 +272,8 @@ function ResultCard({ result, runs, onAgain, onSwitch, ranking }: { result: Puzz
   );
 }
 
-const boardLink = (mode: Mode) => `/leaderboards?board=${mode}`;
+/** The leaderboard sits beside the game (below it on phones). */
+const toBoard = () => document.getElementById('leaderboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 // ---------------- guests (and unranked play): in the browser ----------------
 
@@ -300,7 +303,11 @@ function LocalGame({ mode, setKey, existing, runs, onSaved, onSwitch, fourColor,
     <p className="pz-rank-line note">
       {note ?? (
         <>
-          <Link to="/login?next=%2F">Sign in</Link> to put your results on the <Link to={boardLink(mode)}>leaderboard</Link>.
+          <Link to="/login?next=%2F">Sign in</Link> to put your results on the{' '}
+          <button className="linklike" onClick={toBoard}>
+            leaderboard
+          </button>
+          .
         </>
       )}
     </p>
@@ -389,7 +396,7 @@ function LocalGame({ mode, setKey, existing, runs, onSaved, onSwitch, fourColor,
 
 // ---------------- signed in: ranked, through the table server ----------------
 
-function RankedGame({ mode, existing, runs, onSaved, onSwitch, fourColor, onUnranked }: GameProps & { onUnranked: () => void }) {
+function RankedGame({ mode, existing, runs, onSaved, onSwitch, fourColor, onUnranked, onRanked }: GameProps & { onUnranked: () => void }) {
   const [view, setView] = useState<RankedView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -431,6 +438,12 @@ function RankedGame({ mode, existing, runs, onSaved, onSwitch, fourColor, onUnra
       trackOnce(`puzzle:${run.id}`, 'Puzzle Completed', { mode: run.mode, ranked: true });
     }
   }, [a, runs, onSaved]);
+
+  // once the run is on the leaderboard, the board beside the game shows it
+  const saved = view?.save?.state === 'saved' ? view.attempt?.id : null;
+  useEffect(() => {
+    if (saved) onRanked?.();
+  }, [saved, onRanked]);
 
   // the question on screen has to be shown by the server first: that starts its clock
   const serving = useRef(false);
@@ -615,9 +628,9 @@ function RankedGame({ mode, existing, runs, onSaved, onSwitch, fourColor, onUnra
 /** Where a finished ranked run stands: saving, saved (with its rank), or not saved yet. */
 function RankingLine({ mode, save, onRetry }: { mode: Mode; save: SaveState | null; onRetry: () => void }) {
   const link = (
-    <Link className="btn small" to={boardLink(mode)}>
+    <button className="btn small" onClick={toBoard}>
       See the leaderboard
-    </Link>
+    </button>
   );
   if (!save || save.state === 'saving') {
     return (
