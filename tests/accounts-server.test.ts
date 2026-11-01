@@ -130,3 +130,26 @@ describe('account names at the tables', () => {
     expect(await fetchDisplayName('tok', CFG, answer(200, []))).toBeNull();
   });
 });
+
+describe('names guests cannot use', () => {
+  it('asks the database whether a name is an account’s; guest default names are never checked', async () => {
+    const { nameIsTaken, isGuestDefaultName } = await import('../src/multiplayer/accounts');
+    const asked: unknown[] = [];
+    const answer = (status: number, body: unknown) =>
+      (async (url: string, init?: RequestInit) => {
+        asked.push({ url, body: JSON.parse(String(init?.body)), auth: new Headers(init?.headers).get('Authorization') });
+        return new Response(JSON.stringify(body), { status });
+      }) as unknown as typeof fetch;
+    expect(await nameIsTaken('Founder', CFG, answer(200, true))).toBe(true);
+    expect(asked[0]).toEqual({ url: 'https://proj.supabase.co/rest/v1/rpc/name_is_taken', body: { name: 'Founder' }, auth: null });
+    expect(await nameIsTaken('Somebody', CFG, answer(200, false))).toBe(false);
+    // the database cannot be reached: guests can still play
+    expect(await nameIsTaken('Founder', CFG, answer(500, { message: 'down' }))).toBe(false);
+    expect(await nameIsTaken('Founder', CFG, (async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)).toBe(false);
+    for (const n of ['Player', 'player 2', 'PLAYER 13']) expect(isGuestDefaultName(n), n).toBe(true);
+    expect(isGuestDefaultName('Player 4821')).toBe(false);
+    asked.length = 0;
+    expect(await nameIsTaken('Player 2', CFG, answer(200, true))).toBe(false);
+    expect(asked).toEqual([]);
+  });
+});

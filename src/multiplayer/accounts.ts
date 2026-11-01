@@ -70,6 +70,29 @@ export async function fetchDisplayName(token: string, cfg: AccountAuthConfig, f:
   }
 }
 
+/** Names guests get when they leave theirs blank ("Player", "Player 2"…): never an account's. */
+export const isGuestDefaultName = (name: string) => /^player( [0-9]{1,3})?$/i.test(name.trim());
+
+/**
+ * Whether a name belongs to an account (ignoring capitals), so a guest cannot sit under it. Asks
+ * the database, which answers only yes or no. If it cannot be asked within a few seconds the
+ * answer is no: an outage should not stop guests from playing.
+ */
+export async function nameIsTaken(name: string, cfg: AccountAuthConfig, f: typeof fetch = fetch): Promise<boolean> {
+  if (!cfg.supabaseUrl || isGuestDefaultName(name)) return false;
+  try {
+    const r = await f(`${cfg.supabaseUrl.replace(/\/+$/, '')}/rest/v1/rpc/name_is_taken`, {
+      method: 'POST',
+      headers: { apikey: cfg.publishableKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(3000),
+    });
+    return r.ok && (await r.json()) === true;
+  } catch {
+    return false;
+  }
+}
+
 async function askSupabase(token: string, issuer: string, publishableKey: string, f: typeof fetch): Promise<string | null> {
   const r = await f(`${issuer}/user`, { headers: { apikey: publishableKey, Authorization: `Bearer ${token}` } });
   if (!r.ok) return null;

@@ -8,6 +8,7 @@ import { fetchSignInMethods, supabase, type SignInMethods } from './supabase';
 import { setLiveAccount } from '../ui/useLiveTable';
 import { track } from '../ui/analytics';
 import { nameProblem } from '../multiplayer/moderation';
+import { isGuestDefaultName } from '../multiplayer/accounts';
 
 export type AuthStatus = 'off' | 'loading' | 'signed-out' | 'signed-in';
 
@@ -249,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const name = cleanDisplayName(raw);
       if (!name) return { ok: false as const, message: `Use 1 to ${DISPLAY_NAME_MAX} characters.` };
       if (/^bot\b/i.test(name)) return { ok: false as const, message: 'Names starting with “Bot” are kept for the live tables’ bots.' };
+      if (isGuestDefaultName(name)) return { ok: false as const, message: 'Names like “Player” and “Player 2” are kept for people playing without an account.' };
       const problem = nameProblem(name);
       if (problem) return { ok: false as const, message: problem };
       if (!supabase || !userId) return fail(null);

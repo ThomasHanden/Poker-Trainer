@@ -59,10 +59,10 @@ beforeAll(async () => {
 });
 
 describe('profiles', () => {
-  it('every new account gets a profile, named from sign-up details or "Player"', async () => {
+  it('every new account gets a profile, named from sign-up details or "Player" and four digits', async () => {
     expect(await rows(`select id, display_name from public.profiles order by id`)).toEqual([
       { id: ANN, display_name: 'Ann Marie' },
-      { id: BOB, display_name: 'Player' },
+      { id: BOB, display_name: expect.stringMatching(/^Player \d{4}$/) },
     ]);
     expect((await rows<{ n: string }>(`select public.clean_display_name($1) as n`, ['x'.repeat(40)]))[0].n).toHaveLength(24);
   });
@@ -76,7 +76,7 @@ describe('profiles', () => {
       // other columns cannot be changed at all
       expect(await fails(db.query(`update public.profiles set id = $1 where id = $2`, [BOB, ANN]))).toMatch(/permission denied/);
     });
-    expect(await rows(`select display_name from public.profiles where id = $1`, [BOB])).toEqual([{ display_name: 'Player' }]);
+    expect(await rows(`select display_name from public.profiles where id = $1`, [BOB])).toEqual([{ display_name: expect.stringMatching(/^Player \d{4}$/) }]);
     expect(await as(null, () => fails(db.query(`select * from public.profiles`)))).toMatch(/permission denied/);
   });
 
@@ -205,7 +205,7 @@ describe('account names', () => {
     const annName = await nameOf(ANN);
     const err = await as(BOB, () => fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [annName.toUpperCase(), BOB])));
     expect(err).toMatch(/profiles_display_name_unique/);
-    expect(await nameOf(BOB)).toBe('Player');
+    expect(await nameOf(BOB)).toMatch(/^Player \d{4}$/);
   });
 
   it('a new account gets its own name if it is allowed and free, otherwise one with a number added', async () => {
@@ -217,7 +217,7 @@ describe('account names', () => {
       FAY, { display_name: 'Bot 3' }, // a bot's name
     ]);
     expect(await nameOf(DAN)).toMatch(new RegExp(`^${annName} \\d{4}$`, 'i'));
-    expect(await nameOf(ED)).toMatch(/^Player \d{4}$/); // "Player" itself is Bob's
+    expect(await nameOf(ED)).toMatch(/^Player \d{4}$/);
     expect(await nameOf(FAY)).toMatch(/^Player \d{4}$/);
     const all = await rows<{ n: string }>(`select lower(display_name) as n from public.profiles`);
     expect(new Set(all.map((r) => r.n)).size).toBe(all.length);
@@ -227,7 +227,9 @@ describe('account names', () => {
     await as(BOB, async () => {
       for (const bad of ['f4ggot', 'N.I.G.G.E.R', 'xXtrannyXx', 'Bot 2', 'bot'])
         expect(await fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [bad, BOB])), bad).toMatch(/display_name_allowed/);
-      for (const ok of ['Shithead', 'Botond', 'Bot3', 'Player'])
+      for (const guestName of ['Player', 'player 12', 'PLAYER 3'])
+        expect(await fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [guestName, BOB])), guestName).toMatch(/display_name_not_guest/);
+      for (const ok of ['Shithead', 'Botond', 'Bot3', 'Player 4821', 'Playful'])
         expect(await fails(db.query(`update public.profiles set display_name = $1 where id = $2`, [ok, BOB])), ok).toBeNull();
     });
   });
@@ -238,3 +240,16 @@ describe('account names', () => {
       expect((await rows<{ l: string }>(`select public.name_letters($1) as l`, [s]))[0].l, s).toBe(nameLetters(s));
   });
 });
+
+describe('names guests cannot use', () => {
+  it('anyone can ask whether a name belongs to an account, and learns only yes or no', async () => {
+    const annName = (await rows<{ n: string }>(`select display_name as n from public.profiles where id = $1`, [ANN]))[0].n;
+    for (const who of [null, BOB]) {
+      expect((await as(who, () => rows<{ t: boolean }>(`select public.name_is_taken($1) as t`, [` ${annName.toUpperCase()} `])))[0].t).toBe(true);
+      expect((await as(who, () => rows<{ t: boolean }>(`select public.name_is_taken($1) as t`, ['Nobody Has This'])))[0].t).toBe(false);
+    }
+    // it does not open up the profiles themselves
+    expect(await as(null, () => fails(db.query(`select * from public.profiles`)))).toMatch(/permission denied/);
+  });
+});
+

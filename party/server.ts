@@ -8,7 +8,7 @@ import { Server, routePartykitRequest, type Connection, type ConnectionContext, 
 import { BOT_SEATS, LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
 import { KEY_PATTERN, claimDaily, deposit, moveGuestChips, playerId, rollDaily, status, upgrade, utcDay, withdraw, type Account, type BankStatus } from '../src/multiplayer/bank';
 import { ChatRoom } from '../src/multiplayer/chat';
-import { accountPlayerId, fetchDisplayName, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
+import { accountPlayerId, fetchDisplayName, nameIsTaken, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
 import { nameProblem } from '../src/multiplayer/moderation';
 
 type Env = {
@@ -201,6 +201,9 @@ export class PokerTable extends Server<Env> {
     // a signed-in player sits under their account name (unique, and checked by the database)
     const name = accountName ? String(rawName) : cleanName(rawName);
     if (nameProblem(name)) return accountName ? 'Your account name is not allowed at the tables. Change it on your Account page.' : 'That name is not allowed. Choose a different one.';
+    // account names belong to their accounts: a guest cannot sit under one
+    if (!accountName && !this.table.isSeated(pid) && (await nameIsTaken(name, authConfig(this.env))))
+      return `${name} is someone’s account name. Choose a different one, or sign in if it is yours.`;
     if (this.table.isSeated(pid) || this.table.reservationOf(pid)) return this.table.sit(pid, name);
     if (this.buyingIn.has(pid)) return null; // the first request is still at the bank
     const seatProblem = this.table.seatProblem(rawSeat);

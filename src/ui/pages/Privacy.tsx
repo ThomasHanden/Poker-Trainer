@@ -36,8 +36,8 @@ export function PrivacyPage() {
           first name as your starting display name, and never see your Google password.
         </li>
         <li>
-          <strong>Your display name</strong>, which you can change on your Account page. Each name belongs to one account, and you play under it at live
-          tables. Your email address is never shown to other players.
+          <strong>Your display name</strong>, which you can change on your Account page. Each name belongs to one account (nobody else, signed in or not, can
+          use it), and you play under it at live tables. Your email address is never shown to other players.
         </li>
         <li>
           <strong>Your progress:</strong> lesson progress, saved ranges, settings, practice hands and daily puzzle results, so they are on every device you sign in
