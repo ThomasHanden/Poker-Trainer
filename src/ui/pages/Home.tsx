@@ -196,10 +196,8 @@ export function HomePage() {
               <dd>{survivalBest || '—'}</dd>
             </div>
           </dl>
-          <h3>Top runs</h3>
-          {board.length === 0 ? (
-            <p className="note">Finish a puzzle run to get on the board. Ties are broken by time.</p>
-          ) : (
+          {board.length > 0 && <h3>Top runs</h3>}
+          {board.length > 0 && (
             <table className="sb-table">
               <thead>
                 <tr>
@@ -225,19 +223,17 @@ export function HomePage() {
               </tbody>
             </table>
           )}
-          <h3>Practice</h3>
           <p className="sb-line">
+            <strong>Practice:</strong>{' '}
             {played ? (
               <>
-                {played} hand{played === 1 ? '' : 's'} played{avg !== null ? `, average score ${avg}` : ''}. <Link to="/progress">Details</Link>
+                {played} hand{played === 1 ? '' : 's'}
+                {avg !== null ? `, average ${avg}` : ''} · <Link to="/progress">Details</Link>
               </>
             ) : (
-              <>
-                No hands yet. <Link to="/practice">Play your first hand</Link>
-              </>
+              <Link to="/practice">play your first hand</Link>
             )}
           </p>
-          <p className="note">{owner ? 'Bests, runs and practice stats are saved to your account.' : 'Bests, runs and practice stats are saved in this browser.'}</p>
         </aside>
       </div>
     </div>
@@ -409,17 +405,9 @@ function PuzzleGame({
             ? 'A preflop decision, some quick poker math, a hand to read and two surprises. Everyone gets the same five today.'
             : `Questions keep coming until you miss ${LIVES}. Any puzzle type can show up.`}
         </p>
-        <ul className="pz-rules">
-          <li>
-            <strong>100</strong> points for a right answer
-          </li>
-          <li>
-            up to <strong>+50</strong> more for answering fast
-          </li>
-          <li>
-            a <strong>combo</strong> multiplier for answers in a row (up to ×2)
-          </li>
-        </ul>
+        <p className="pz-rules-line">
+          <strong>100</strong> a right answer · up to <strong>+50</strong> for speed · <strong>×2</strong> combo for answers in a row
+        </p>
         <button
           className="btn primary big"
           data-testid="pz-start"

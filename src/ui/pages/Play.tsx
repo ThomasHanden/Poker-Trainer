@@ -242,27 +242,27 @@ export function PlayLobbyPage() {
         <div className="ph-main">
           <h1 className="ph-title">Play live</h1>
           <p className="ph-sub">
-            Free play-money No-Limit Hold’em against real people, with bots filling empty seats at public tables. Claim {DAILY_MIN}–{DAILY_MAX} free chips each day.
-            Each table has a minimum and maximum buy-in, and you choose how much to bring; your stack comes back to you when you leave. Chips you win stay in
-            your balance: it never resets.
+            Free play-money No-Limit Hold’em with real people. {DAILY_MIN}–{DAILY_MAX} free chips a day; what you win is yours to keep.
           </p>
         </div>
       </header>
       {!PARTY_HOST && <NotConfigured />}
       <Wallet bank={bank} onBank={setBank} />
       <p className="note live-history-link">
-        <Link to="/play/history">Your live hands</Link>: replays, session stats and logs to download.
+        <Link to="/play/history">Your live hands</Link> · reviews, stats and logs
       </p>
       <section className="live-card live-public" aria-labelledby="pub-title">
-        <h2 id="pub-title">Public tables</h2>
-        <p className="note">
-          Open to anyone, and you never wait for a game: when you sit down, bots (named Bot 1, Bot 2 and so on) fill the empty seats and the first hand starts in a
-          few seconds.
-        </p>
-        <p className="note">
-          <strong>You can always take a bot’s seat.</strong> People come first: if every seat is taken, press <em>Take seat from…</em> under the table, and
-          the bot hands you its seat as soon as the hand it is playing ends.
-        </p>
+        <div className="pub-head">
+          <h2 id="pub-title">Public tables</h2>
+          <details className="pub-how">
+            <summary>How bots work</summary>
+            <p className="note">
+              Bots (Bot 1, Bot 2…) fill empty seats so a hand starts in seconds. People come first: if every seat is taken, press <em>Take seat from…</em> under the
+              table and the bot gives you its seat when its hand ends.
+            </p>
+          </details>
+        </div>
+        <p className="note">Open to anyone. Bots fill the empty seats, so you never wait for a game.</p>
         <ul className="live-tables">
           {PUBLIC_TABLES.map((room) => {
             const s = tables[room];
@@ -290,10 +290,7 @@ export function PlayLobbyPage() {
       <div className="live-lobby">
         <section className="live-card">
           <h3>Start a table</h3>
-          <p className="note">
-            Set it up, share the link, deal the cards. Only people with the link can join, up to {MAX_SEATS} players. You are the host: you can pause the game, let
-            people in, call bomb pots and change the settings at any time.
-          </p>
+          <p className="note">For you and friends with the link, up to {MAX_SEATS} players. You host: pause, let people in, change the rules.</p>
           <form onSubmit={createTable} className="new-table">
             <div className="seg new-stakes" role="radiogroup" aria-label="Blinds">
               {(

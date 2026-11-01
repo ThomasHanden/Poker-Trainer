@@ -16,67 +16,98 @@ export function LearnPage() {
     const t = q.trim().toLowerCase();
     return LESSONS.filter((l) => (level === 'any' || l.level === level) && (!t || [l.title, l.summary, ...l.plain, ...l.mistakes].join(' ').toLowerCase().includes(t)));
   }, [q, level]);
-  const done = (id: string) => data.lessons[id]?.completed;
+  const done = (id: string) => !!data.lessons[id]?.completed;
   const searching = q.trim().length > 0 || level !== 'any';
+  const doneCount = LESSONS.filter((l) => done(l.id)).length;
+  // the next lesson: the first unread one in the first track you have started (else the first track)
+  const next = useMemo(() => {
+    const started = SEQUENCES.find((s) => s.lessons.some(done) && s.lessons.some((id) => !done(id))) ?? SEQUENCES.find((s) => s.lessons.some((id) => !done(id)));
+    const id = started?.lessons.find((x) => !done(x));
+    return started && id ? { track: started, id, n: started.lessons.filter(done).length } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.lessons]);
   return (
     <div className="page learn">
-      <header className="page-head">
-        <p className="eyebrow">Library · {LESSONS.length} lessons</p>
-        <h1>Learn the theory</h1>
-        <p className="lead">Short lessons on one idea each, with worked examples, practice problems and a quiz. Start with a study track or pick any topic.</p>
-      </header>
-      <div className="filters">
-        <label className="grow">
-          Search
-          <input type="search" placeholder="e.g. pot odds, ICM, blockers" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <label>
-          Level
-          <Select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
-            <option value="any">Any</option>
+      <header className="learn-head">
+        <div>
+          <h1>Learn</h1>
+          <p className="lead">
+            {LESSONS.length} short lessons, one idea each{doneCount ? ` · ${doneCount} done` : ''}.
+          </p>
+        </div>
+        <div className="learn-filters">
+          <label className="sr-only" htmlFor="learn-q">
+            Search lessons
+          </label>
+          <input id="learn-q" type="search" placeholder="Search: pot odds, ICM, blockers…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <label className="sr-only" htmlFor="learn-level">
+            Level
+          </label>
+          <Select id="learn-level" value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
+            <option value="any">All levels</option>
             <option value="beginner">Beginner</option>
             <option value="intermediate">Intermediate</option>
             <option value="advanced">Advanced</option>
           </Select>
-        </label>
-      </div>
+        </div>
+      </header>
       {searching ? (
-        <section>
+        <section className="learn-results">
           <h2>
             {results.length} result{results.length === 1 ? '' : 's'}
           </h2>
-          {results.length === 0 && <p className="empty">No lessons match. Try a broader term.</p>}
-          <ul className="lesson-grid">
-            {results.map((l) => (
-              <LessonCard key={l.id} id={l.id} done={!!done(l.id)} />
-            ))}
-          </ul>
+          {results.length === 0 ? (
+            <p className="empty">No lessons match. Try a broader term.</p>
+          ) : (
+            <ul className="lesson-rows">
+              {results.map((l) => (
+                <LessonRow key={l.id} id={l.id} done={done(l.id)} />
+              ))}
+            </ul>
+          )}
         </section>
       ) : (
         <>
-          <section>
-            <h2>Study tracks</h2>
-            <p className="note">Optional reading orders. Every lesson is open, so you can also pick any topic below.</p>
-            <div className="sequences">
+          {next && (
+            <Link className="learn-next" to={`/learn/${next.id}`}>
+              <span className="learn-next-label">{next.n ? `Continue ${next.track.title}` : `Start with ${next.track.title}`}</span>
+              <strong>{LESSON_INDEX[next.id].title}</strong>
+              <span className="learn-next-go" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          )}
+          <section aria-labelledby="tracks-title">
+            <h2 id="tracks-title" className="learn-sub">
+              Study tracks
+            </h2>
+            <div className="tracks">
               {SEQUENCES.map((s) => {
                 const n = s.lessons.filter(done).length;
                 return (
-                  <details key={s.id} className="sequence">
+                  <details key={s.id} className="track">
                     <summary>
-                      <span className="seq-title">{s.title}</span>
-                      <span className="seq-blurb">{s.blurb}</span>
-                      <span className="seq-count">
-                        {n} of {s.lessons.length}
+                      <span className="track-title">{s.title}</span>
+                      <span className="track-blurb">{s.blurb}</span>
+                      <span className="track-progress" aria-label={`${n} of ${s.lessons.length} done`}>
+                        <span style={{ width: `${(100 * n) / s.lessons.length}%` }} />
+                      </span>
+                      <span className="track-count">
+                        {n}/{s.lessons.length}
                       </span>
                     </summary>
                     <ol className="link-list numbered">
                       {s.lessons.map((id, i) => (
                         <li key={id}>
                           <Link to={`/learn/${id}`} className={done(id) ? 'done' : ''}>
-                            <span className="ll-num" aria-hidden="true">{done(id) ? '✓' : i + 1}</span>
+                            <span className="ll-num" aria-hidden="true">
+                              {done(id) ? '✓' : i + 1}
+                            </span>
                             <span className="ll-title">{LESSON_INDEX[id].title}</span>
                             {done(id) && <span className="sr-only"> (completed)</span>}
-                            <span className="ll-chev" aria-hidden="true">›</span>
+                            <span className="ll-chev" aria-hidden="true">
+                              ›
+                            </span>
                           </Link>
                         </li>
                       ))}
@@ -86,35 +117,59 @@ export function LearnPage() {
               })}
             </div>
           </section>
-          {SECTIONS.map((s) => (
-            <section key={s.id}>
-              <h2>{s.title}</h2>
-              <p className="note">{s.blurb}</p>
-              <ul className="lesson-grid">
-                {lessonsInSection(s.id).map((l) => (
-                  <LessonCard key={l.id} id={l.id} done={!!done(l.id)} />
-                ))}
-              </ul>
-            </section>
-          ))}
+          <section aria-labelledby="topics-title">
+            <h2 id="topics-title" className="learn-sub">
+              All topics
+            </h2>
+            <div className="topics">
+              {SECTIONS.map((s) => {
+                const ls = lessonsInSection(s.id);
+                const n = ls.filter((l) => done(l.id)).length;
+                return (
+                  <details key={s.id} className="topic">
+                    <summary>
+                      <span className="topic-title">{s.title}</span>
+                      <span className="topic-blurb">{s.blurb}</span>
+                      <span className="topic-count">{n ? `${n}/${ls.length} done` : `${ls.length} lessons`}</span>
+                    </summary>
+                    <ul className="lesson-rows">
+                      {ls.map((l) => (
+                        <LessonRow key={l.id} id={l.id} done={done(l.id)} />
+                      ))}
+                    </ul>
+                  </details>
+                );
+              })}
+            </div>
+          </section>
         </>
       )}
     </div>
   );
 }
 
-function LessonCard({ id, done }: { id: string; done: boolean }) {
+/** One lesson in a list: its title and a line about it, its level, and a tick when done. */
+function LessonRow({ id, done }: { id: string; done: boolean }) {
   const l = LESSON_INDEX[id];
   return (
-    <li className="lesson-card">
+    <li className={`lesson-row ${done ? 'done' : ''}`}>
       <Link to={`/learn/${id}`}>
-        <strong>{l.title}</strong>
-        <span>{l.summary}</span>
-        <span className="meta">
+        <span className="lrow-main">
+          <span className="lrow-title">
+            {done && (
+              <span className="lrow-mark" aria-hidden="true">
+                ✓{' '}
+              </span>
+            )}
+            {l.title}
+          </span>
+          <span className="lrow-sum">{l.summary}</span>
+        </span>
+        <span className={`lrow-level lv-${l.level}`}>
           {l.level}
           {l.format !== 'both' ? ` · ${l.format}` : ''}
-          {done ? ' · ✓ completed' : ''}
         </span>
+        {done && <span className="sr-only">(completed)</span>}
       </Link>
     </li>
   );
@@ -180,7 +235,17 @@ export function LessonPage() {
       <nav className="lesson-toc" aria-label="On this page">
         <span className="toc-l">On this page</span>
         {toc.map(([id, label]) => (
-          <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+          <a
+            key={id}
+            href={`#${id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById(id);
+              // a section folded away opens when you jump to it
+              if (el instanceof HTMLDetailsElement) el.open = true;
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
             {label}
           </a>
         ))}
@@ -214,9 +279,20 @@ export function LessonPage() {
           </dl>
         </section>
       )}
+      <section className="why-matters">
+        <h2>Why it matters</h2>
+        <ul>
+          {l.why.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      </section>
       {l.deeper && l.deeper.length > 0 && (
-        <section className="deeper" id="s-deeper">
-          <h2>Going deeper</h2>
+        <details className="lesson-more deeper" id="s-deeper">
+          <summary>
+            <h2>Going deeper</h2>
+            <span className="note">{l.deeper.map((d) => d.heading).join(' · ')}</span>
+          </summary>
           {l.deeper.map((d) => (
             <div key={d.heading} className="deeper-part">
               <h3>{d.heading}</h3>
@@ -225,16 +301,8 @@ export function LessonPage() {
               ))}
             </div>
           ))}
-        </section>
+        </details>
       )}
-      <section>
-        <h2>Why it matters</h2>
-        <ul>
-          {l.why.map((p, i) => (
-            <li key={i}>{p}</li>
-          ))}
-        </ul>
-      </section>
       {[l.example, ...(l.examples ?? [])].map((ex, k) => (
         <section className="example" key={k} id={k === 0 ? 's-examples' : undefined}>
           <h2>
@@ -266,8 +334,10 @@ export function LessonPage() {
         </ul>
       </section>
       {l.math && (
-        <section className="mathbox">
-          <h2>The math</h2>
+        <details className="lesson-more mathbox">
+          <summary>
+            <h2>The math</h2>
+          </summary>
           {l.math.formulas && (
             <ul className="formulas">
               {l.math.formulas.map((f, i) => (
@@ -280,16 +350,18 @@ export function LessonPage() {
           {l.math.notes.map((p, i) => (
             <p key={i}>{p}</p>
           ))}
-        </section>
+        </details>
       )}
-      <section>
-        <h2>Assumptions and exceptions</h2>
+      <details className="lesson-more">
+        <summary>
+          <h2>Assumptions and exceptions</h2>
+        </summary>
         <ul>
           {l.assumptions.map((p, i) => (
             <li key={i}>{p}</li>
           ))}
         </ul>
-      </section>
+      </details>
       {l.problems && l.problems.length > 0 && (
         <section className="problems" id="s-problems">
           <h2>Try it yourself</h2>
@@ -401,8 +473,10 @@ export function LessonPage() {
           ))}
         </ul>
       </section>
-      <section className="sources">
-        <h2>Sources</h2>
+      <details className="lesson-more sources">
+        <summary>
+          <h2>Sources</h2>
+        </summary>
         <ul>
           {l.sources.map((s) => {
             const src = SOURCES[s];
@@ -416,7 +490,7 @@ export function LessonPage() {
           })}
         </ul>
         <p className="note">Explanations are original. Sources are cited for the concepts they are known for.</p>
-      </section>
+      </details>
     </article>
   );
 }
