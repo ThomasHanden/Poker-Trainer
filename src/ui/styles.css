@@ -7546,7 +7546,8 @@ label > span:first-child:not(.select-value) {
   color: var(--text-2);
 }
 .start-choice,
-.continue {
+.continue,
+.home-live {
   margin: 24px 0 0;
   padding: 20px 22px;
   background: var(--surface);
@@ -7589,6 +7590,21 @@ label > span:first-child:not(.select-value) {
 .start-skip {
   margin-top: 14px;
 }
+.home-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 6px;
+}
+.home-live h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+.home-live-head a {
+  font-size: 0.92rem;
+}
 .continue .eyebrow {
   margin: 0 0 2px;
 }
@@ -7619,7 +7635,8 @@ label > span:first-child:not(.select-value) {
     grid-template-columns: minmax(0, 1fr);
   }
   .start-choice,
-  .continue {
+  .continue,
+  .home-live {
     margin-top: 16px;
     padding: 16px;
   }

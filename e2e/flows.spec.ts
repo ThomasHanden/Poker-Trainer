@@ -145,7 +145,7 @@ test('daily puzzles can be completed and show in your stats', async ({ page }) =
   }
   await expect(page.getByTestId('pz-result')).toBeVisible();
   await expect(page.locator('.sb-table tbody tr')).toHaveCount(2);
-  await page.getByRole('link', { name: 'Go to practice →' }).click();
+  await page.locator('.home-actions').getByRole('link', { name: 'Practice', exact: true }).click();
   await expect(page).toHaveURL(/\/practice$/);
 });
 

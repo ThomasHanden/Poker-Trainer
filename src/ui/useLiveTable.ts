@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PartySocket from 'partysocket';
 import type { PlayerAction } from '../engine/rules';
-import type { ClientMessage, ServerMessage, TableView } from '../multiplayer/table';
+import { PUBLIC_TABLES, type ClientMessage, type ServerMessage, type TableSummary, type TableView } from '../multiplayer/table';
 import type { BankStatus } from '../multiplayer/bank';
 import type { ChatMessage } from '../multiplayer/chat';
 
@@ -19,6 +19,8 @@ export type ChatLine = ChatMessage & { state?: 'sending' | 'failed'; error?: str
 
 /** How long to wait for the server to confirm a message before calling it not delivered. */
 const CHAT_ACK_MS = 8000;
+/** How often the lobby rechecks how full the public tables are. */
+export const LOBBY_POLL_MS = 10_000;
 
 const local = () => /^(localhost|127\.0\.0\.1)[:/]/.test(PARTY_HOST ?? '');
 const httpBase = () => `${local() ? 'http' : 'https'}://${PARTY_HOST}`;
@@ -162,6 +164,48 @@ export async function claimDailyChips(): Promise<Bankroll & { amount: number }> 
     if (e instanceof TypeError) return once().catch(() => Promise.reject(new Error('Could not reach the chip server. Check your connection and try again.')));
     throw e;
   }
+}
+
+/** "1 player · 3 bots · in a hand". Bots are counted separately, never as players. */
+export function occupancy(s: TableSummary): string {
+  const bots = s.bots ?? 0; // table servers from before bots leave it out
+  if (!s.players && !bots) return 'empty';
+  const parts = [`${s.players} ${s.players === 1 ? 'player' : 'players'}`];
+  if (bots) parts.push(`${bots} ${bots === 1 ? 'bot' : 'bots'}`);
+  if (s.playing) parts.push('in a hand');
+  return parts.join(' · ');
+}
+
+/** How full each public table is, refreshed while the page is open and visible (and `enabled`). */
+export function usePublicTables(enabled = true): Record<string, TableSummary | null | undefined> {
+  const [info, setInfo] = useState<Record<string, TableSummary | null>>({});
+  useEffect(() => {
+    if (!PARTY_HOST || !enabled) return;
+    let stopped = false;
+    const load = async () => {
+      if (document.hidden) return;
+      const rows = await Promise.all(
+        PUBLIC_TABLES.map(async (room) => {
+          try {
+            const r = await fetch(tableInfoUrl(room));
+            return [room, r.ok ? ((await r.json()) as TableSummary) : null] as const;
+          } catch {
+            return [room, null] as const;
+          }
+        }),
+      );
+      if (!stopped) setInfo(Object.fromEntries(rows));
+    };
+    load();
+    const t = setInterval(load, LOBBY_POLL_MS);
+    document.addEventListener('visibilitychange', load);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', load);
+    };
+  }, [enabled]);
+  return info;
 }
 
 /** A live table, as the signed-in account (accountId) or as this browser's guest; switching reconnects. */

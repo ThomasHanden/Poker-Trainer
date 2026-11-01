@@ -71,23 +71,18 @@ export function nextTrackLesson(lessons: Record<string, LessonProgress>, tracks 
   return step;
 }
 
-/** Today's Daily five: not started, part answered, or finished (with its points). */
-export type DailyState = { state: 'new' } | { state: 'started'; answered: number; total: number } | { state: 'done'; points: number };
-
 export type Suggestion =
   /** five hands on a concept you are finding hard (or carrying on with the five you started) */
   | { kind: 'concept'; concept: ConceptId; avg: number; n: number; resume?: { done: number; total: number } }
   /** a concept you are finding hard that practice cannot deal with your settings: its lesson instead */
   | { kind: 'concept-lesson'; concept: ConceptId; avg: number; n: number }
   | ({ kind: 'lesson' } & TrackStep)
-  | ({ kind: 'daily' } & DailyState)
   /** not enough decisions yet to say what to work on */
   | { kind: 'practice'; decisions: number };
 
 export interface PlanInput {
   history: HandRecord[];
   lessons: Record<string, LessonProgress>;
-  daily: DailyState;
   /** whether practice can deal hands on this concept with the player's settings */
   canPractise: (c: ConceptId) => boolean;
   /** five hands on a concept started in this tab and not finished yet */
@@ -99,7 +94,7 @@ export interface PlanInput {
  * links. Only concepts with enough decisions to judge (MIN_N, unassisted) are called something to
  * work on; with too few, the suggestion is simply to keep practising.
  */
-export function continuePlan({ history, lessons, daily, canPractise, run }: PlanInput): Suggestion[] {
+export function continuePlan({ history, lessons, canPractise, run }: PlanInput): Suggestion[] {
   const out: Suggestion[] = [];
   const stats = conceptStats(history);
   const weak = weakConcepts(stats);
@@ -118,7 +113,5 @@ export function continuePlan({ history, lessons, daily, canPractise, run }: Plan
   if (step) out.push({ kind: 'lesson', ...step });
   // 3. nothing to work on (yet): more practice, which is also what finds the weak spots
   if (!weak.length && !running) out.push({ kind: 'practice', decisions: decisionsOf(history, false).filter(({ d }) => d.points !== null).length });
-  // 4. today's Daily five (once finished, the card just says so)
-  out.push({ kind: 'daily', ...daily });
   return out;
 }

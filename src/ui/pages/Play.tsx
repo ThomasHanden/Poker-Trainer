@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { Table, HistoryList, dealMs, type Seating } from '../components/Table';
 import { ActionBar, type AmountUnit } from '../components/ActionBar';
 import { LiveChat, useMutes } from '../components/LiveChat';
-import { PARTY_HOST, claimDailyChips, fetchBankroll, rememberTable, tableInfoUrl, useLiveTable, type Bankroll } from '../useLiveTable';
+import { PARTY_HOST, claimDailyChips, fetchBankroll, LOBBY_POLL_MS, occupancy, rememberTable, useLiveTable, usePublicTables, type Bankroll } from '../useLiveTable';
 import {
   CHIP,
   HIGH_PREFIX,
@@ -32,7 +32,6 @@ import { legalActions, type HandState, type PlayerAction } from '../../engine/ru
 import { describeScore } from '../../engine/evaluator';
 
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no look-alikes (i/l/1, o/0)
-const LOBBY_POLL_MS = 10_000;
 
 /** Live tables type and show amounts in chips. */
 const CHIPS: AmountUnit = { per: CHIP, fmt: fmtChips, short: '', name: 'chips' };
@@ -170,48 +169,6 @@ function NotConfigured() {
       Live tables are not switched on for this site yet: the table server address (VITE_PARTY_HOST) is missing.
     </div>
   );
-}
-
-/** "1 player · 3 bots · in a hand". Bots are counted separately, never as players. */
-function occupancy(s: TableSummary): string {
-  const bots = s.bots ?? 0; // table servers from before bots leave it out
-  if (!s.players && !bots) return 'empty';
-  const parts = [`${s.players} ${s.players === 1 ? 'player' : 'players'}`];
-  if (bots) parts.push(`${bots} ${bots === 1 ? 'bot' : 'bots'}`);
-  if (s.playing) parts.push('in a hand');
-  return parts.join(' · ');
-}
-
-/** How full each public table is, refreshed while the page is open and visible (and `enabled`). */
-function usePublicTables(enabled = true): Record<string, TableSummary | null | undefined> {
-  const [info, setInfo] = useState<Record<string, TableSummary | null>>({});
-  useEffect(() => {
-    if (!PARTY_HOST || !enabled) return;
-    let stopped = false;
-    const load = async () => {
-      if (document.hidden) return;
-      const rows = await Promise.all(
-        PUBLIC_TABLES.map(async (room) => {
-          try {
-            const r = await fetch(tableInfoUrl(room));
-            return [room, r.ok ? ((await r.json()) as TableSummary) : null] as const;
-          } catch {
-            return [room, null] as const;
-          }
-        }),
-      );
-      if (!stopped) setInfo(Object.fromEntries(rows));
-    };
-    load();
-    const t = setInterval(load, LOBBY_POLL_MS);
-    document.addEventListener('visibilitychange', load);
-    return () => {
-      stopped = true;
-      clearInterval(t);
-      document.removeEventListener('visibilitychange', load);
-    };
-  }, [enabled]);
-  return info;
 }
 
 /**

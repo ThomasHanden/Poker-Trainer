@@ -20,7 +20,7 @@ saved-hand ids, exact times or dates. Properties are short labels, at most two p
 | Lesson Practice Started | none | practice deals a hand after arriving from a lesson’s practice button (`?from=lesson`) | each arrival from a lesson; refreshing that page does not count again |
 | Puzzle Completed | mode: daily / survival | a Daily five or Survival run is finished and saved | every run (the Daily five can only be finished once a day) |
 | Review Opened | none | a saved hand’s review (`/review/…`) has been rebuilt and is on screen | each opening; not again on rerenders |
-| Continue Card Used | type: concept / concept-lesson / lesson / practice / daily, place: main / more | a suggestion on the home page’s Continue card is followed | every click |
+| Continue Card Used | type: concept / concept-lesson / lesson / practice, place: main / more | a suggestion on the home page’s Continue card is followed | every click |
 | Returned | days: 1 day / 2-7 days / 8-30 days / 31+ days | the first visit on a calendar day after this browser’s first visit | at most once per local calendar day |
 | Live Table Left Before First Hand | table: public / private | someone asked for a seat on a live table, then left it (Leave, another table or another page) before being dealt a hand | once per seat request |
 | Live Table Opened, Seat Requested, Seat Assigned, Bot Seat Replacement Completed, First Live Hand Dealt, First Live Hand Completed, Daily Chips Claimed | see `docs/LIVE_TABLES.md` | | |

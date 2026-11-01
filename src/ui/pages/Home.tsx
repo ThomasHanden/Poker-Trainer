@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../../auth/AuthContext';
@@ -6,7 +6,9 @@ import { CardRow } from '../components/Card';
 import { LESSON_INDEX, SEQUENCES } from '../../content/lessons';
 import { CONCEPTS } from '../../content/concepts';
 import { canPractise } from '../../scenarios/generator';
-import { DailyState, Suggestion, continuePlan } from '../../progress/insights';
+import { Suggestion, continuePlan } from '../../progress/insights';
+import { PARTY_HOST, occupancy, usePublicTables } from '../useLiveTable';
+import { PUBLIC_TABLES, buyInFor, fmtChips, stakesFor, tableLabel } from '../../multiplayer/table';
 import { loadRun, newRunId, runDone } from '../../progress/conceptRun';
 import { StartChoice, loadStartChoice, saveStartChoice, shouldAskStart } from '../startChoice';
 import { track, trackOnce } from '../analytics';
@@ -58,8 +60,6 @@ export function HomePage() {
   useEffect(() => setRuns(loadRuns()), [owner, runsVersion]);
   const [mode, setMode] = useState<Mode>('daily');
   const dailyRun = runs.find((r) => r.id === `daily:${today}`);
-  // answering today's five below updates the Continue card
-  const [dailyTick, setDailyTick] = useState(0);
   const [startChoice, setStartChoice] = useState<StartChoice | null>(loadStartChoice);
   // a signed-in account's progress is still on its way: decide nothing about it yet (no wrong suggestions
   // in the meantime). The page built ahead of time (scripts/prerender.tsx) shows neither card either.
@@ -71,28 +71,17 @@ export function HomePage() {
     saveStartChoice(c);
     setStartChoice(c);
   };
-  const goDaily = () => {
-    setMode('daily');
-    requestAnimationFrame(() => document.getElementById('daily')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  };
 
   const plan = useMemo(() => {
     if (!returning) return [];
-    const total = puzzleSet(today).length;
-    const prog = loadProgress(`daily:${today}`);
-    const answered = prog ? prog.picks.filter((x) => x !== null && x !== undefined).length : 0;
-    const daily: DailyState = dailyRun ? { state: 'done', points: dailyRun.points } : answered > 0 ? { state: 'started', answered, total } : { state: 'new' };
     const r = loadRun();
     return continuePlan({
       history: data.history,
       lessons: data.lessons,
-      daily,
       canPractise: (c) => canPractise(data.settings, c),
       run: r && !runDone(r) ? { concept: r.concept, done: r.hands.length, total: r.total } : null,
     });
-    // dailyTick: today's five was answered below
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [returning, data.history, data.lessons, data.settings, dailyRun, today, dailyTick]);
+  }, [returning, data.history, data.lessons, data.settings]);
 
   const played = data.history.length;
   const scored = data.history.filter((h) => h.score !== null);
@@ -106,9 +95,9 @@ export function HomePage() {
     <div className="page home">
       <section className="home-band">
         <div>
-          <p className="eyebrow">No-Limit Hold’em trainer</p>
-          <h1>Make the right play, and know why.</h1>
-          <p className="lead">Warm up with today’s puzzles, then play full hands and spots with a review of every decision.</p>
+          <p className="eyebrow">Free play-money No-Limit Hold’em</p>
+          <h1>Sit down at a live table.</h1>
+          <p className="lead">Play real people, with bots filling the empty seats so a hand starts in seconds. Then sharpen your game with practice and today’s puzzles.</p>
           {!askStart && (
             <p className="home-new">
               New to poker? <Link to={`/learn/${FIRST_LESSON}`}>Start with the first lesson</Link>
@@ -117,11 +106,11 @@ export function HomePage() {
         </div>
         {!askStart && (
           <div className="home-actions">
-            <Link className="btn primary big" to="/practice">
-              Go to practice →
+            <Link className="btn primary big" to="/play" data-testid="home-play-live">
+              Play live →
             </Link>
-            <Link className="btn big" to="/play" data-testid="home-play-live">
-              Play live
+            <Link className="btn big" to="/practice">
+              Practice
             </Link>
           </div>
         )}
@@ -150,7 +139,9 @@ export function HomePage() {
         </section>
       )}
 
-      {returning && plan.length > 0 && <ContinueCard plan={plan} onDaily={goDaily} />}
+      {!askStart && PARTY_HOST && <LiveTables />}
+
+      {returning && plan.length > 0 && <ContinueCard plan={plan} />}
 
       <div className="home-grid">
         <section className="puzzles" id="daily" aria-labelledby="pz-title">
@@ -173,7 +164,6 @@ export function HomePage() {
               runs={runs}
               onSaved={setRuns}
               onSwitch={() => setMode('survival')}
-              onProgress={() => setDailyTick((t) => t + 1)}
             />
           ) : (
             <PuzzleGame key="survival" mode="survival" setKey="survival" runs={runs} onSaved={setRuns} onSwitch={() => setMode('daily')} />
@@ -247,45 +237,60 @@ export function HomePage() {
   );
 }
 
+/** The public tables, how full each one is, and a seat at any of them. */
+function LiveTables() {
+  const tables = usePublicTables();
+  return (
+    <section className="home-live live-card" aria-labelledby="home-live-title" data-testid="home-live">
+      <div className="home-live-head">
+        <h2 id="home-live-title">Live tables</h2>
+        <Link to="/play">Private tables and your chips →</Link>
+      </div>
+      <ul className="live-tables">
+        {PUBLIC_TABLES.map((room) => {
+          const s = tables[room];
+          const buyIn = buyInFor(stakesFor(room));
+          const full = !!s && s.players >= s.maxSeats;
+          return (
+            <li key={room}>
+              <span className="lt-name">{tableLabel(room)}</span>
+              <span className="lt-count note">
+                Buy-in {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : occupancy(s)}
+              </span>
+              <Link className={`btn small ${full ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${full ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
+                {full ? 'Watch' : 'Join'}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /** The home page's one suggested next step for someone who has been here before, with up to two smaller ones. */
-function ContinueCard({ plan, onDaily }: { plan: Suggestion[]; onDaily: () => void }) {
+function ContinueCard({ plan }: { plan: Suggestion[] }) {
   const [main, ...rest] = plan;
   const used = (s: Suggestion, place: 'main' | 'more') => track('Continue Card Used', { type: s.kind, place });
-  // a link that follows a suggestion: a page, or today's five further down this one
-  const go = (s: Suggestion, place: 'main' | 'more', label: ReactNode, className: string) => {
-    if (s.kind === 'daily')
-      return (
-        <button
-          className={className}
-          onClick={() => {
-            used(s, place);
-            onDaily();
-          }}
-        >
-          {label}
-        </button>
-      );
-    return (
-      <Link className={className} to={href(s)} onClick={() => used(s, place)}>
-        {label}
-      </Link>
-    );
-  };
-  const more = rest.filter((s) => !(s.kind === 'daily' && s.state === 'done')).slice(0, 2);
-  const dailyDone = plan.find((s): s is Extract<Suggestion, { kind: 'daily'; state: 'done' }> => s.kind === 'daily' && s.state === 'done');
+  const more = rest.slice(0, 2);
   const text = mainText(main);
   return (
     <section className="continue" aria-labelledby="continue-title" data-testid="continue">
       <p className="eyebrow">Continue</p>
       <h2 id="continue-title">{text.title}</h2>
       <p className="continue-why">{text.body}</p>
-      {go(main, 'main', text.action, 'btn primary')}
-      {(more.length > 0 || dailyDone) && (
+      <Link className="btn primary" to={href(main)} onClick={() => used(main, 'main')}>
+        {text.action}
+      </Link>
+      {more.length > 0 && (
         <ul className="continue-more">
           {more.map((s) => (
-            <li key={s.kind}>{go(s, 'more', moreText(s), 'linklike')}</li>
+            <li key={s.kind}>
+              <Link className="linklike" to={href(s)} onClick={() => used(s, 'more')}>
+                {moreText(s)}
+              </Link>
+            </li>
           ))}
-          {dailyDone && <li className="note">Today’s Daily five: done, {dailyDone.points} points.</li>}
         </ul>
       )}
     </section>
@@ -303,8 +308,6 @@ function href(s: Suggestion): string {
       return `/learn/${s.lesson}`;
     case 'practice':
       return '/practice?start=1';
-    case 'daily':
-      return '/#daily';
   }
 }
 
@@ -335,10 +338,6 @@ function mainText(s: Suggestion): { title: string; body: string; action: string 
         body: 'Play a few more hands. Once a concept has five scored decisions, this will suggest what to work on.',
         action: 'Deal a hand',
       };
-    case 'daily':
-      return s.state === 'started'
-        ? { title: 'Finish today’s Daily five', body: `${s.answered} of ${s.total} answered.`, action: 'Carry on' }
-        : { title: 'Today’s Daily five', body: 'Five quick questions, the same for everyone today.', action: 'Play today’s five' };
   }
 }
 
@@ -352,8 +351,6 @@ function moreText(s: Suggestion): string {
       return `Next in ${s.title}: ${LESSON_INDEX[s.lesson]?.title ?? s.lesson}`;
     case 'practice':
       return 'Deal a practice hand';
-    case 'daily':
-      return s.state === 'started' ? `Finish today’s Daily five (${s.answered} of ${s.total})` : 'Play today’s Daily five';
   }
 }
 
