@@ -253,33 +253,13 @@ test('progress says where it is kept', async ({ page }) => {
   await expect(page.locator('.data-tools')).not.toContainText('no account');
 });
 
-test('settings: preferences apply straight away, survive a reload, and old table options carry over', async ({ page }) => {
-  await page.goto('/');
-  // table options saved by pages from before Settings existed
-  await page.evaluate(() => {
-    localStorage.setItem('live-prefs', JSON.stringify({ bb: true, felt: 'blue' }));
-    localStorage.setItem('live-sound', 'off');
-  });
+test('settings are for signed-in players: guests are asked to sign in', async ({ page }) => {
+  await page.goto('/learn');
+  // no way in for guests
+  await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
-  await expect(page.getByLabel('Show amounts in big blinds at live tables')).toBeChecked();
-  await expect(page.getByLabel('Table sounds')).not.toBeChecked();
-  await expect(page.getByRole('radio', { name: 'Blue' })).toHaveAttribute('aria-checked', 'true');
-  expect(await page.evaluate(() => localStorage.getItem('live-prefs'))).toBeNull();
-  // four-colour deck: the sample cards change at once
-  const before = await page.locator('.set-preview').innerHTML();
-  await page.getByLabel('Four-colour deck').check();
-  expect(await page.locator('.set-preview').innerHTML()).not.toBe(before);
-  await page.getByLabel('Show keyboard shortcut hints').uncheck();
-  await expect(page.locator('html')).toHaveAttribute('data-shortcuts', 'off');
-  await page.getByRole('radio', { name: 'Slow' }).click();
-  await page.reload();
-  await expect(page.getByLabel('Four-colour deck')).toBeChecked();
-  await expect(page.getByRole('radio', { name: 'Slow' })).toHaveAttribute('aria-checked', 'true');
-  await expect(page.locator('html')).toHaveAttribute('data-shortcuts', 'off');
-  // reachable from every page
-  await page.goto('/learn');
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
-  await page.screenshot({ path: `test-results/settings-${test.info().project.name}.png`, fullPage: true });
+  await expect(page.getByText('Sign in to change your settings.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in' }).last()).toHaveAttribute('href', '/login?next=%2Fsettings');
+  await expect(page.getByLabel('Four-colour deck')).toHaveCount(0);
 });

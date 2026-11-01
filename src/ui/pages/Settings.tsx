@@ -1,5 +1,5 @@
-// Settings: every preference in one place. They are saved with the rest of your progress: in this
-// browser, and with your account when you are signed in (so they follow you to other devices).
+// Settings: every preference in one place, for signed-in players (reached from the account menu).
+// They are saved with the rest of your progress, with your account, so they follow you to every device.
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../../auth/AuthContext';
@@ -17,8 +17,38 @@ const SPEEDS: [PlaySpeed, string][] = [
 ];
 
 export function SettingsPage() {
-  const { data, update, owner } = useStore();
   const { status } = useAuth();
+  if (status !== 'signed-in') {
+    return (
+      <div className="page settings-page">
+        <header className="page-head">
+          <p className="eyebrow">Preferences</p>
+          <h1>Settings</h1>
+        </header>
+        <div className="set-group set-signin">
+          {status === 'loading' ? (
+            <p className="note">Checking your sign-in…</p>
+          ) : status === 'off' ? (
+            <p>Settings need an account, and accounts are not available on this site right now.</p>
+          ) : (
+            <>
+              <p>
+                <strong>Sign in to change your settings.</strong> They are saved with your account, so they follow you to every device.
+              </p>
+              <Link className="btn primary" to="/login?next=%2Fsettings">
+                Sign in
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return <Settings />;
+}
+
+function Settings() {
+  const { data, update } = useStore();
   const [table, setTable] = useTablePrefs();
   const prefs = data.prefs;
   const set = (p: Partial<typeof prefs>) => update((d) => ({ ...d, prefs: { ...d.prefs, ...p } }));
@@ -29,9 +59,7 @@ export function SettingsPage() {
       <header className="page-head">
         <p className="eyebrow">Preferences</p>
         <h1>Settings</h1>
-        <p className="lead">
-          {owner ? 'Saved to your account, so they follow you to every device you sign in on.' : 'Saved in this browser.'} Changes apply straight away.
-        </p>
+        <p className="lead">Saved to your account, so they follow you to every device you sign in on. Changes apply straight away.</p>
       </header>
 
       <section className="set-group" aria-labelledby="set-cards">
@@ -145,17 +173,7 @@ export function SettingsPage() {
             <Link to="/play/history">Your live hands</Link>: download session logs, or delete your live hand history.
           </li>
           <li>
-            {status === 'signed-in' ? (
-              <>
-                <Link to="/account">Account</Link>: your name, signing out, and deleting your account.
-              </>
-            ) : status === 'off' ? (
-              'Everything is kept in this browser.'
-            ) : (
-              <>
-                <Link to="/login?next=%2Fsettings">Sign in</Link> to keep your progress and settings on every device.
-              </>
-            )}
+            <Link to="/account">Account</Link>: your name, signing out, and deleting your account.
           </li>
           <li>
             <Link to="/privacy">Privacy</Link>: what is stored, where, and how to delete it.

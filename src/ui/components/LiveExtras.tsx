@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
+import { useAuth } from '../../auth/AuthContext';
 import type { Felt } from '../../persistence/storage';
 import {
   BOMB_BB,
@@ -328,6 +329,7 @@ export function FeltPicker({ value, onChange }: { value: Felt; onChange: (f: Fel
 }
 
 export function TableOptions({ prefs, onChange }: { prefs: TablePrefs; onChange: (p: Partial<TablePrefs>) => void }) {
+  const signedIn = useAuth().status === 'signed-in';
   return (
     <details className="more live-history table-options">
       <summary>Table options</summary>
@@ -346,7 +348,12 @@ export function TableOptions({ prefs, onChange }: { prefs: TablePrefs; onChange:
         </div>
       </div>
       <p className="note">
-        Saved with your other preferences. <Link to="/settings">All settings</Link>
+        Saved with your other preferences.{signedIn && (
+          <>
+            {' '}
+            <Link to="/settings">All settings</Link>
+          </>
+        )}
       </p>
     </details>
   );

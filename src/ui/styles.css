@@ -8428,23 +8428,6 @@ label > span:first-child:not(.select-value) {
 /* ============================================================
    Settings
    ============================================================ */
-.settings-link {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-.settings-link:hover,
-.settings-link:focus-visible {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.settings-link[aria-current='page'] {
-  color: var(--accent);
-}
 /* keyboard shortcut hints can be switched off (Settings) */
 [data-shortcuts='off'] .btn kbd {
   display: none;
@@ -8516,4 +8499,11 @@ label > span:first-child:not(.select-value) {
   .set-control {
     justify-content: flex-start;
   }
+}
+
+.set-signin {
+  padding: 18px;
+}
+.set-signin p {
+  margin: 0 0 12px;
 }
