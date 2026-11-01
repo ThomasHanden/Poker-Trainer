@@ -78,6 +78,12 @@ function Wallet({ bank, onBank, compact = false }: { bank: Bankroll | null; onBa
     <section className={`live-wallet ${compact ? 'compact' : ''}`} aria-label="Your chips">
       <p className="live-bank">
         Your chips: <strong>{fmtChips(bank.balance)}</strong>
+        {!compact && (
+          <>
+            {' · '}
+            <Link to="/leaderboards">Chip leaderboard</Link>
+          </>
+        )}
       </p>
       {bank.claimedToday === undefined ? null : bank.claimedToday ? (
         <div className="daily">

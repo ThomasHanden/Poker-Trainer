@@ -11,6 +11,7 @@ import { HomePage } from './pages/Home';
 import { PlayLobbyPage, PlayTablePage } from './pages/Play';
 import { AccountPage, AuthCallbackPage, GuestImport, LoginPage, ResetPasswordPage } from './pages/Account';
 import { PrivacyPage } from './pages/Privacy';
+import { LeaderboardsPage } from './pages/Leaderboards';
 import { AuthMenu } from './components/AuthMenu';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
@@ -84,6 +85,7 @@ export function Shell() {
     ['/ranges', 'Ranges'],
     ['/review', 'Review'],
     ['/progress', 'Progress'],
+    ['/leaderboards', 'Leaderboards'],
     ['/play', 'Play live'],
   ];
   return (
@@ -132,6 +134,7 @@ export function Shell() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/leaderboards" element={<LeaderboardsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ErrorBoundary>

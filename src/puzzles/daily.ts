@@ -332,9 +332,26 @@ export function pointsFor(correct: boolean, ms: number, combo: number): number {
   return Math.round((BASE_POINTS + 50 * speed) * mult);
 }
 
+/** Survival ends after this many wrong answers. */
+export const LIVES = 3;
+
 /** Local date key, e.g. 2026-10-29. */
 export function todayKey(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The daily five's date, e.g. 2026-10-29. Everyone shares one challenge a day, changing at midnight
+ * UTC (as the live tables' daily chips do), so its leaderboard compares the same five questions.
+ */
+export function challengeKey(ms = Date.now()): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** When the next daily five starts: the next midnight UTC. */
+export function nextChallengeAt(ms = Date.now()): number {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
 /** Five puzzles for a day (or for any seed, for unranked extra sets). */
@@ -456,15 +473,16 @@ export function saveProgress(key: string, p: PuzzleProgress | null) {
   }
 }
 
-/** Consecutive days with a completed daily set, ending today or yesterday. */
+/** Consecutive days with a completed daily set, ending today or yesterday (challenge days, in UTC). */
 export function streak(runs: PuzzleRun[], today = new Date()): number {
   const days = new Set(runs.filter((r) => r.mode === 'daily').map((r) => r.date));
-  const d = new Date(today);
-  if (!days.has(todayKey(d))) d.setDate(d.getDate() - 1);
+  const DAY = 86_400_000;
+  let at = today.getTime();
+  if (!days.has(challengeKey(at))) at -= DAY;
   let n = 0;
-  while (days.has(todayKey(d))) {
+  while (days.has(challengeKey(at))) {
     n++;
-    d.setDate(d.getDate() - 1);
+    at -= DAY;
   }
   return n;
 }

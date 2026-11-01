@@ -5,7 +5,9 @@ site with `npm run party:deploy`). Each table is one Durable Object holding the 
 chat in memory; one `Bank` Durable Object holds everyone's chips and daily claims. The rules live
 in `src/multiplayer/` (`table.ts`, `bots.ts`, `bank.ts`, `chat.ts`), which has no Cloudflare code
 and is unit tested (`tests/live-table.test.ts`, `tests/live-bots.test.ts`,
-`tests/daily-chips.test.ts`, `tests/chat.test.ts`).
+`tests/daily-chips.test.ts`, `tests/chat.test.ts`). The bank also tracks what each table holds
+for each player, for the chip leaderboard, and a `Puzzles` object per signed-in player runs ranked
+puzzle runs: see [LEADERBOARDS.md](LEADERBOARDS.md).
 
 ## Who a player is
 

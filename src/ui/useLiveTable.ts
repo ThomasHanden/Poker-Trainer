@@ -65,6 +65,11 @@ export function setLiveAccount(a: typeof liveAccount) {
   liveAccount = a;
 }
 
+/** The signed-in player's access token for the table server, or null for a guest. */
+export async function accountToken(): Promise<string | null> {
+  return liveAccount ? liveAccount.token() : null;
+}
+
 /** Who a bank request is from: the guest's key, or the signed-in player's access token. */
 async function bankBody(): Promise<string> {
   if (liveAccount) {

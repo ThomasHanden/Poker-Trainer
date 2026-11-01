@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { puzzleSet, randomPuzzle, streak, todayKey, pointsFor, PuzzleRun } from '../src/puzzles/daily';
+import { puzzleSet, randomPuzzle, streak, challengeKey, nextChallengeAt, pointsFor, PuzzleRun } from '../src/puzzles/daily';
 import { compareHands, evaluate, categoryOf, HandCategory } from '../src/engine/evaluator';
 import { fullDeck } from '../src/engine/cards';
 
@@ -51,10 +51,16 @@ describe('puzzles', () => {
     expect(pointsFor(true, 1000, 5)).toBe(300);
   });
   it('counts streaks of consecutive daily runs', () => {
-    const today = new Date(2026, 9, 29);
-    const run = (d: Date): PuzzleRun => ({ id: `daily:${todayKey(d)}`, mode: 'daily', date: todayKey(d), points: 300, correct: 3, total: 5, ms: 1, at: 0, marks: 'ooxxo' });
-    const days = [0, 1, 2, 4].map((k) => run(new Date(2026, 9, 29 - k)));
+    const today = new Date(Date.UTC(2026, 9, 29, 12));
+    const run = (d: Date): PuzzleRun => ({ id: `daily:${challengeKey(d.getTime())}`, mode: 'daily', date: challengeKey(d.getTime()), points: 300, correct: 3, total: 5, ms: 1, at: 0, marks: 'ooxxo' });
+    const days = [0, 1, 2, 4].map((k) => run(new Date(Date.UTC(2026, 9, 29 - k, 3))));
     expect(streak(days, today)).toBe(3);
     expect(streak(days.slice(1), today)).toBe(2);
+  });
+  it('changes the daily five at midnight UTC for everyone', () => {
+    expect(challengeKey(Date.UTC(2026, 9, 29, 23, 59, 59))).toBe('2026-10-29');
+    expect(challengeKey(Date.UTC(2026, 9, 30, 0, 0, 0))).toBe('2026-10-30');
+    expect(nextChallengeAt(Date.UTC(2026, 9, 29, 23, 59, 59))).toBe(Date.UTC(2026, 9, 30));
+    expect(nextChallengeAt(Date.UTC(2026, 9, 30))).toBe(Date.UTC(2026, 9, 31));
   });
 });

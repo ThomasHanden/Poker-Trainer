@@ -97,7 +97,7 @@ test('unsupported settings are explained, not generated', async ({ page }) => {
 });
 
 test('main pages have no horizontal overflow', async ({ page }) => {
-  for (const path of ['/', '/practice', '/learn', '/learn/pot-odds', '/ranges', '/ranges?tab=editor', '/ranges?tab=compare', '/ranges?tab=drills', '/ranges?tab=equity', '/review', '/progress']) {
+  for (const path of ['/', '/practice', '/learn', '/learn/pot-odds', '/ranges', '/ranges?tab=editor', '/ranges?tab=compare', '/ranges?tab=drills', '/ranges?tab=equity', '/review', '/progress', '/leaderboards']) {
     await page.goto(path);
     await page.waitForTimeout(300);
     const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
@@ -251,4 +251,61 @@ test('progress says where it is kept', async ({ page }) => {
   await page.goto('/progress');
   await expect(page.locator('.data-tools')).toContainText('stored in this browser only');
   await expect(page.locator('.data-tools')).not.toContainText('no account');
+});
+
+// Test rows only: the database is never reached, every leaderboard request is answered here.
+const FIXTURE_NAMES = ['Ann', 'Bob', 'Cat', 'Dan', 'Eve', 'Fay', 'Gus', 'Hal', 'Ivy', 'Jo'];
+function fixtureRows(fn: string, off: number, lim: number, entries: number) {
+  // points fall by 50 a place, with places 2 and 3 tied
+  return Array.from({ length: Math.max(0, Math.min(lim, entries - off)) }, (_, k) => {
+    const i = off + k;
+    const score = 3000 - 50 * (i >= 2 ? i - 1 : i);
+    const rank = i === 2 ? 2 : i + 1;
+    const name = `${FIXTURE_NAMES[i % 10]}${i >= 10 ? ` ${i}` : ''}`;
+    const base = { rank, name, is_me: false, entries };
+    if (fn === 'lb_chips') return { ...base, chips: score * 2, bank: score, at_tables: score };
+    if (fn === 'lb_daily') return { ...base, points: Math.min(1500, score / 2), correct: 4, answered: 5 };
+    return { ...base, points: score, correct: 20, answered: 23, completed_at: '2026-10-30T10:00:00Z' };
+  });
+}
+
+test('leaderboards: three boards, shared ranks, load more, and a failed request', async ({ page }) => {
+  let failDaily = true;
+  await page.route('**/rest/v1/rpc/lb_*', async (route) => {
+    const fn = route.request().url().split('/rpc/')[1].split('?')[0];
+    const args = JSON.parse(route.request().postData() ?? '{}');
+    if (fn === 'lb_daily' && failDaily) return route.fulfill({ status: 500, body: '{}' });
+    if (fn === 'lb_daily_days') return route.fulfill({ json: [{ day: '2026-10-31', entries: 3 }] });
+    if (fn === 'lb_standing') return route.fulfill({ json: null });
+    return route.fulfill({ json: fixtureRows(fn, args.off ?? 0, args.lim ?? 25, fn === 'lb_chips' ? 30 : 8) });
+  });
+  await page.goto('/leaderboards');
+  await expect(page.getByRole('tab', { name: 'Live Play' })).toHaveAttribute('aria-selected', 'true');
+  const rows = page.locator('.lb-list .lb-row');
+  await expect(rows).toHaveCount(25);
+  await expect(rows.nth(1).locator('.lb-rank')).toHaveText('2');
+  await expect(rows.nth(2).locator('.lb-rank')).toHaveText('2');
+  await expect(rows.nth(3).locator('.lb-rank')).toHaveText('4');
+  await expect(page.locator('.lb-row.top1')).toHaveCount(1);
+  await expect(page.getByText('Sign in to get on the leaderboards.')).toBeVisible();
+  await page.getByRole('button', { name: 'Load 5 more' }).click();
+  await expect(rows).toHaveCount(30);
+  // keyboard: arrow keys move between boards
+  await page.getByRole('tab', { name: 'Live Play' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Daily Five' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/board=daily/);
+  await expect(page.getByRole('alert')).toContainText('could not be loaded');
+  failDaily = false;
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(rows).toHaveCount(8);
+  await expect(page.getByText('4 of 5 right').first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Survival' }).click();
+  await expect(page.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'This week' }).click();
+  await expect(page).toHaveURL(/period=week/);
+  await expect(rows).toHaveCount(8);
+  const [sw, cw] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  expect(sw).toBeLessThanOrEqual(cw + 1);
+  await page.screenshot({ path: `test-results/leaderboards-${test.info().project.name}.png`, fullPage: true });
 });
