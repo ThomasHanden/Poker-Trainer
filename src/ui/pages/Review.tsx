@@ -1,11 +1,12 @@
 import { Select } from '../components/Select';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { run } from '../../workers/client';
 import { RebuildResult } from '../../workers/tasks';
 import { ReviewView, GradeBadge } from '../components/ReviewView';
 import { TEMPLATES } from '../../scenarios/templates';
+import { track } from '../analytics';
 
 export function ReviewListPage() {
   const { data, update } = useStore();
@@ -95,6 +96,13 @@ export function ReviewDetailPage() {
   const rec = data.history.find((h) => h.id === id);
   const [res, setRes] = useState<RebuildResult | null>(null);
   const [loading, setLoading] = useState(true);
+  // each time a saved hand's review is opened and shown (not again on rerenders)
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!res?.scenario || !res.evaluation || !rec || opened.current === rec.id) return;
+    opened.current = rec.id;
+    track('Review Opened');
+  }, [res, rec]);
   useEffect(() => {
     if (!rec) return;
     setLoading(true);

@@ -83,7 +83,7 @@ export const DISCIPLINE_X: Record<string, LessonExtra> = {
         steps: [
           'Progress shows repeated low scores in “Facing a c-bet”.',
           'Day 1: read “Pot odds”, “Blind defense” and “Minimum defense frequency”.',
-          'Days 2–5: ten guided c-bet-defense scenarios a day, then five in assessment mode.',
+          'Days 2–5: ten c-bet-defense scenarios a day in Help me mode, then five in Test me mode.',
           'Day 7: compare your unassisted score with the start of the week.',
         ],
       },

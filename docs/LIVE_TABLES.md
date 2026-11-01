@@ -110,7 +110,7 @@ Change the number of seats bots fill with the `BOT_SEATS` variable in `wrangler.
 ## Analytics events (live tables)
 
 Sent from `src/ui/analytics.ts` (Vercel Web Analytics custom events; they only appear on Vercel
-plans that include custom events). No names, cards or ids are sent.
+plans that include custom events). No names, cards or ids are sent. All events: `docs/ANALYTICS.md`.
 
 | Event | Properties | Counted |
 |---|---|---|
@@ -121,6 +121,7 @@ plans that include custom events). No names, cards or ids are sent.
 | First Live Hand Dealt | table, wait (bucket, from asking for a seat) | once per sit-down |
 | First Live Hand Completed | table | once per browser |
 | Daily Chips Claimed | none | once per claim day per page load |
+| Live Table Left Before First Hand | table | asked for a seat, then left before being dealt a hand (once per seat request) |
 
 - **Visitors who get seated:** `Seat Assigned` ÷ `Live Table Opened` (both are per page load).
 - **Time from joining to first hand:** the `wait` buckets on `First Live Hand Dealt`.

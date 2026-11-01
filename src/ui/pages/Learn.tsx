@@ -6,6 +6,7 @@ import { SOURCES } from '../../content/sources';
 import { useStore } from '../store';
 import { TEMPLATES } from '../../scenarios/templates';
 import { CONCEPTS } from '../../content/concepts';
+import { track } from '../analytics';
 
 export function LearnPage() {
   const { data } = useStore();
@@ -138,14 +139,22 @@ export function LessonPage() {
   const correct = l.quiz.filter((q, i) => answers[i] === q.answer).length;
   const check = () => {
     setChecked(true);
+    if (!prog?.completed && correct === l.quiz.length) track('Lesson Completed', { via: 'quiz' });
     update((d) => {
       const old = d.lessons[l.id];
       const best = !old?.quizBest || correct / l.quiz.length > old.quizBest.correct / old.quizBest.total ? { correct, total: l.quiz.length, at: Date.now() } : old.quizBest;
       return { ...d, lessons: { ...d.lessons, [l.id]: { ...old, completed: old?.completed || correct === l.quiz.length, quizBest: best, visitedAt: Date.now() } } };
     });
   };
-  const practiceHref = l.practice.templates?.length ? `/practice?template=${l.practice.templates[0]}` : l.practice.concepts?.length ? `/practice?concept=${l.practice.concepts[0]}` : '/practice?start=1';
+  const practiceHref =
+    (l.practice.templates?.length ? `/practice?template=${l.practice.templates[0]}` : l.practice.concepts?.length ? `/practice?concept=${l.practice.concepts[0]}` : '/practice?start=1') +
+    (l.practice.mode ? `&mode=${l.practice.mode}` : '') +
+    '&from=lesson';
   const section = SECTIONS.find((s) => s.id === l.section)!;
+  // the study track this lesson is part of (one you have been working through, if it is in several), and what comes next in it
+  const tracks = SEQUENCES.filter((s) => s.lessons.includes(l.id));
+  const seq = tracks.find((s) => s.lessons.some((id) => data.lessons[id]?.completed)) ?? tracks[0];
+  const nextInTrack = seq ? seq.lessons[seq.lessons.indexOf(l.id) + 1] : undefined;
   const toc: [string, string][] = [
     ...(l.takeaways?.length ? [['s-takeaways', 'Takeaways'] as [string, string]] : []),
     ['s-idea', 'The idea'],
@@ -335,7 +344,13 @@ export function LessonPage() {
           </p>
         )}
         {!prog?.completed && (
-          <button className="btn ghost" onClick={() => update((d) => ({ ...d, lessons: { ...d.lessons, [l.id]: { ...d.lessons[l.id], completed: true, visitedAt: Date.now() } } }))}>
+          <button
+            className="btn ghost"
+            onClick={() => {
+              track('Lesson Completed', { via: 'marked' });
+              update((d) => ({ ...d, lessons: { ...d.lessons, [l.id]: { ...d.lessons[l.id], completed: true, visitedAt: Date.now() } } }));
+            }}
+          >
             Mark as completed
           </button>
         )}
@@ -351,13 +366,25 @@ export function LessonPage() {
             {l.practice.templates.slice(1).map((t, i) => (
               <span key={t}>
                 {i > 0 && ' · '}
-                <Link to={`/practice?template=${t}`}>{TEMPLATES.find((x) => x.id === t)?.title}</Link>
+                <Link to={`/practice?template=${t}&from=lesson`}>{TEMPLATES.find((x) => x.id === t)?.title}</Link>
               </span>
             ))}
           </p>
         )}
         {l.practice.concepts && l.practice.concepts.length > 0 && <p className="note">Concepts: {l.practice.concepts.map((c) => CONCEPTS[c].name).join(', ')}</p>}
       </section>
+      {seq && (
+        <section className="track-next" data-testid="track-next">
+          <h2>{nextInTrack ? `Next in ${seq.title}` : `That was the last lesson in ${seq.title}`}</h2>
+          {nextInTrack ? (
+            <Link className="btn" to={`/learn/${nextInTrack}`}>
+              {LESSON_INDEX[nextInTrack].title} <span aria-hidden="true">→</span>
+            </Link>
+          ) : (
+            <Link to="/learn">Choose another study track</Link>
+          )}
+        </section>
+      )}
       <section>
         <h2>Related lessons</h2>
         <ul className="link-list">

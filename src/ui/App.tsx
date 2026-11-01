@@ -15,6 +15,7 @@ import { AuthMenu } from './components/AuthMenu';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { isPublicTable } from '../multiplayer/table';
 import { NOT_FOUND, pageMeta } from '../seo';
+import { noteVisit } from './analytics';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -174,6 +175,8 @@ function analyticsPath(pathname: string): string {
 
 function PageAnalytics() {
   const path = analyticsPath(useLocation().pathname);
+  // a visit on a later day than this browser's first counts as a return (see analytics.ts)
+  useEffect(() => noteVisit(), []);
   return <Analytics route={path} path={path} beforeSend={(e) => ({ ...e, url: new URL(path, e.url).toString() })} />;
 }
 

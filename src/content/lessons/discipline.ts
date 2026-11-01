@@ -81,7 +81,7 @@ export const DISCIPLINE: Lesson[] = [
     mistakes: ['Playing on after recognizing you are tilted.', 'Blaming luck instead of noticing your own decisions changed.'],
     assumptions: ['General guidance, not clinical advice.'],
     quiz: [{ q: 'A good response to noticing tilt is…', options: ['Play bigger to win it back', 'Take a break'], answer: 1, explain: 'Protect decision quality.' }],
-    practice: { label: 'Assessment mode sessions', concepts: [] },
+    practice: { label: 'Test me sessions', concepts: [], mode: 'assessment' },
     related: ['results-oriented', 'bankroll'],
     sources: ['malmuth'],
   },
@@ -115,7 +115,7 @@ export const DISCIPLINE: Lesson[] = [
     format: 'both',
     plain: [
       'Effective study is deliberate: choose one topic, learn the theory, practice many similar spots, then review mistakes. Repeat with the next topic.',
-      'A simple weekly loop with this app: (1) check Progress for weak concepts, (2) read the linked lessons, (3) do 20–30 targeted scenarios in guided mode, (4) do 20 in assessment mode on the same concepts, (5) compare unassisted scores over time.',
+      'A simple weekly loop with this app: (1) check Progress for weak concepts, (2) read the linked lessons, (3) do 20–30 targeted scenarios in Help me mode, (4) do 20 in Test me mode on the same concepts, (5) compare unassisted scores over time.',
       'Keep assisted and unassisted practice separate when judging progress — help makes scores look better than your unaided play.',
     ],
     why: ['Unstructured play repeats habits; structured study changes them.'],

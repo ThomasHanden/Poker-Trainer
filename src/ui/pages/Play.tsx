@@ -14,6 +14,7 @@ import {
   NAME_MAX,
   PUBLIC_TABLES,
   TURN_MS,
+  affordableTables,
   buyInFor,
   fmtChips,
   isPublicTable,
@@ -22,7 +23,7 @@ import {
   type Stakes,
   type TableSummary,
 } from '../../multiplayer/table';
-import { DAILY_MAX, DAILY_MIN, nextUtcMidnight } from '../../multiplayer/bank';
+import { DAILY_MAX, DAILY_MIN, buyInAfterClaim, claimCovers as claimCoversTable, nextUtcMidnight } from '../../multiplayer/bank';
 import { isBotId } from '../../multiplayer/bots';
 import { useAuth } from '../../auth/AuthContext';
 import { nameProblem } from '../../multiplayer/moderation';
@@ -181,11 +182,11 @@ function occupancy(s: TableSummary): string {
   return parts.join(' · ');
 }
 
-/** How full each public table is, refreshed while the lobby is open and visible. */
-function usePublicTables(): Record<string, TableSummary | null | undefined> {
+/** How full each public table is, refreshed while the page is open and visible (and `enabled`). */
+function usePublicTables(enabled = true): Record<string, TableSummary | null | undefined> {
   const [info, setInfo] = useState<Record<string, TableSummary | null>>({});
   useEffect(() => {
-    if (!PARTY_HOST) return;
+    if (!PARTY_HOST || !enabled) return;
     let stopped = false;
     const load = async () => {
       if (document.hidden) return;
@@ -209,8 +210,37 @@ function usePublicTables(): Record<string, TableSummary | null | undefined> {
       clearInterval(t);
       document.removeEventListener('visibilitychange', load);
     };
-  }, []);
+  }, [enabled]);
   return info;
+}
+
+/**
+ * Not enough chips for this table: what you can do instead, with no pressure to win anything back.
+ * Today's free chips if they are still to claim, a public table your chips cover (only one with a
+ * seat for you), or practice, which uses no chips at all.
+ */
+function NotEnoughChips({ room, bank, onBank, tables, lost = false }: { room: string; bank: Bankroll; onBank: (b: Bankroll) => void; tables: Record<string, TableSummary | null | undefined>; lost?: boolean }) {
+  const min = buyInFor(stakesFor(room)).min;
+  const other = affordableTables(bank.balance, tables, room)[0];
+  return (
+    <div className="live-options" data-testid="chip-options">
+      <p>
+        {lost ? 'You are out of chips at this table. ' : ''}It needs at least {fmtChips(min)} chips to sit down, and you have {fmtChips(bank.balance)}.
+      </p>
+      {bank.claimedToday === false && <Wallet bank={bank} onBank={onBank} compact />}
+      <div className="row">
+        {other && (
+          <Link className="btn primary" to={`/play/${other}`}>
+            Join {tableLabel(other)}
+          </Link>
+        )}
+        <Link className={`btn ${other ? '' : 'primary'}`} to="/practice?start=1">
+          Practice without chips
+        </Link>
+      </div>
+      {bank.claimedToday && <p className="note">Your next free chips: {localTime(bank.nextClaimAt)} your time.</p>}
+    </div>
+  );
 }
 
 export function PlayLobbyPage() {
@@ -264,14 +294,18 @@ export function PlayLobbyPage() {
             const s = tables[room];
             const full = !!s && s.players >= s.maxSeats;
             const buyIn = buyInFor(stakesFor(room));
+            // joinable: your chips cover the minimum, or today's claim (still to come) surely will
+            const short = !!bank && bank.balance < buyIn.min && !claimCoversTable(stakesFor(room), bank);
+            const watch = full || short;
             return (
               <li key={room}>
                 <span className="lt-name">{tableLabel(room)}</span>
                 <span className="lt-count note">
                   Buy-in {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} · {s === undefined ? '…' : s === null ? 'unavailable' : occupancy(s)}
+                  {short && !full ? ` · needs ${fmtChips(buyIn.min)} chips` : ''}
                 </span>
-                <Link className={`btn small ${full ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${full ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
-                  {full ? 'Watch' : 'Join'}
+                <Link className={`btn small ${watch ? '' : 'primary'}`} to={`/play/${room}`} aria-label={`${watch ? 'Watch' : 'Join'} ${tableLabel(room)}`}>
+                  {watch ? 'Watch' : 'Join'}
                 </Link>
               </li>
             );
@@ -405,14 +439,27 @@ export function PlayTablePage() {
 
   // the seat you clicked: the buy-in window is open for it until you sit down (or start waiting) or cancel
   const [picking, setPicking] = useState<number | null>(null);
+  const pickingRef = useRef<number | null>(null);
+  pickingRef.current = picking;
   const seated = !!mySeat;
   const waiting = view?.waiting ?? null;
+  // a seat request on its way to the server: one at a time (the server also refuses a second buy-in)
+  const [sitting, setSitting] = useState(false);
   useEffect(() => {
     if (seated || waiting) {
       setPicking(null);
       rememberTable(room);
     }
   }, [seated, waiting, room]);
+  useEffect(() => {
+    if (error) setSitting(false);
+  }, [error]);
+  useEffect(() => setSitting(false), [picking, seated, waiting]);
+  useEffect(() => {
+    if (!sitting) return;
+    const t = setTimeout(() => setSitting(false), 8000); // no answer: let them try again
+    return () => clearTimeout(t);
+  }, [sitting]);
 
   // analytics: only for seats asked for on this page, so a reload does not count again
   const asked = useRef<{ at: number; bot: boolean } | null>(null);
@@ -431,6 +478,22 @@ export function PlayTablePage() {
     track('First Live Hand Dealt', { table: kind, wait: waitBucket(Date.now() - asked.current.at) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealtIn]);
+  // left this table (Leave, another table or another page) after asking for a seat here but before
+  // being dealt a hand; once per seat request
+  const leftEarly = (r: string, k: string) => {
+    const a = asked.current;
+    if (a && !dealtAfterAsking.current) trackOnce(`left-early:${r}:${a.at}`, 'Live Table Left Before First Hand', { table: k });
+  };
+  useEffect(
+    () => () => {
+      leftEarly(room, kind);
+      // a different table is a fresh start for these counts
+      asked.current = null;
+      dealtAfterAsking.current = false;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [room, kind],
+  );
   const finishedMine = !!view?.hand?.complete && view.me >= 0;
   useEffect(() => {
     if (finishedMine) trackFirst('First Live Hand Completed', { table: kind });
@@ -505,23 +568,76 @@ export function PlayTablePage() {
   };
 
   const [nameError, setNameError] = useState<string | null>(null);
-  const sitDown = (e: FormEvent) => {
-    e.preventDefault();
-    if (!buyValid || picking === null) return;
-    // signed in: you sit under your account name (the server uses it whatever is sent)
-    if (!account) {
-      const problem = nameProblem(name);
-      setNameError(problem);
-      if (problem) return;
-      saveName(name.trim());
-    }
-    const bot = !!holder(picking)?.bot;
+  /** Guests need a name the tables accept (signed in, you sit under your account name, whatever is sent). */
+  const nameReady = () => {
+    if (account) return true;
+    const problem = nameProblem(name);
+    setNameError(problem);
+    if (problem) return false;
+    saveName(name.trim());
+    return true;
+  };
+  const requestSeat = (seat: number, units: number) => {
+    const bot = !!holder(seat)?.bot;
     if (!asked.current) {
       asked.current = { at: Date.now(), bot };
       track('Seat Requested', { table: kind, seat: bot ? 'bot seat' : 'open seat' });
     }
-    sit(account ? account.displayName : name, picking, (buyChips as number) * CHIP);
+    setSitting(true);
+    // the server takes the chips from your balance only if the seat is still free, and gives them back if not
+    sit(account ? account.displayName : name, seat, units);
   };
+  const sitDown = (e: FormEvent) => {
+    e.preventDefault();
+    if (!buyValid || picking === null || sitting || !nameReady()) return;
+    requestSeat(picking, (buyChips as number) * CHIP);
+  };
+
+  // no chips yet, and today's free chips cover this table: claim them and sit down in one go
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const claimCovers = !!bank && claimCoversTable(stakes, bank);
+  // another table (e.g. a cheaper one offered below): nothing of this one's sit-down stays open
+  useEffect(() => {
+    setPicking(null);
+    setClaimError(null);
+    setNameError(null);
+  }, [room]);
+  const claimAndSit = async (e: FormEvent) => {
+    e.preventDefault();
+    const seat = picking;
+    if (claiming || sitting || seat === null || !nameReady()) return;
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      // paid at most once a day: asking again (a double click, a retry) returns the same claim
+      const r = await claimDailyChips();
+      setBank(r);
+      trackOnce(`claim:${r.claim?.day}`, 'Daily Chips Claimed');
+      // the chips are yours whatever happens next; sit down unless the window was closed meanwhile
+      const units = buyInAfterClaim(stakes, r.balance);
+      if (pickingRef.current === seat && units !== null) requestSeat(seat, units);
+    } catch (err) {
+      setClaimError(err instanceof Error ? err.message : 'Could not claim your chips. Try again.');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  // out of chips here: the options stay on screen (the next hand starts without you) until you sit
+  // down again, with that hand's actions to look back at
+  const bustedNow = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
+  const [bustHand, setBustHand] = useState<{ state: HandState; me: number } | null>(null);
+  useEffect(() => {
+    if (bustedNow && h) setBustHand({ state: h, me });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bustedNow]);
+  useEffect(() => {
+    if (seated || waiting) setBustHand(null);
+  }, [seated, waiting]);
+  useEffect(() => setBustHand(null), [room]);
+  // other tables, for somewhere your chips do cover (only looked up when needed)
+  const tables = usePublicTables(!!bustHand || (picking !== null && !canBuyIn));
 
   if (!PARTY_HOST)
     return (
@@ -531,12 +647,39 @@ export function PlayTablePage() {
       </div>
     );
 
+  const nameField = account ? (
+    <p className="live-have">
+      You play as <strong>{account.displayName || '…'}</strong>. <Link to="/account">Change your name</Link>
+    </p>
+  ) : (
+    <div className="row">
+      <label htmlFor="live-name">Your name</label>
+      <input
+        id="live-name"
+        className="live-input"
+        value={name}
+        maxLength={NAME_MAX}
+        onChange={(e) => {
+          setName(e.target.value);
+          setNameError(null);
+        }}
+        autoComplete="nickname"
+        autoFocus={!name}
+        aria-invalid={!!nameError}
+        aria-describedby={nameError ? 'live-name-err' : undefined}
+      />
+      {nameError && (
+        <span id="live-name-err" className="error" role="alert">
+          {nameError}
+        </span>
+      )}
+    </div>
+  );
   const toActName = live ? h!.players[h!.toAct]?.name : '';
   const others = (view?.seats ?? []).filter((s) => !s.bot && s.id !== view?.you).map((s) => ({ id: s.id, name: s.name }));
   const botToAct = live && isBotId(view?.handIds[h!.toAct] ?? '');
   const botTable = (view?.botSeats ?? 0) > 0;
   const results = h?.complete && h.result ? resultLines(h, me) : [];
-  const busted = !!h?.complete && !!myPlayer && myPlayer.stack === 0;
 
   // Seats. Players in the hand are drawn in the seat they were dealt in; once a hand is over, anyone
   // who has since left is hidden. Seated players not in the hand shown wait in their seat.
@@ -618,6 +761,7 @@ export function PlayTablePage() {
             className="btn ghost"
             onClick={() => {
               if (mySeat || waiting) leave();
+              leftEarly(room, kind);
               nav('/play');
             }}
           >
@@ -728,16 +872,20 @@ export function PlayTablePage() {
                 ))}
               </div>
             )}
-            {busted && (
-              <div className="note live-bust">
+            {bustHand && !mySeat && !waiting && bank && (
+              <div className="live-bust">
                 {canBuyIn ? (
-                  `You lost your stack. Pick an open seat to buy in again; you have ${fmtChips(bank?.balance ?? 0)} chips.`
+                  <p className="note">
+                    You are out of chips at this table. You have {fmtChips(bank.balance)} chips: pick an open seat to buy in again, or{' '}
+                    <Link to="/practice?start=1">practise without chips</Link>.
+                  </p>
                 ) : (
-                  <>
-                    <p>You lost your stack, and you do not have enough chips for this table.</p>
-                    <Wallet bank={bank} onBank={setBank} compact />
-                  </>
+                  <NotEnoughChips room={room} bank={bank} onBank={setBank} tables={tables} lost />
                 )}
+                <details className="more live-history">
+                  <summary>Actions in that hand</summary>
+                  <HistoryList state={bustHand.state} hero={bustHand.me} showNames money={fmtChips} />
+                </details>
               </div>
             )}
             {/* your controls keep one place on the page, so nothing jumps when your turn comes */}
@@ -820,13 +968,34 @@ export function PlayTablePage() {
                   Back to the table
                 </button>
               </>
+            ) : !canBuyIn && claimCovers ? (
+              <form className="live-buyin" onSubmit={claimAndSit} data-testid="claim-and-sit">
+                <p className="live-have">
+                  You have <strong>{fmtChips(bank!.balance)}</strong> chips. This table needs {fmtChips(buyIn.min)}, and today’s free chips ({DAILY_MIN}–{DAILY_MAX}) cover
+                  that.
+                </p>
+                {nameField}
+                {(claimError || error) && (
+                  <p className="error" role="alert">
+                    {claimError ?? error}
+                  </p>
+                )}
+                <div className="row">
+                  <button className="btn primary" type="submit" disabled={claiming || sitting} aria-busy={claiming || sitting}>
+                    {claiming ? 'Claiming…' : sitting ? 'Sitting down…' : 'Claim daily chips & sit down'}
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setPicking(null)}>
+                    Cancel
+                  </button>
+                </div>
+                <p className="note">
+                  You bring as many of your chips as the table allows (up to {fmtChips(buyIn.max)}); the rest stay in your balance. Free chips can be claimed once a day.
+                </p>
+              </form>
             ) : !canBuyIn ? (
               <>
-                <p>
-                  This table needs at least {fmtChips(buyIn.min)} chips and you have {fmtChips(bank!.balance)}.
-                </p>
-                <Wallet bank={bank} onBank={setBank} compact />
-                <button className="btn" onClick={() => setPicking(null)}>
+                <NotEnoughChips room={room} bank={bank!} onBank={setBank} tables={tables} />
+                <button className="btn ghost" onClick={() => setPicking(null)}>
                   Back to the table
                 </button>
               </>
@@ -835,34 +1004,7 @@ export function PlayTablePage() {
                 <p className="live-have">
                   You have <strong>{bank ? fmtChips(bank.balance) : '…'}</strong> chips
                 </p>
-                {account ? (
-                  <p className="live-have">
-                    You play as <strong>{account.displayName || '…'}</strong>. <Link to="/account">Change your name</Link>
-                  </p>
-                ) : (
-                  <div className="row">
-                    <label htmlFor="live-name">Your name</label>
-                    <input
-                      id="live-name"
-                      className="live-input"
-                      value={name}
-                      maxLength={NAME_MAX}
-                      onChange={(e) => {
-                        setName(e.target.value);
-                        setNameError(null);
-                      }}
-                      autoComplete="nickname"
-                      autoFocus={!name}
-                      aria-invalid={!!nameError}
-                      aria-describedby={nameError ? 'live-name-err' : undefined}
-                    />
-                    {nameError && (
-                      <span id="live-name-err" className="error" role="alert">
-                        {nameError}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {nameField}
                 <div className="live-buyin-row">
                   <label htmlFor="buyin-amount">Buy in for</label>
                   <span className="live-amt-box">
@@ -912,8 +1054,8 @@ export function PlayTablePage() {
                   </p>
                 )}
                 <div className="row">
-                  <button className="btn primary" type="submit" disabled={!buyValid}>
-                    Sit down with {buyValid ? buyChips : '…'} chips
+                  <button className="btn primary" type="submit" disabled={!buyValid || sitting} aria-busy={sitting}>
+                    {sitting ? 'Sitting down…' : `Sit down with ${buyValid ? buyChips : '…'} chips`}
                   </button>
                   <button type="button" className="btn ghost" onClick={() => setPicking(null)}>
                     Cancel

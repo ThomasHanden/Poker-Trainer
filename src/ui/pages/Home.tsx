@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
+import { useAuth } from '../../auth/AuthContext';
 import { CardRow } from '../components/Card';
-import { LESSON_INDEX } from '../../content/lessons';
+import { LESSON_INDEX, SEQUENCES } from '../../content/lessons';
+import { CONCEPTS } from '../../content/concepts';
+import { canPractise } from '../../scenarios/generator';
+import { DailyState, Suggestion, continuePlan } from '../../progress/insights';
+import { loadRun, newRunId, runDone } from '../../progress/conceptRun';
+import { StartChoice, loadStartChoice, saveStartChoice, shouldAskStart } from '../startChoice';
+import { track, trackOnce } from '../analytics';
+import { progressKnown } from '../../persistence/accountSync';
 import {
   Puzzle,
   PuzzleProgress,
@@ -18,6 +26,9 @@ import {
   streak,
   todayKey,
 } from '../../puzzles/daily';
+
+/** Where someone new to poker starts: the first lesson of the First steps track. */
+const FIRST_LESSON = SEQUENCES.find((s) => s.id === 'first-steps')?.lessons[0] ?? 'rules-rankings';
 
 const LIVES = 3;
 const fmtTime = (ms: number) => {
@@ -39,14 +50,49 @@ const untilMidnight = () => {
 type Mode = 'daily' | 'survival';
 
 export function HomePage() {
-  const { data, owner, runsVersion } = useStore();
-  const nav = useNavigate();
+  const { data, owner, runsVersion, sync } = useStore();
+  const { status } = useAuth();
   const today = todayKey();
   const [runs, setRuns] = useState<PuzzleRun[]>(loadRuns);
   // results arrive from the account after signing in
   useEffect(() => setRuns(loadRuns()), [owner, runsVersion]);
   const [mode, setMode] = useState<Mode>('daily');
   const dailyRun = runs.find((r) => r.id === `daily:${today}`);
+  // answering today's five below updates the Continue card
+  const [dailyTick, setDailyTick] = useState(0);
+  const [startChoice, setStartChoice] = useState<StartChoice | null>(loadStartChoice);
+  // a signed-in account's progress is still on its way: decide nothing about it yet (no wrong suggestions
+  // in the meantime). The page built ahead of time (scripts/prerender.tsx) shows neither card either.
+  const settled = typeof window !== 'undefined' && progressKnown(status, owner, sync);
+  const activity = { hands: data.history.length, lessons: Object.keys(data.lessons).length, puzzles: runs.length };
+  const askStart = settled && shouldAskStart(startChoice, activity);
+  const returning = settled && activity.hands + activity.lessons + activity.puzzles > 0;
+  const remember = (c: StartChoice) => {
+    saveStartChoice(c);
+    setStartChoice(c);
+  };
+  const goDaily = () => {
+    setMode('daily');
+    requestAnimationFrame(() => document.getElementById('daily')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const plan = useMemo(() => {
+    if (!returning) return [];
+    const total = puzzleSet(today).length;
+    const prog = loadProgress(`daily:${today}`);
+    const answered = prog ? prog.picks.filter((x) => x !== null && x !== undefined).length : 0;
+    const daily: DailyState = dailyRun ? { state: 'done', points: dailyRun.points } : answered > 0 ? { state: 'started', answered, total } : { state: 'new' };
+    const r = loadRun();
+    return continuePlan({
+      history: data.history,
+      lessons: data.lessons,
+      daily,
+      canPractise: (c) => canPractise(data.settings, c),
+      run: r && !runDone(r) ? { concept: r.concept, done: r.hands.length, total: r.total } : null,
+    });
+    // dailyTick: today's five was answered below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returning, data.history, data.lessons, data.settings, dailyRun, today, dailyTick]);
 
   const played = data.history.length;
   const scored = data.history.filter((h) => h.score !== null);
@@ -63,14 +109,51 @@ export function HomePage() {
           <p className="eyebrow">No-Limit Hold’em trainer</p>
           <h1>Make the right play, and know why.</h1>
           <p className="lead">Warm up with today’s puzzles, then play full hands and spots with a review of every decision.</p>
+          {!askStart && (
+            <p className="home-new">
+              New to poker? <Link to={`/learn/${FIRST_LESSON}`}>Start with the first lesson</Link>
+            </p>
+          )}
         </div>
-        <button className="btn primary big" onClick={() => nav('/practice')}>
-          Go to practice →
-        </button>
+        {!askStart && (
+          <div className="home-actions">
+            <Link className="btn primary big" to="/practice">
+              Go to practice →
+            </Link>
+            <Link className="btn big" to="/play" data-testid="home-play-live">
+              Play live
+            </Link>
+          </div>
+        )}
       </section>
 
+      {askStart && (
+        <section className="start-choice" aria-labelledby="start-title" data-testid="start-choice">
+          <h2 id="start-title">Where would you like to start?</h2>
+          <div className="start-options">
+            <Link className="start-option" to={`/learn/${FIRST_LESSON}`} onClick={() => remember('new')}>
+              <strong>New to poker</strong>
+              <span>How a hand plays and which hands win, in short lessons.</span>
+            </Link>
+            <Link className="start-option" to="/practice?start=1&mode=guided" onClick={() => remember('rules')}>
+              <strong>I know the rules</strong>
+              <span>Play a practice hand with hints if you want them, then see the best play and why.</span>
+            </Link>
+            <Link className="start-option" to="/play" onClick={() => remember('game')}>
+              <strong>Just want a game</strong>
+              <span>Sit down at a live table with other players and bots. Play chips only, no real money.</span>
+            </Link>
+          </div>
+          <button className="linklike start-skip" onClick={() => remember('skip')} data-testid="start-skip">
+            Skip — I’ll look around
+          </button>
+        </section>
+      )}
+
+      {returning && plan.length > 0 && <ContinueCard plan={plan} onDaily={goDaily} />}
+
       <div className="home-grid">
-        <section className="puzzles" aria-labelledby="pz-title">
+        <section className="puzzles" id="daily" aria-labelledby="pz-title">
           <div className="pz-modes" role="tablist" aria-label="Puzzle mode">
             <button role="tab" aria-selected={mode === 'daily'} className={mode === 'daily' ? 'on' : ''} onClick={() => setMode('daily')}>
               Daily five
@@ -82,7 +165,16 @@ export function HomePage() {
             </button>
           </div>
           {mode === 'daily' ? (
-            <PuzzleGame key={`daily:${today}`} mode="daily" setKey={today} existing={dailyRun} runs={runs} onSaved={setRuns} onSwitch={() => setMode('survival')} />
+            <PuzzleGame
+              key={`daily:${today}`}
+              mode="daily"
+              setKey={today}
+              existing={dailyRun}
+              runs={runs}
+              onSaved={setRuns}
+              onSwitch={() => setMode('survival')}
+              onProgress={() => setDailyTick((t) => t + 1)}
+            />
           ) : (
             <PuzzleGame key="survival" mode="survival" setKey="survival" runs={runs} onSaved={setRuns} onSwitch={() => setMode('daily')} />
           )}
@@ -155,6 +247,116 @@ export function HomePage() {
   );
 }
 
+/** The home page's one suggested next step for someone who has been here before, with up to two smaller ones. */
+function ContinueCard({ plan, onDaily }: { plan: Suggestion[]; onDaily: () => void }) {
+  const [main, ...rest] = plan;
+  const used = (s: Suggestion, place: 'main' | 'more') => track('Continue Card Used', { type: s.kind, place });
+  // a link that follows a suggestion: a page, or today's five further down this one
+  const go = (s: Suggestion, place: 'main' | 'more', label: ReactNode, className: string) => {
+    if (s.kind === 'daily')
+      return (
+        <button
+          className={className}
+          onClick={() => {
+            used(s, place);
+            onDaily();
+          }}
+        >
+          {label}
+        </button>
+      );
+    return (
+      <Link className={className} to={href(s)} onClick={() => used(s, place)}>
+        {label}
+      </Link>
+    );
+  };
+  const more = rest.filter((s) => !(s.kind === 'daily' && s.state === 'done')).slice(0, 2);
+  const dailyDone = plan.find((s): s is Extract<Suggestion, { kind: 'daily'; state: 'done' }> => s.kind === 'daily' && s.state === 'done');
+  const text = mainText(main);
+  return (
+    <section className="continue" aria-labelledby="continue-title" data-testid="continue">
+      <p className="eyebrow">Continue</p>
+      <h2 id="continue-title">{text.title}</h2>
+      <p className="continue-why">{text.body}</p>
+      {go(main, 'main', text.action, 'btn primary')}
+      {(more.length > 0 || dailyDone) && (
+        <ul className="continue-more">
+          {more.map((s) => (
+            <li key={s.kind}>{go(s, 'more', moreText(s), 'linklike')}</li>
+          ))}
+          {dailyDone && <li className="note">Today’s Daily five: done, {dailyDone.points} points.</li>}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function href(s: Suggestion): string {
+  switch (s.kind) {
+    case 'concept':
+      // carrying on keeps the run's id, so the hands already played count; a new run gets a new one
+      return `/practice?concept=${s.concept}&run=${s.resume ? (loadRun()?.id ?? newRunId()) : newRunId()}`;
+    case 'concept-lesson':
+      return `/learn/${CONCEPTS[s.concept].lesson}`;
+    case 'lesson':
+      return `/learn/${s.lesson}`;
+    case 'practice':
+      return '/practice?start=1';
+    case 'daily':
+      return '/#daily';
+  }
+}
+
+function mainText(s: Suggestion): { title: string; body: string; action: string } {
+  switch (s.kind) {
+    case 'concept': {
+      const name = CONCEPTS[s.concept].name;
+      if (s.resume) return { title: `Carry on with ${name}`, body: `You have played ${s.resume.done} of your ${s.resume.total} hands on it.`, action: 'Continue' };
+      return {
+        title: `Work on ${name}`,
+        body: `Your decisions on it average ${Math.round(s.avg)} over the last ${s.n}. Play five hands on it, then see how they went.`,
+        action: 'Practise 5 hands',
+      };
+    }
+    case 'concept-lesson': {
+      const c = CONCEPTS[s.concept];
+      return {
+        title: `Brush up on ${c.name}`,
+        body: `Your decisions on it average ${Math.round(s.avg)} over the last ${s.n}. Practice does not deal these spots with your current settings, so start with the lesson.`,
+        action: `Read: ${LESSON_INDEX[c.lesson]?.title ?? c.name}`,
+      };
+    }
+    case 'lesson':
+      return { title: `Continue ${s.title}`, body: `${s.done} of ${s.total} lessons done. Next: ${LESSON_INDEX[s.lesson]?.title ?? s.lesson}.`, action: 'Read the next lesson' };
+    case 'practice':
+      return {
+        title: 'Keep practising',
+        body: 'Play a few more hands. Once a concept has five scored decisions, this will suggest what to work on.',
+        action: 'Deal a hand',
+      };
+    case 'daily':
+      return s.state === 'started'
+        ? { title: 'Finish today’s Daily five', body: `${s.answered} of ${s.total} answered.`, action: 'Carry on' }
+        : { title: 'Today’s Daily five', body: 'Five quick questions, the same for everyone today.', action: 'Play today’s five' };
+  }
+}
+
+function moreText(s: Suggestion): string {
+  switch (s.kind) {
+    case 'concept':
+      return s.resume ? `Carry on: ${CONCEPTS[s.concept].name} (${s.resume.done} of ${s.resume.total})` : `Practise 5 hands on ${CONCEPTS[s.concept].name}`;
+    case 'concept-lesson':
+      return `Read: ${LESSON_INDEX[CONCEPTS[s.concept].lesson]?.title ?? CONCEPTS[s.concept].name}`;
+    case 'lesson':
+      return `Next in ${s.title}: ${LESSON_INDEX[s.lesson]?.title ?? s.lesson}`;
+    case 'practice':
+      return 'Deal a practice hand';
+    case 'daily':
+      return s.state === 'started' ? `Finish today’s Daily five (${s.answered} of ${s.total})` : 'Play today’s Daily five';
+  }
+}
+
 function PuzzleGame({
   mode,
   setKey,
@@ -162,6 +364,7 @@ function PuzzleGame({
   runs,
   onSaved,
   onSwitch,
+  onProgress,
 }: {
   mode: Mode;
   setKey: string;
@@ -169,6 +372,7 @@ function PuzzleGame({
   runs: PuzzleRun[];
   onSaved: (r: PuzzleRun[]) => void;
   onSwitch: () => void;
+  onProgress?: () => void;
 }) {
   const { data } = useStore();
   const nav = useNavigate();
@@ -183,7 +387,11 @@ function PuzzleGame({
   const daily = useMemo(() => (mode === 'daily' ? puzzleSet(setKey) : []), [mode, setKey]);
   const puzzleAt = (k: number): Puzzle => (mode === 'daily' ? daily[k] : randomPuzzle(survivalSeed, k));
 
-  useEffect(() => saveProgress(progressKey, prog), [progressKey, prog]);
+  useEffect(() => {
+    saveProgress(progressKey, prog);
+    onProgress?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressKey, prog]);
   useEffect(() => setShownAt(Date.now()), [prog?.index]);
 
   // start screen for survival, or when nothing is in progress
@@ -336,6 +544,7 @@ function PuzzleGame({
       marks,
     };
     onSaved(saveRun(run));
+    trackOnce(`puzzle:${run.id}`, 'Puzzle Completed', { mode: run.mode });
     setResult(run);
     setProg(null);
   };

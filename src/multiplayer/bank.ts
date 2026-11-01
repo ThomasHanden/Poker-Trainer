@@ -2,7 +2,7 @@
 // bank; buy-ins come out of the bank and stacks go back into it when players stand up.
 // The Bank Durable Object (party/server.ts) stores one Account per player and applies these rules.
 
-import { CHIP } from './table';
+import { CHIP, bestBuyIn, buyInFor, type Stakes } from './table';
 
 /** The daily claim in whole chips: every amount from DAILY_MIN to DAILY_MAX is equally likely. */
 export const DAILY_MIN = 50;
@@ -122,4 +122,20 @@ export const KEY_PATTERN = /^[A-Za-z0-9-]{20,100}$/;
 export async function playerId(key: string): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)));
   return Array.from(bytes.slice(0, 12), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Today's claim is still to come and even the smallest one covers what this table needs, so
+ * claiming and sitting down can be offered as one step (otherwise the claim comes first, with no
+ * promise of a seat).
+ */
+export function claimCovers(st: Stakes, bank: { balance: number; claimedToday?: boolean }): boolean {
+  const { min } = buyInFor(st);
+  return bank.balance < min && bank.claimedToday === false && bank.balance + DAILY_MIN * CHIP >= min;
+}
+
+/** After claiming: sit down with as much as the table allows, or null when the balance still falls short. */
+export function buyInAfterClaim(st: Stakes, balance: number): number | null {
+  const units = bestBuyIn(st, balance);
+  return units >= buyInFor(st).min ? units : null;
 }

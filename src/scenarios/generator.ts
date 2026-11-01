@@ -28,6 +28,7 @@ import {
   STACK_BANDS,
 } from './types';
 import { TEMPLATES } from './templates';
+import type { ConceptId } from '../content/concepts';
 
 export const AMBIGUITY: Record<Difficulty, number> = { beginner: 0.1, intermediate: 0.35, advanced: 0.6, expert: 0.8 };
 
@@ -273,6 +274,17 @@ export function matchingTemplates(settings: PracticeSettings, templates: Scenari
   }
   return { templates: pool, reasons };
 }
+
+/**
+ * Settings for practising one concept: your settings, aimed at the concept. Always single spots,
+ * since full hands cannot be aimed at a concept (they would only be labelled with it).
+ */
+export function conceptSettings(s: PracticeSettings, concept: ConceptId): PracticeSettings {
+  return { ...s, street: s.street === 'full' ? 'any' : s.street, concepts: [concept] };
+}
+
+/** Whether practice can deal spots on this concept with these settings (some need a harder difficulty). */
+export const canPractise = (s: PracticeSettings, concept: ConceptId) => matchingTemplates(conceptSettings(s, concept)).templates.length > 0;
 
 export interface GenerateOptions {
   seed?: number;

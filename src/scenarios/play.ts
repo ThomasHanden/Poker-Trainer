@@ -15,6 +15,16 @@ export interface PlaySession {
   startedAt: number;
 }
 
+/** Full hands are dealt from the start and played to the end, every decision scored. */
+export const isFullHand = (sc: Scenario) => sc.templateId === 'full-hand';
+
+/**
+ * Whether there is nothing more to play. A single spot is about one decision, so it is over once you
+ * have made it and the other players have replied, even if the hand would go on (the review then
+ * shows the hand as far as it got). Full hands are played to the end.
+ */
+export const spotOver = (s: PlaySession) => s.state.complete || (!isFullHand(s.scenario) && s.decisions.length > 0);
+
 export function startSession(sc: Scenario): PlaySession {
   const s: PlaySession = { scenario: sc, state: sc.state, decisions: [], startedAt: Date.now() };
   return advanceOpponents(s);

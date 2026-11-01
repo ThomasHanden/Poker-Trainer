@@ -202,6 +202,15 @@ export type SyncState =
   /** loaded, but the latest changes are not saved yet (kept here and retried) */
   | { phase: 'save-failed'; message: string };
 
+/**
+ * Whether the progress on screen is really the player's, so suggestions can be made from it: a
+ * guest's straight away; a signed-in account's once it has loaded (or failed to, when this device's
+ * copy is what there is). While sign-in or the account's progress is still on its way: not yet.
+ */
+export function progressKnown(auth: 'off' | 'loading' | 'signed-out' | 'signed-in', owner: string | null, sync: SyncState | null): boolean {
+  return auth !== 'loading' && (!owner || (!!sync && sync.phase !== 'loading'));
+}
+
 export interface SyncHost {
   getData(): AppData;
   setData(d: AppData): void;

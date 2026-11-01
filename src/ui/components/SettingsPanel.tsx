@@ -1,6 +1,6 @@
 import { Select } from './Select';
 import { useMemo } from 'react';
-import { PracticeSettings, DIFFICULTIES, STACK_BANDS, StackBand } from '../../scenarios/types';
+import { PracticeSettings, DIFFICULTIES, MODE_LABEL, STACK_BANDS, StackBand } from '../../scenarios/types';
 import { matchingTemplates } from '../../scenarios/generator';
 import { PROFILE_LIST } from '../../opponents/profiles';
 import { CONCEPTS, ConceptId, CONCEPT_IDS } from '../../content/concepts';
@@ -17,7 +17,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 /** One-line description of the current settings, used when the panel is collapsed. */
 export function settingsSummary(s: PracticeSettings): string {
-  const parts = [cap(s.difficulty), s.mode === 'guided' ? 'Guided' : 'Assessment'];
+  const parts = [cap(s.difficulty), MODE_LABEL[s.mode]];
   if (s.format !== 'any') parts.push(s.format === 'cash' ? 'Cash' : 'Tournament');
   if (s.tableSize !== 'any') parts.push(s.tableSize === 2 ? 'Heads-up' : s.tableSize === 6 ? '6-max' : 'Full ring');
   if (s.stack !== 'any') parts.push(STACK_BANDS[s.stack].label.split(' (')[0]);
@@ -57,9 +57,9 @@ export function SettingsPanel({ settings, onChange }: { settings: PracticeSettin
         <div className="field">
           <span className="field-label">Mode</span>
           <div className="seg" role="radiogroup" aria-label="Mode">
-            {(['assessment', 'guided'] as const).map((md) => (
+            {(['guided', 'assessment'] as const).map((md) => (
               <button key={md} role="radio" aria-checked={settings.mode === md} className={settings.mode === md ? 'on' : ''} onClick={() => set('mode', md)}>
-                {md === 'guided' ? 'Guided' : 'Assessment'}
+                {MODE_LABEL[md]}
               </button>
             ))}
           </div>
@@ -75,7 +75,9 @@ export function SettingsPanel({ settings, onChange }: { settings: PracticeSettin
       </div>
       <p className="note settings-help">
         {DIFF_HELP[settings.difficulty]}{' '}
-        {settings.mode === 'guided' ? 'Guided: optional help during the hand; assisted decisions are tracked separately.' : 'Assessment: no help during the hand; feedback comes afterwards.'}
+        {settings.mode === 'guided'
+          ? `${MODE_LABEL.guided}: hints and pot odds are there if you want them; decisions you take help on are tracked separately.`
+          : `${MODE_LABEL.assessment}: no help during the hand; you see the review afterwards.`}
       </p>
       {settings.mode === 'guided' && (
         <div className="checks">

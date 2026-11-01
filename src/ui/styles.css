@@ -6806,8 +6806,9 @@ label > span:first-child:not(.select-value) {
    Live tables on phones: the whole table and your buttons fit on one screen
    ============================================================ */
 @media (max-width: 820px) {
-  /* must match PORTRAIT_LIVE in Table.tsx */
-  .felt.live {
+  /* must match PORTRAIT_SHORT in Table.tsx: live tables, and practice tables of six or fewer */
+  .felt.live,
+  .felt.short {
     aspect-ratio: 1 / 1.45;
   }
 }
@@ -7249,4 +7250,405 @@ label > span:first-child:not(.select-value) {
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;
+}
+
+/* ============================================================
+   Practice on phones: while you play, the title stays on one row (the rest is under Details),
+   the table is sized to the screen and your controls stay at the bottom of it
+   ============================================================ */
+.ph-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ph-toggle,
+.ph-replay {
+  display: none;
+}
+/* only a box of its own on phones held upright (below); elsewhere its contents lay out as before */
+.practice-controls {
+  display: contents;
+}
+.review-end {
+  margin: 20px 0 0;
+}
+@media (max-width: 680px) {
+  .page.practice:not(.live) {
+    padding-top: 8px;
+  }
+  .page.practice:not(.live) .practice-head {
+    gap: 6px;
+    margin: 0 0 4px;
+    padding: 2px 0 6px;
+  }
+  .page.practice:not(.live) .ph-titlebar .ph-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page.practice:not(.live) .practice-head.open .ph-title {
+    white-space: normal;
+  }
+  .page.practice:not(.live) .ph-toggle,
+  .page.practice:not(.live) .ph-replay {
+    display: inline-flex;
+    flex: none;
+    min-height: 34px;
+    padding: 0 10px;
+  }
+  /* folded away until Details is opened */
+  .page.practice:not(.live) .practice-head:not(.open) .ph-sub,
+  .page.practice:not(.live) .practice-head:not(.open) .ph-meta,
+  .page.practice:not(.live) .practice-head:not(.open) .ph-side,
+  .page.practice:not(.live) .practice-head:not(.open) + .session-strip {
+    display: none;
+  }
+  .page.practice:not(.live) .practice-head.open .ph-sub {
+    margin: 6px 0 8px;
+  }
+  /* review: Next hand stays at the bottom of the screen while you read */
+  .page.practice .review-end {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    gap: 8px;
+    margin: 16px -16px 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
+  }
+  .page.practice .review-end .btn {
+    flex: 1 1 0;
+    min-height: 46px;
+  }
+}
+/* taller phones also have room for the spot's description */
+@media (max-width: 680px) and (min-height: 700px) {
+  .page.practice:not(.live) .practice-head:not(.open) .ph-sub {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 2px 0 0;
+    font-size: 0.86rem;
+    line-height: 1.35;
+  }
+}
+/* phones: the table takes the room left between the header and the controls */
+@media (max-width: 680px) {
+  .page.practice:not(.live) {
+    /* room kept for the controls; with help buttons they need a row more */
+    --dock: 6.5rem;
+  }
+  .page.practice.guided:not(.live) {
+    --dock: 8.75rem;
+  }
+  .page.practice:not(.live) .practice-body .table-wrap .felt {
+    --ratio: 1.75;
+    min-width: 168px;
+    margin-top: 30px;
+    margin-bottom: 40px;
+  }
+  .page.practice:not(.live) .practice-body .table-wrap .felt.short {
+    --ratio: 1.45;
+  }
+  .practice-controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: var(--dock);
+    margin: 0 -16px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
+  }
+  .practice-controls:empty {
+    visibility: hidden;
+  }
+  .practice-controls .playback {
+    position: static;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+  .practice-controls .loading {
+    margin: 0;
+    padding: 8px 0;
+  }
+  /* your decision: what you have and any help above the buttons, the buttons at the very bottom */
+  .practice-controls .decision-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+  }
+  .practice-controls .facts {
+    order: 1;
+    flex-wrap: nowrap;
+    gap: 14px;
+    margin: 0;
+    padding: 0 2px;
+    border: none;
+    overflow: hidden;
+  }
+  /* the pot is on the table and the amount to call is on the Call button */
+  .practice-controls .fact.f-pot,
+  .practice-controls .fact.f-call {
+    display: none;
+  }
+  .practice-controls .fact {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 5px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .practice-controls .fact-l {
+    font-size: 0.66rem;
+  }
+  .practice-controls .fact-v {
+    font-size: 0.86rem;
+  }
+  .practice-controls .fact.wide .fact-v {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .practice-controls .dp-feedback {
+    order: 2;
+    margin: 0;
+    font-size: 0.84rem;
+  }
+  .practice-controls .dp-help {
+    order: 3;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  .practice-controls .assist-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .practice-controls .assist-buttons .btn.small {
+    min-height: 32px;
+  }
+  /* the assisted note appears once help is used */
+  .practice-controls .dp-help:not(.used) .assist-buttons .note {
+    display: none;
+  }
+  .practice-controls .assist-buttons .note {
+    flex-basis: 100%;
+    font-size: 0.76rem;
+  }
+  .practice-controls .dp-help .hint {
+    margin: 6px 0 0;
+    font-size: 0.86rem;
+  }
+  .practice-controls .action-bar {
+    order: 4;
+  }
+  /* no keyboard on a phone; Replay is in the title row */
+  .practice-controls .dp-links,
+  .practice-controls .keys {
+    display: none;
+  }
+  /* all your options on one row */
+  .practice-controls .action-buttons {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .practice-controls .action-buttons .btn.act.raise:nth-child(3) {
+    grid-column: auto;
+  }
+  .practice-controls .btn.act {
+    height: 48px;
+    min-width: 0;
+    padding: 0 6px;
+  }
+}
+/* held upright: everything fits on one screen. --above is where the table starts (measured in
+   Practice.tsx); below it come your seat, which hangs over the rail, and the controls */
+@media (max-width: 680px) and (min-height: 480px) {
+  .page.practice:not(.live) .practice-body .table-wrap .felt {
+    width: min(100%, calc((100svh - var(--above, 160px) - 40px - var(--dock)) / var(--ratio)));
+  }
+}
+/* sideways: the table is at most a screen high, so one scroll shows the board, your cards and the buttons */
+@media (max-width: 680px) and (max-height: 479px) {
+  .page.practice:not(.live) .practice-body .table-wrap .felt {
+    width: min(100%, calc((100svh - 70px - var(--dock)) / var(--ratio)));
+  }
+}
+/* bet amount box: keep room on the right for its unit ("bb") over the generic input padding */
+.sizing label.size-input input[type='number'] {
+  padding-right: 30px;
+}
+
+/* five hands on a concept: where you are, and the summary at the end */
+.run-chip {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.run-done {
+  margin: 12px 0;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 16px;
+  background: var(--surface);
+  scroll-margin-top: 80px;
+}
+.run-done h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+.run-done p {
+  margin: 0 0 12px;
+}
+
+/* home: the actions under the welcome, the first-visit question and the Continue card */
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.home-new {
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+  color: var(--text-2);
+}
+.start-choice,
+.continue {
+  margin: 24px 0 0;
+  padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.start-choice h2 {
+  margin: 0 0 14px;
+  font-size: 1.3rem;
+}
+.start-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.start-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.start-option strong {
+  font-size: 1.05rem;
+}
+.start-option span {
+  color: var(--text-2);
+  font-size: 0.92rem;
+}
+.start-option:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.start-skip {
+  margin-top: 14px;
+}
+.continue .eyebrow {
+  margin: 0 0 2px;
+}
+.continue h2 {
+  margin: 0 0 6px;
+  font-size: 1.3rem;
+}
+.continue-why {
+  margin: 0 0 14px;
+  color: var(--text-2);
+}
+.continue-more {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+@media (max-width: 680px) {
+  .home-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .start-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .start-choice,
+  .continue {
+    margin-top: 16px;
+    padding: 16px;
+  }
+  .continue .btn {
+    width: 100%;
+  }
+  .continue-more {
+    flex-direction: column;
+  }
+}
+
+/* live: not enough chips for a table, and what to do instead */
+.live-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+.live-options p {
+  margin: 0;
+}
+.live-options .live-wallet {
+  margin: 0;
+}
+.live-bust .live-history {
+  text-align: left;
 }

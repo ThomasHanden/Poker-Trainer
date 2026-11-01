@@ -331,6 +331,7 @@ export function ReviewView({
                   ))}
               </p>
             )}
+            {!finalState.complete && <p className="rsum-result note">Single spots stop after your decision, so the rest of this hand was not played.</p>}
           </div>
         </div>
         {hidden.length > 0 && (
@@ -403,6 +404,22 @@ export function ReviewView({
           </ul>
         </details>
       </section>
+
+      {/* the same way on at the end (on phones it stays at the bottom of the screen while you read) */}
+      {(onNext || onRetry) && (
+        <div className="review-actions review-end">
+          {onNext && (
+            <button className="btn primary" onClick={onNext} data-testid="next-hand-bottom">
+              Next hand
+            </button>
+          )}
+          {onRetry && (
+            <button className="btn" onClick={onRetry}>
+              Retry this spot
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -43,9 +43,13 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
   potType: 'any',
   opponent: 'random',
   concepts: [],
-  mode: 'assessment',
+  // new players start with help on hand; settings someone has saved (Test me included) are kept
+  mode: 'guided',
   assists: { hints: true, potOdds: true, equity: false, immediateFeedback: false },
 };
+
+/** What the two practice modes are called on screen (the stored values stay 'guided' and 'assessment'). */
+export const MODE_LABEL: Record<PracticeSettings['mode'], string> = { guided: 'Help me', assessment: 'Test me' };
 
 /** How a scripted action's size is specified. */
 export type SizeSpec =

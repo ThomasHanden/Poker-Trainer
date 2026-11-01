@@ -24,7 +24,8 @@ export interface Lesson {
   math?: { formulas?: string[]; notes: string[] };
   assumptions: string[]; // assumptions and exceptions
   quiz: QuizQuestion[];
-  practice: { label: string; templates?: string[]; concepts?: ConceptId[] };
+  /** mode: open practice in Help me ('guided') or Test me ('assessment') for this visit, without changing saved settings */
+  practice: { label: string; templates?: string[]; concepts?: ConceptId[]; mode?: 'guided' | 'assessment' };
   related: string[];
   sources: string[]; // ids in SOURCES
   /** deeper explanation, split into short sub-sections */

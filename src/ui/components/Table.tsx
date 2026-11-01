@@ -116,8 +116,8 @@ export const dealMs = (n: number) => Math.round(((2 * n - 1) * DEAL_GAP + DEAL_A
 // felt proportions (must match .felt aspect-ratio in styles.css)
 const LANDSCAPE = { w: 2.1, h: 1 };
 const PORTRAIT = { w: 1, h: 1.75 };
-// live tables seat at most six, so on phones they use a shorter felt that fits beside the action buttons
-const PORTRAIT_LIVE = { w: 1, h: 1.45 };
+// tables of six or fewer (every live table) use a shorter felt on phones, so it fits above the action buttons
+const PORTRAIT_SHORT = { w: 1, h: 1.45 };
 
 /** Contested pots (main first) from what was bet on earlier streets; one entry means no side pot. */
 function settledPots(state: HandState): number[] {
@@ -211,7 +211,8 @@ export function Table({
   }, [turnKey, turnEndsAt, turnMs, live]);
   // seat geometry: hero at the bottom center, others evenly spaced clockwise along the rail
   const narrow = useNarrow();
-  const box = narrow ? (live ? PORTRAIT_LIVE : PORTRAIT) : LANDSCAPE;
+  const short = live || n <= 6;
+  const box = narrow ? (short ? PORTRAIT_SHORT : PORTRAIT) : LANDSCAPE;
   // position round the rail: by fixed seat on live tables, else evenly spaced from the hero
   const slotT = (slot: number) => (seating ? ((slot - seating.viewSlot + seating.slots) % seating.slots) / seating.slots : 0);
   const geo = (i: number) => geoAt(seating ? slotT(seating.slotOf(i)) : ((i - hero + n) % n) / n, i === hero);
@@ -240,7 +241,7 @@ export function Table({
   };
   return (
     <div className="table-wrap" aria-label="Poker table">
-      <div className={`felt ${n >= 8 ? 'crowded' : ''} ${live ? 'live' : ''}`}>
+      <div className={`felt ${n >= 8 ? 'crowded' : ''} ${live ? 'live' : ''} ${short ? 'short' : ''}`}>
         <div className="felt-line" aria-hidden="true" />
         <div className="table-center">
           {/* live: once the pot has gone to the winner, the middle is empty */}
@@ -392,13 +393,13 @@ export function DecisionFacts({ state, hero, money }: { state: HandState; hero: 
   const toCall = state.toAct === hero ? Math.max(0, Math.min(state.currentBet - me.streetCommitted, me.stack)) : 0;
   return (
     <div className="facts" aria-live="polite">
-      <div className="fact">
+      <div className="fact f-pot">
         <span className="fact-l">
           <Term id="pot">Pot</Term>
         </span>
         <span className="fact-v">{fmt(potSize(state))}</span>
       </div>
-      <div className="fact">
+      <div className="fact f-call">
         <span className="fact-l">
           <Term id="tocall">To call</Term>
         </span>
@@ -406,7 +407,7 @@ export function DecisionFacts({ state, hero, money }: { state: HandState; hero: 
           {fmt(toCall)}
         </span>
       </div>
-      <div className="fact">
+      <div className="fact f-eff">
         <span className="fact-l">
           <Term id="effective">Effective stack</Term>
         </span>

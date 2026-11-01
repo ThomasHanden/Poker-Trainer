@@ -145,7 +145,7 @@ test('daily puzzles can be completed and show in your stats', async ({ page }) =
   }
   await expect(page.getByTestId('pz-result')).toBeVisible();
   await expect(page.locator('.sb-table tbody tr')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Go to practice →' }).click();
+  await page.getByRole('link', { name: 'Go to practice →' }).click();
   await expect(page).toHaveURL(/\/practice$/);
 });
 
@@ -185,4 +185,67 @@ test('public pages are complete in the first HTML response, with link-preview me
   const sitemap = await (await request.get('/sitemap.xml')).text();
   expect(sitemap).toContain('/learn/pot-odds</loc>');
   expect(sitemap).not.toContain('/review');
+});
+
+/** Skip the replay of the action so far (if any) and wait for your decision. */
+async function toDecision(page: Page) {
+  for (let i = 0; i < 60; i++) {
+    if (await page.locator('.action-bar').count()) break;
+    const skip = page.getByTestId('skip-playback');
+    if (await skip.count()) await skip.click().catch(() => {});
+    else await page.waitForTimeout(250);
+  }
+  await expect(page.locator('.action-bar')).toBeVisible({ timeout: 30_000 });
+}
+
+test('first visit: choose where to start, or skip it for good', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('start-choice')).toBeVisible();
+  await page.getByTestId('start-skip').click();
+  await expect(page.getByTestId('start-choice')).toHaveCount(0);
+  await expect(page.getByTestId('home-play-live')).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('home-play-live')).toBeVisible();
+  await expect(page.getByTestId('start-choice')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Start with the first lesson' })).toHaveAttribute('href', '/learn/rules-rankings');
+});
+
+test('I know the rules: a hand with help, one decision, its review, and the next hand from the bottom', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: /I know the rules/ }).click();
+  await expect(page).toHaveURL(/\/practice\?start=1&mode=guided$/);
+  await toDecision(page);
+  await expect(page.getByRole('button', { name: 'Hint' })).toBeVisible();
+  await page.waitForTimeout(500); // a decision that has just come up ignores taps for a moment
+  await page.locator('.btn.act').first().click();
+  await expect(page.locator('[data-testid=review]')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.rdecisions .dcard')).toHaveCount(1); // a single spot reviews one decision
+  await page.getByTestId('next-hand-bottom').click();
+  await toDecision(page);
+});
+
+test('phones: at a decision your cards and the action buttons fit on the screen', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phones only');
+  for (const size of [
+    { width: 360, height: 640 },
+    { width: 393, height: 727 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.goto('/practice?start=1');
+    await toDecision(page);
+    await page.waitForTimeout(1200); // the cards finish being dealt
+    const cards = (await page.locator('.seat.hero .seat-cards').boundingBox())!;
+    const dock = (await page.locator('.practice-controls').boundingBox())!;
+    const buttons = (await page.locator('.action-buttons').boundingBox())!;
+    expect(cards.y).toBeGreaterThanOrEqual(0);
+    expect(cards.y + cards.height).toBeLessThanOrEqual(dock.y + 1); // nothing covers your cards
+    expect(buttons.y + buttons.height).toBeLessThanOrEqual(size.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+});
+
+test('progress says where it is kept', async ({ page }) => {
+  await page.goto('/progress');
+  await expect(page.locator('.data-tools')).toContainText('stored in this browser only');
+  await expect(page.locator('.data-tools')).not.toContainText('no account');
 });

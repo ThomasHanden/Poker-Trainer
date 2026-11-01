@@ -11,8 +11,9 @@ export function PrivacyPage() {
 
       <h2>Without an account</h2>
       <p>
-        Your practice hands, lesson progress, saved ranges, settings and daily puzzle results are saved in your own browser and are not sent to us. Clearing your
-        browser’s data for this site, or <Link to="/progress">Reset everything</Link> on the Progress page, removes them.
+        Your practice hands, lesson progress, saved ranges, settings and daily puzzle results are saved in your own browser and are not sent to us, along with
+        small things like your answer to “Where would you like to start?”. Clearing your browser’s data for this site, or{' '}
+        <Link to="/progress">Reset everything</Link> on the Progress page, removes them.
       </p>
 
       <h2>Live tables</h2>
@@ -52,9 +53,11 @@ export function PrivacyPage() {
 
       <h2>Analytics</h2>
       <p>
-        We use Vercel Web Analytics to count visits and a few actions, such as opening a live table or signing in, along with general details like the kind of
-        device and the country. It uses no cookies. We leave private table codes and saved-hand ids out of the addresses it sees, and never send it your name,
-        email address, cards or chat.
+        We use Vercel Web Analytics to count visits and a few actions, such as finishing a practice hand, a lesson or a puzzle, opening a live table or signing
+        in, along with general details like the kind of device and the country. It uses no cookies. To count people coming back, your browser remembers the day of
+        your first visit (that date stays in your browser); on a later day we send only a rough range, such as “2–7 days”, never a date or anything that
+        identifies you. We leave private table codes and saved-hand ids out of the addresses it sees, and never send it your name, email address, cards or
+        chat.
       </p>
 
       <h2>Who stores it</h2>

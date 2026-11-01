@@ -57,6 +57,21 @@ export const tableLabel = (room: string) => {
 };
 export const buyInFor = (st: Stakes) => ({ min: MIN_BUY_IN_BB * st.bb, max: MAX_BUY_IN_BB * st.bb });
 
+/** The most of a balance that can be brought to a table: whole chips, up to its maximum buy-in (below its minimum means you cannot sit). */
+export const bestBuyIn = (st: Stakes, balance: number) => Math.floor(Math.min(buyInFor(st).max, balance) / CHIP) * CHIP;
+
+/**
+ * Public tables you could join now with this balance: the minimum buy-in is covered and a person
+ * could sit (an open seat, or a bot's). Tables whose state is not known are left out rather than
+ * offered on a guess.
+ */
+export function affordableTables(balance: number, summaries: Record<string, TableSummary | null | undefined>, except?: string): string[] {
+  return PUBLIC_TABLES.filter((room) => {
+    const s = summaries[room];
+    return room !== except && buyInFor(stakesFor(room)).min <= balance && !!s && s.players < s.maxSeats;
+  });
+}
+
 /** The buy-in a player asked for, if it is a whole number of chips inside the table's range; otherwise null. */
 export function checkBuyIn(st: Stakes, requested: unknown): number | null {
   const { min, max } = buyInFor(st);

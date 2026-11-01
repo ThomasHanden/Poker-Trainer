@@ -1,49 +1,30 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
-import { HandRecord, exportData, importData, reset, DecisionSummary } from '../../persistence/storage';
+import { HandRecord, exportData, importData, reset } from '../../persistence/storage';
 import { CONCEPTS, ConceptId } from '../../content/concepts';
 import { LESSONS, LESSON_INDEX } from '../../content/lessons';
 import { SCORING_VERSION } from '../../evaluation/evaluate';
 import { todayKey } from '../../puzzles/daily';
-
-interface Agg {
-  key: string;
-  n: number;
-  avg: number;
-  mistakes: number;
-}
-
-function aggregate(rows: { key: string; d: DecisionSummary }[]): Agg[] {
-  const m = new Map<string, { n: number; sum: number; mistakes: number }>();
-  for (const { key, d } of rows) {
-    if (d.points === null) continue;
-    const a = m.get(key) ?? { n: 0, sum: 0, mistakes: 0 };
-    a.n++;
-    a.sum += d.points;
-    if (d.grade === 'mistake' || d.grade === 'blunder' || d.grade === 'inaccuracy') a.mistakes++;
-    m.set(key, a);
-  }
-  return [...m.entries()].map(([key, a]) => ({ key, n: a.n, avg: a.sum / a.n, mistakes: a.mistakes }));
-}
-
-const MIN_N = 5;
+import { Agg, MIN_N, aggregate, decisionsOf, strongConcepts, weakConcepts } from '../../progress/insights';
+import { useAuth } from '../../auth/AuthContext';
+import { canPractise } from '../../scenarios/generator';
 
 export function ProgressPage() {
-  const { data, replaceAll, owner } = useStore();
+  const { data, replaceAll, owner, sync } = useStore();
+  const { status } = useAuth();
   const [assistedView, setAssistedView] = useState<'unassisted' | 'assisted'>('unassisted');
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const hist = data.history;
   const pick = (h: HandRecord) => (assistedView === 'assisted' ? h.assisted : !h.assisted);
-  const decs = useMemo(() => hist.flatMap((h) => h.decisions.filter((d) => (assistedView === 'assisted' ? d.assisted : !d.assisted)).map((d) => ({ h, d }))), [hist, assistedView]);
+  const decs = useMemo(() => decisionsOf(hist, assistedView === 'assisted'), [hist, assistedView]);
   const byConcept = useMemo(() => aggregate(decs.flatMap(({ d }) => d.concepts.map((c) => ({ key: c, d })))), [decs]);
   const byStreet = useMemo(() => aggregate(decs.map(({ d }) => ({ key: d.street, d }))), [decs]);
   const byPos = useMemo(() => aggregate(decs.filter(({ d }) => d.isKey).map(({ h, d }) => ({ key: h.heroPosition, d }))), [decs]);
   const byDiff = useMemo(() => aggregate(decs.map(({ h, d }) => ({ key: h.difficulty, d }))), [decs]);
-  const scored = byConcept.filter((a) => a.n >= MIN_N).sort((a, b) => a.avg - b.avg);
-  const weak = scored.filter((a) => a.avg < 80).slice(0, 4);
-  const strong = [...scored].reverse().filter((a) => a.avg >= 80).slice(0, 4);
+  const weak = weakConcepts(byConcept).slice(0, 4);
+  const strong = strongConcepts(byConcept).slice(0, 4);
   const handsUn = hist.filter((h) => !h.assisted);
   const handsAs = hist.filter((h) => h.assisted);
   const avg = (xs: HandRecord[]) => {
@@ -128,7 +109,11 @@ export function ProgressPage() {
                     return (
                       <li key={w.key}>
                         <strong>{c?.name ?? w.key}</strong> — average {w.avg.toFixed(0)} over {w.n} decisions ({w.mistakes} below “reasonable”).{' '}
-                        <Link to={`/practice?concept=${w.key}`}>Practice</Link>
+                        {canPractise(data.settings, w.key as ConceptId) ? (
+                          <Link to={`/practice?concept=${w.key}`}>Practice</Link>
+                        ) : (
+                          <span className="note">Practice does not deal these spots with your current settings (some need a harder difficulty).</span>
+                        )}
                         {c && LESSON_INDEX[c.lesson] && (
                           <>
                             {' · '}
@@ -174,7 +159,15 @@ export function ProgressPage() {
       )}
       <section className="data-tools">
         <h2>Your data</h2>
-        <p className="note">Everything is stored in this browser (no account). Export to keep a backup or move to another device.</p>
+        <p className="note">
+          {owner
+            ? sync?.phase === 'load-failed' || sync?.phase === 'save-failed'
+              ? 'Your progress is saved to your account; right now the latest is kept on this device until your account can be reached. Export to keep a copy of your own.'
+              : 'Your progress is saved to your account, so it is on every device you sign in on. Export to keep a copy of your own.'
+            : status === 'off'
+              ? 'Your progress is stored in this browser only. Export to keep a backup or move it to another device.'
+              : <>Your progress is stored in this browser only. <Link to="/login?next=%2Fprogress">Sign in</Link> to keep it on every device, or export a backup.</>}
+        </p>
         <div className="row">
           <button className="btn" onClick={doExport} disabled={hist.length === 0 && data.ranges.length === 0 && lessonsDone === 0}>
             Export history

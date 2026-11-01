@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { run } from '../../workers/client';
-import { GenerateResult } from '../../scenarios/generator';
+import { GenerateResult, conceptSettings } from '../../scenarios/generator';
 import { Scenario, PracticeSettings } from '../../scenarios/types';
-import { PlaySession, startSession, heroAct } from '../../scenarios/play';
+import { PlaySession, startSession, heroAct, spotOver } from '../../scenarios/play';
 import { PlayerAction, legalActions, winnablePot } from '../../engine/rules';
 import { buildTimeline, TimelineStep } from '../../engine/timeline';
 import { ScenarioEvaluation, LiveHelp, Assistance, DecisionEvaluation } from '../../evaluation/evaluate';
@@ -18,6 +18,8 @@ import { HandRecord, PlaySpeed, newId } from '../../persistence/storage';
 import { PROFILES } from '../../opponents/profiles';
 import { CONCEPTS, ConceptId } from '../../content/concepts';
 import { Term } from '../components/Term';
+import { ConceptRun, loadRun, newRunId, recordHand, runAverage, runDone, runFor, saveRun } from '../../progress/conceptRun';
+import { track, trackOnce } from '../analytics';
 
 type Phase = 'idle' | 'loading' | 'playing' | 'evaluating' | 'done' | 'error';
 const NO_ASSIST: Assistance = {
@@ -78,6 +80,58 @@ function stepDelay(steps: TimelineStep[], i: number): number {
 
 const isClean = (ev: ScenarioEvaluation) => ev.decisions.length > 0 && ev.decisions.every((d) => d.grade === 'best' || d.grade === 'good');
 
+/** Phones: the controls are pinned to the bottom of the screen and the table is sized to fit above them (styles.css). */
+const PHONE_QUERY = '(max-width: 680px)';
+
+/**
+ * Tells the CSS how far down the page the table starts (top bar, banners, header), so it can size
+ * the table to the screen. Paused while something above it is open, so opening it does not shrink
+ * the table.
+ */
+function useTableFit(page: RefObject<HTMLElement>, hand: string | null, paused: boolean) {
+  useLayoutEffect(() => {
+    const el = page.current;
+    if (!el || !hand || paused) return;
+    const measure = () => {
+      const felt = el.querySelector('.felt');
+      if (!felt) return;
+      const top = `${Math.round(felt.getBoundingClientRect().top + window.scrollY)}px`;
+      if (el.style.getPropertyValue('--above') !== top) el.style.setProperty('--above', top);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [page, hand, paused]);
+}
+
+/**
+ * Phones: the controls stay on screen at the bottom. When a decision comes up, or the controls grow
+ * while you decide (bet sizing, a hint), scroll so they sit below the table instead of over your
+ * cards. Nothing moves when everything already fits.
+ */
+function useControlsInView(controls: RefObject<HTMLElement>, active: boolean) {
+  useEffect(() => {
+    const el = controls.current;
+    if (!el || !active || !window.matchMedia(PHONE_QUERY).matches) return;
+    // the controls are the last thing on the table: bring their place in the page into view
+    const settle = () => {
+      const over = (el.parentElement ?? el).getBoundingClientRect().bottom - window.innerHeight;
+      if (over > 1) window.scrollBy({ top: over, behavior: 'smooth' });
+    };
+    settle();
+    let last = el.offsetHeight;
+    const ro = new ResizeObserver(() => {
+      const h = el.offsetHeight;
+      const grew = h > last;
+      last = h;
+      if (grew) settle();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [controls, active]);
+}
+
 export function PracticePage() {
   const { data, update } = useStore();
   const [params, setParams] = useSearchParams();
@@ -99,19 +153,41 @@ export function PracticePage() {
   const [stats, setStats] = useState<SessionStats>(loadSession);
   const [fastShown, setFastShown] = useState(false);
   const [fastPaused, setFastPaused] = useState(false);
+  /** phones: the spot description and settings, folded away while you play */
+  const [headOpen, setHeadOpen] = useState(false);
   const fastMode = !!data.prefs.fastMode;
   const speed: PlaySpeed = data.prefs.playSpeed ?? 'normal';
   const scrolledFor = useRef<string | null>(null);
   const decisionStart = useRef(Date.now());
+  /** taps on the action buttons are ignored until then: a quick second tap on Skip must not fold */
+  const actGuard = useRef(0);
   const autoSeedUsed = useRef(false);
-  const settings = data.settings;
+  const pageRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const targetTemplate = params.get('template') ?? undefined;
   const targetConcept = params.get('concept') as ConceptId | null;
   const targetSeed = params.get('seed') ? Number(params.get('seed')) : undefined;
+  // a link can ask for a mode (e.g. ?mode=guided from the home page) without changing your saved settings
+  const modeParam = params.get('mode');
+  const settings: PracticeSettings = useMemo(() => (modeParam === 'guided' || modeParam === 'assessment' ? { ...data.settings, mode: modeParam } : data.settings), [data.settings, modeParam]);
 
-  const effectiveSettings: PracticeSettings = useMemo(() => (targetConcept && CONCEPTS[targetConcept] ? { ...settings, concepts: [targetConcept] } : settings), [settings, targetConcept]);
+  const effectiveSettings: PracticeSettings = useMemo(() => (targetConcept && CONCEPTS[targetConcept] ? conceptSettings(settings, targetConcept) : settings), [settings, targetConcept]);
+
+  // five hands on a concept (?concept=…&run=…, from the home page): a refresh or a visit to another
+  // page carries on with the same five rather than starting again
+  const runId = params.get('run');
+  const [conceptRun, setConceptRun] = useState<ConceptRun | null>(null);
+  const runRef = useRef<ConceptRun | null>(null);
+  useEffect(() => {
+    const r = runId && targetConcept && CONCEPTS[targetConcept] ? runFor(runId, targetConcept, loadRun()) : null;
+    if (r) saveRun(r);
+    runRef.current = r;
+    setConceptRun(r);
+  }, [runId, targetConcept]);
 
   const setSettings = (s: PracticeSettings) => update((d) => ({ ...d, settings: s }));
+  /** arrived from a lesson's practice button (?from=lesson): counted once a hand is dealt */
+  const fromLesson = useRef(false);
 
   const begin = useCallback(
     async (
@@ -158,10 +234,23 @@ export function PracticePage() {
           },
         }));
         const st = startSession(sc);
+        if (fromLesson.current) {
+          // once per arrival from a lesson: a refresh of this address does not count again
+          fromLesson.current = false;
+          track('Lesson Practice Started');
+          setParams(
+            (old) => {
+              const p = new URLSearchParams(old);
+              p.delete('from');
+              return p;
+            },
+            { replace: true },
+          );
+        }
         setSess(st);
         setShowSettings(false);
+        setHeadOpen(false);
         play(st.state, 0);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
         decisionStart.current = Date.now();
         if (st.state.complete) await finish(st);
         else setPhase('playing');
@@ -177,9 +266,12 @@ export function PracticePage() {
   // auto-start from home page / lesson links
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    const key = params.toString();
+    const p = new URLSearchParams(params);
+    if (p.get('from') === 'lesson') fromLesson.current = true;
+    p.delete('from');
+    const key = p.toString();
     if (autoStarted.current === key) return;
-    if (params.get('start') === '1' || params.get('template') || params.get('concept')) {
+    if (p.get('start') === '1' || p.get('template') || p.get('concept')) {
       autoStarted.current = key;
       autoSeedUsed.current = false;
       begin();
@@ -267,6 +359,17 @@ export function PracticePage() {
         bookmarked: false,
       };
       update((d) => ({ ...d, history: [...d.history, rec] }));
+      trackOnce(`hand:${rec.id}`, 'Practice Hand Completed', { mode: sc.settings.mode, difficulty: sc.difficulty });
+      // five hands on a concept: a hand dealt for it counts (once)
+      const r = runRef.current;
+      if (r && sc.settings.concepts.includes(r.concept)) {
+        const counted = recordHand(r, rec.id, ev.score);
+        if (counted !== r) {
+          saveRun(counted);
+          runRef.current = counted;
+          setConceptRun(counted);
+        }
+      }
       setRecordId(rec.id);
       setPhase('done');
     } catch (e) {
@@ -277,7 +380,7 @@ export function PracticePage() {
 
   const onAct = useCallback(
     (a: PlayerAction) => {
-      if (!sess || phase !== 'playing') return;
+      if (!sess || phase !== 'playing' || Date.now() < actGuard.current) return;
       const guided = sess.scenario.settings.mode === 'guided';
       const assisted: Assistance = {
         ...assist,
@@ -295,7 +398,8 @@ export function PracticePage() {
       setHelp(null);
       setAssist(NO_ASSIST);
       decisionStart.current = Date.now();
-      if (guided && sess.scenario.settings.assists.immediateFeedback) {
+      const over = spotOver(next);
+      if (guided && sess.scenario.settings.assists.immediateFeedback && !over) {
         const last = next.decisions[next.decisions.length - 1];
         run<ScenarioEvaluation>({
           kind: 'evaluate',
@@ -305,7 +409,7 @@ export function PracticePage() {
           .then((ev) => setFeedback(ev.decisions[0]))
           .catch(() => setFeedback(null));
       }
-      if (next.state.complete) finish(next);
+      if (over) finish(next);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sess, phase, assist],
@@ -334,20 +438,23 @@ export function PracticePage() {
     setHelpLoading(false);
   };
 
-  // fast mode: deal the next hand automatically after a clean hand
+  // the hand just finished was the last of five on a concept
+  const runJustDone = !!conceptRun && runDone(conceptRun) && conceptRun.hands[conceptRun.hands.length - 1]?.id === recordId;
+
+  // fast mode: deal the next hand automatically after a clean hand (but stop to show five hands done)
   useEffect(() => {
-    if (phase !== 'done' || pb || !fastShown || fastPaused) return;
+    if (phase !== 'done' || pb || !fastShown || fastPaused || runJustDone) return;
     const t = setTimeout(() => begin(), 2200);
     return () => clearTimeout(t);
-  }, [phase, pb, fastShown, fastPaused, begin]);
+  }, [phase, pb, fastShown, fastPaused, runJustDone, begin]);
 
   // once the hand has finished playing out, bring the review into view
   const reviewReady = phase === 'done' && !!evaluation && !pb;
   useEffect(() => {
     if (!reviewReady || !recordId || scrolledFor.current === recordId) return;
     scrolledFor.current = recordId;
-    requestAnimationFrame(() => document.querySelector(fastShown ? '.fast-result' : '.rsum')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }, [reviewReady, recordId, fastShown]);
+    requestAnimationFrame(() => document.querySelector(runJustDone ? '.run-done' : fastShown ? '.fast-result' : '.rsum')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [reviewReady, recordId, fastShown, runJustDone]);
 
   // page-level shortcuts
   useEffect(() => {
@@ -355,6 +462,10 @@ export function PracticePage() {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Escape' && headOpen) {
+        setHeadOpen(false);
+        return;
+      }
       if (e.key === '?') setShowKeys((s) => !s);
       if (pb && (e.key === ' ' || e.key.toLowerCase() === 's')) {
         e.preventDefault();
@@ -373,7 +484,19 @@ export function PracticePage() {
 
   const sc: Scenario | undefined = sess?.scenario;
   const template = sc ? getTemplate(sc.templateId) : undefined;
-  const heroTurn = sess && !sess.state.complete && sess.state.toAct === sc!.heroIndex;
+  const heroTurn = phase === 'playing' && !!sess && !sess.state.complete && sess.state.toAct === sc!.heroIndex;
+  const deciding = heroTurn && !pb;
+  // a decision has just come up: ignore taps for a moment (see actGuard)
+  useLayoutEffect(() => {
+    if (deciding) actGuard.current = Date.now() + 350;
+  }, [deciding]);
+  // a new hand starts at the top of the page, once it is on screen (phones jump there: the table is sized for it)
+  useLayoutEffect(() => {
+    if (sc) window.scrollTo({ top: 0, behavior: window.matchMedia(PHONE_QUERY).matches ? 'auto' : 'smooth' });
+  }, [sc]);
+  const atTable = !!sc && phase !== 'loading' && !reviewReady;
+  useTableFit(pageRef, atTable && sc ? sc.id : null, headOpen || showSettings);
+  useControlsInView(controlsRef, deciding);
   const guided = sc?.settings.mode === 'guided';
   const record = recordId ? data.history.find((h) => h.id === recordId) : undefined;
   const la = sess && heroTurn ? legalActions(sess.state) : null;
@@ -464,8 +587,8 @@ export function PracticePage() {
             <div className="lobby-modes" role="radiogroup" aria-label="Practice type">
               {(
                 [
-                  ['spots', 'Single spots', 'One key decision from a common situation — preflop, flop, turn or river. Quick reps, one lesson at a time.', 'About 30 seconds a hand'],
-                  ['full', 'Full hands', 'A whole hand from the deal to the end. You make every decision along the way, street by street.', 'About 2 minutes a hand'],
+                  ['spots', 'Single spots', 'One key decision from a common situation — preflop, flop, turn or river — then straight to the review.', 'One decision a hand'],
+                  ['full', 'Full hands', 'A whole hand from the deal to the end. You make every decision along the way, street by street.', 'Every decision, every street'],
                 ] as const
               ).map(([m, title, desc, meta]) => {
                 const on = isFull === (m === 'full');
@@ -514,13 +637,34 @@ export function PracticePage() {
   }
 
   // ---------- at the table ----------
+  const helpUsed = assist.hint || assist.potOdds || assist.equity;
   return (
-    <div className="page practice">
-      <header className="practice-head">
+    <div className={`page practice ${guided ? 'guided' : ''}`} ref={pageRef}>
+      <header className={`practice-head ${headOpen ? 'open' : ''}`}>
         <div className="ph-main">
-          <h1 className="ph-title">{sc ? sc.title : 'Practice'}</h1>
-          {sc && <p className="ph-sub">{sc.setupText}</p>}
-          <div className="ph-meta">
+          {/* phones: just the title, with the rest folded behind Details while you play */}
+          <div className="ph-titlebar">
+            <h1 className="ph-title">{sc ? sc.title : 'Practice'}</h1>
+            {conceptRun && (
+              <span className="run-chip" title={`Five hands on ${CONCEPTS[conceptRun.concept].name}`}>
+                {runDone(conceptRun) ? `${conceptRun.total} of ${conceptRun.total} done` : `Hand ${Math.min(conceptRun.total, conceptRun.hands.length + (phase === 'done' ? 0 : 1))} of ${conceptRun.total}`}
+              </span>
+            )}
+            {deciding && sess && (
+              <button className="btn small ghost ph-replay" onClick={() => play(sess.state, 0)}>
+                Replay
+              </button>
+            )}
+            <button className="btn small ph-toggle" aria-expanded={headOpen} aria-controls="ph-sub ph-meta ph-side" onClick={() => setHeadOpen((o) => !o)}>
+              Details <span aria-hidden="true">{headOpen ? '▴' : '▾'}</span>
+            </button>
+          </div>
+          {sc && (
+            <p className="ph-sub" id="ph-sub">
+              {sc.setupText}
+            </p>
+          )}
+          <div className="ph-meta" id="ph-meta">
             <div className="ph-chips">
               {settingsSummary(settings)
                 .split(' · ')
@@ -549,7 +693,7 @@ export function PracticePage() {
             </button>
           </div>
         </div>
-        <div className="ph-side">
+        <div className="ph-side" id="ph-side">
           <div className="seg mode-switch" role="radiogroup" aria-label="Practice type">
             {(
               [
@@ -626,100 +770,130 @@ export function PracticePage() {
           Dealing a fresh hand…
         </div>
       )}
-      {sc && shownState && phase !== 'loading' && !reviewReady && (
+      {atTable && sc && shownState && (
         <div className="practice-body">
           <Table state={shownState} hero={sc.heroIndex} profiles={sc.shownProfiles} fourColor={data.prefs.fourColor} spotlight={spotlight} />
-          {pb && (
-            <div className="playback" aria-live="polite" data-testid="playback">
-              <span className="pb-caption">
-                {pbStep?.record && <strong className="street-tag">{cap(pbStep.record.street)}</strong>} {stepCaption(pb.steps, pb.i, sc.heroIndex)}
-              </span>
-              <span className="pb-controls">
-                <span className="seg pb-speed" role="radiogroup" aria-label="Speed">
-                  {(['slow', 'normal', 'fast'] as const).map((v) => (
-                    <button key={v} role="radio" aria-checked={speed === v} className={speed === v ? 'on' : ''} onClick={() => update((d) => ({ ...d, prefs: { ...d.prefs, playSpeed: v } }))}>
-                      {cap(v)}
-                    </button>
-                  ))}
+          {/* phones: pinned to the bottom of the screen, below the table */}
+          <div className="practice-controls" ref={controlsRef}>
+            {pb && (
+              <div className="playback" aria-live="polite" data-testid="playback">
+                <span className="pb-caption">
+                  {pbStep?.record && <strong className="street-tag">{cap(pbStep.record.street)}</strong>} {stepCaption(pb.steps, pb.i, sc.heroIndex)}
                 </span>
-                <button className="btn small ghost pb-skip" onClick={() => setPb(null)} data-testid="skip-playback">
-                  Skip <span aria-hidden="true">›</span>
-                </button>
-              </span>
-            </div>
-          )}
-          {heroTurn && !pb && (
-            <section className="decision-panel" aria-label="Your decision">
-              <DecisionFacts state={sess.state} hero={sc.heroIndex} />
-              <ActionBar state={sess.state} onAct={onAct} disabled={phase !== 'playing'} />
-              {feedback && (
-                <p className="dp-feedback" role="status">
-                  Last decision: {feedback.actionLabel} <GradeBadge grade={feedback.grade} />
-                </p>
-              )}
-              {guided && (
-                <div className="dp-help">
-                  <div className="assist-buttons">
-                    <span className="dp-help-label">Help</span>
-                    {sc.settings.assists.hints && (
-                      <button className="btn small" onClick={() => requestHelp('hint')}>
-                        Hint
+                <span className="pb-controls">
+                  <span className="seg pb-speed" role="radiogroup" aria-label="Speed">
+                    {(['slow', 'normal', 'fast'] as const).map((v) => (
+                      <button key={v} role="radio" aria-checked={speed === v} className={speed === v ? 'on' : ''} onClick={() => update((d) => ({ ...d, prefs: { ...d.prefs, playSpeed: v } }))}>
+                        {cap(v)}
                       </button>
-                    )}
-                    {sc.settings.assists.potOdds && la && la.toCall > 0 && (
-                      <button className="btn small" onClick={() => requestHelp('potOdds')}>
-                        Pot odds
-                      </button>
-                    )}
-                    {sc.settings.assists.equity && sc.difficulty !== 'expert' && (
-                      <button className="btn small" onClick={() => requestHelp('equity')} disabled={helpLoading}>
-                        {helpLoading ? 'Calculating…' : 'Equity'}
-                      </button>
-                    )}
-                    <span className="note">Using help marks the decision as assisted.</span>
-                  </div>
-                  {assist.hint && (
-                    <p className="hint">
-                      {sess.decisions.length === 0 ? template?.hint : 'Which hands in their range call or fold each option? Compare the price with your equity, and think about later streets.'}
-                    </p>
-                  )}
-                  {assist.potOdds && la && la.toCall > 0 && (
-                    <p className="hint">
-                      <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(winnablePot(sess.state, sc.heroIndex, la.toCall), sc.state.config.bb)} → you need{' '}
-                      {((100 * la.toCall) / (winnablePot(sess.state, sc.heroIndex, la.toCall) + la.toCall)).toFixed(1)}% equity to break even.
-                    </p>
-                  )}
-                  {assist.equity && help?.equity && (
-                    <p className="hint">
-                      <Term id="equity">Equity</Term> vs the modeled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
-                      {help.equity.samples && help.equity.se > 0 ? `, ±${(196 * help.equity.se).toFixed(1)}%` : ''}
-                      ). {help.rangeSummary}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="dp-links">
-                <button className="linklike" onClick={() => play(sess.state, 0)} data-testid="watch-again">
-                  Watch the action again
-                </button>
-                <button className="linklike shortcuts-link" onClick={() => setShowKeys((k) => !k)} aria-expanded={showKeys}>
-                  Keyboard shortcuts
-                </button>
+                    ))}
+                  </span>
+                  <button className="btn small ghost pb-skip" onClick={() => setPb(null)} data-testid="skip-playback">
+                    {/* before your first decision, skipping goes straight to it; the action stays on the table and Replay shows it again */}
+                    {sess.decisions.length === 0 && !sess.state.complete && sess.state.toAct === sc.heroIndex ? 'Skip to your decision' : 'Skip'} <span aria-hidden="true">›</span>
+                  </button>
+                </span>
               </div>
-              {showKeys && (
-                <p className="keys">
-                  <kbd>F</kbd> fold · <kbd>C</kbd> check/call · <kbd>B</kbd>/<kbd>R</kbd> bet or raise · <kbd>1</kbd>–<kbd>7</kbd> sizes · <kbd>A</kbd> all-in · <kbd>Enter</kbd> confirm · <kbd>H</kbd>{' '}
-                  hint · <kbd>S</kbd> skip the replay · <kbd>N</kbd> next hand
-                </p>
-              )}
-            </section>
-          )}
-          {phase === 'evaluating' && !pb && (
-            <div className="loading" role="status">
-              Hand complete — reviewing your decisions…
-            </div>
-          )}
+            )}
+            {deciding && (
+              <section className="decision-panel" aria-label="Your decision">
+                <DecisionFacts state={sess.state} hero={sc.heroIndex} />
+                <ActionBar state={sess.state} onAct={onAct} disabled={phase !== 'playing'} />
+                {feedback && (
+                  <p className="dp-feedback" role="status">
+                    Last decision: {feedback.actionLabel} <GradeBadge grade={feedback.grade} />
+                  </p>
+                )}
+                {guided && (
+                  <div className={`dp-help ${helpUsed ? 'used' : ''}`}>
+                    <div className="assist-buttons">
+                      <span className="dp-help-label">Help</span>
+                      {sc.settings.assists.hints && (
+                        <button className="btn small" onClick={() => requestHelp('hint')}>
+                          Hint
+                        </button>
+                      )}
+                      {sc.settings.assists.potOdds && la && la.toCall > 0 && (
+                        <button className="btn small" onClick={() => requestHelp('potOdds')}>
+                          Pot odds
+                        </button>
+                      )}
+                      {sc.settings.assists.equity && sc.difficulty !== 'expert' && (
+                        <button className="btn small" onClick={() => requestHelp('equity')} disabled={helpLoading}>
+                          {helpLoading ? 'Calculating…' : 'Equity'}
+                        </button>
+                      )}
+                      <span className="note">{helpUsed ? 'Help used: this decision counts as assisted.' : 'Using help marks the decision as assisted.'}</span>
+                    </div>
+                    {assist.hint && (
+                      <p className="hint">
+                        {sess.decisions.length === 0 ? template?.hint : 'Which hands in their range call or fold each option? Compare the price with your equity, and think about later streets.'}
+                      </p>
+                    )}
+                    {assist.potOdds && la && la.toCall > 0 && (
+                      <p className="hint">
+                        <Term id="potodds">Pot odds</Term>: call {fmtBB(la.toCall, sc.state.config.bb)} into {fmtBB(winnablePot(sess.state, sc.heroIndex, la.toCall), sc.state.config.bb)} → you need{' '}
+                        {((100 * la.toCall) / (winnablePot(sess.state, sc.heroIndex, la.toCall) + la.toCall)).toFixed(1)}% equity to break even.
+                      </p>
+                    )}
+                    {assist.equity && help?.equity && (
+                      <p className="hint">
+                        <Term id="equity">Equity</Term> vs the modeled range: <strong>{(help.equity.value * 100).toFixed(1)}%</strong> ({help.equity.method}
+                        {help.equity.samples && help.equity.se > 0 ? `, ±${(196 * help.equity.se).toFixed(1)}%` : ''}
+                        ). {help.rangeSummary}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="dp-links">
+                  <button className="linklike" onClick={() => play(sess.state, 0)} data-testid="watch-again">
+                    Watch the action again
+                  </button>
+                  <button className="linklike shortcuts-link" onClick={() => setShowKeys((k) => !k)} aria-expanded={showKeys}>
+                    Keyboard shortcuts
+                  </button>
+                </div>
+                {showKeys && (
+                  <p className="keys">
+                    <kbd>F</kbd> fold · <kbd>C</kbd> check/call · <kbd>B</kbd>/<kbd>R</kbd> bet or raise · <kbd>1</kbd>–<kbd>7</kbd> sizes · <kbd>A</kbd> all-in · <kbd>Enter</kbd> confirm · <kbd>H</kbd>{' '}
+                    hint · <kbd>S</kbd> skip the replay · <kbd>N</kbd> next hand
+                  </p>
+                )}
+              </section>
+            )}
+            {phase === 'evaluating' && !pb && (
+              <div className="loading" role="status">
+                {sess.state.complete ? 'Hand complete — reviewing your decisions…' : 'Spot complete — reviewing your decision…'}
+              </div>
+            )}
+          </div>
         </div>
+      )}
+      {reviewReady && conceptRun && runJustDone && (
+        <section className="run-done" aria-live="polite" data-testid="run-done">
+          <h2>
+            {conceptRun.total} hands on {CONCEPTS[conceptRun.concept].name}: done
+          </h2>
+          <p>
+            {runAverage(conceptRun) !== null ? (
+              <>
+                Your average on these {conceptRun.total}: <strong>{runAverage(conceptRun)}</strong>.{' '}
+              </>
+            ) : null}
+            This hand’s review is below. Every hand is saved on the <Link to="/review">Review</Link> page.
+          </p>
+          <div className="review-actions">
+            <button className="btn primary" onClick={() => setParams({ concept: conceptRun.concept, run: newRunId() })}>
+              {conceptRun.total} more on this
+            </button>
+            <Link className="btn" to="/">
+              Back to home
+            </Link>
+            <button className="btn ghost" onClick={() => setParams({})}>
+              Practise anything
+            </button>
+          </div>
+        </section>
       )}
       {reviewReady && evaluation && sc && fastShown && (
         <section className="fast-result" aria-live="polite">
@@ -727,10 +901,10 @@ export function PracticePage() {
             <span className="fr-score">{evaluation.score ?? '—'}</span>
             <div>
               <strong>Good hand.</strong> {evaluation.decisions.map((d) => `${cap(d.street)}: ${d.actionLabel.replace(/ \(\d+% pot\)/, '')}`).join(' · ')}
-              <p className="note">{fastPaused ? 'Paused.' : 'Next hand in a moment…'}</p>
+              <p className="note">{fastPaused || runJustDone ? 'Paused.' : 'Next hand in a moment…'}</p>
             </div>
           </div>
-          {!fastPaused && (
+          {!fastPaused && !runJustDone && (
             <div className="fr-bar" aria-hidden="true">
               <span />
             </div>
