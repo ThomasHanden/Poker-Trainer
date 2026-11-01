@@ -6646,6 +6646,7 @@ label > span:first-child:not(.select-value) {
 .emoji-picker {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   height: min(260px, 42svh);
   border-top: 1px solid var(--border);
   background: var(--surface);
@@ -6659,12 +6660,16 @@ label > span:first-child:not(.select-value) {
 .emoji-tabs {
   display: flex;
   justify-content: space-between;
-  padding: 0 6px;
+  padding: 0 4px;
   border-bottom: 1px solid var(--border);
 }
+/* ten tabs share the chat's width, however narrow it is */
 .emoji-tabs button {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 32px;
+  padding: 0;
+  overflow: hidden;
   border: none;
   border-bottom: 2px solid transparent;
   background: none;
