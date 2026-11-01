@@ -3,10 +3,13 @@
 // On by default; the choice is one of the player's preferences (Settings).
 
 let enabled = true;
+let level = 1;
+export const DEFAULT_VOLUME = 0.7;
 
-/** Sounds on or off: follows the player's preference (set by the app whenever it changes). */
-export function setSoundEnabled(on: boolean) {
+/** Sounds on or off, and how loud: follows the player's preferences (set by the app whenever they change). */
+export function setSoundEnabled(on: boolean, volume = DEFAULT_VOLUME) {
   enabled = on;
+  level = Math.max(0, Math.min(1, volume)) / DEFAULT_VOLUME;
 }
 
 /** The on/off choice saved by pages from before sounds were a preference (read once, to carry it over). */
@@ -42,7 +45,7 @@ function tone(freq: number, ms: number, opts: { type?: OscillatorType; gain?: nu
   osc.frequency.setValueAtTime(freq, t0);
   if (opts.slide) osc.frequency.exponentialRampToValueAtTime(opts.slide, t0 + ms / 1000);
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(opts.gain ?? 0.15, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, (opts.gain ?? 0.15) * level), t0 + 0.01);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
   osc.connect(g).connect(a.destination);
   osc.start(t0);

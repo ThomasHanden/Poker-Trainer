@@ -80,7 +80,7 @@ function AccountBanners() {
  */
 function PrefsEffects() {
   const { data, update } = useStore();
-  useEffect(() => setSoundEnabled(data.prefs.sound !== false), [data.prefs.sound]);
+  useEffect(() => setSoundEnabled(data.prefs.sound !== false, data.prefs.volume), [data.prefs.sound, data.prefs.volume]);
   useEffect(() => {
     document.documentElement.dataset.shortcuts = data.prefs.showShortcuts === false ? 'off' : 'on';
   }, [data.prefs.showShortcuts]);

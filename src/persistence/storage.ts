@@ -84,6 +84,8 @@ export interface AppData {
     playSpeed?: PlaySpeed;
     /** table sounds (absent: on) */
     sound?: boolean;
+    /** sound volume, 0 to 1 (absent: DEFAULT_VOLUME) */
+    volume?: number;
     /** live tables: amounts in big blinds instead of chips */
     amountsBB?: boolean;
     felt?: Felt;

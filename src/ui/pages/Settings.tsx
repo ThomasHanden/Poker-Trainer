@@ -1,13 +1,14 @@
 // Settings: every preference in one place, for signed-in players (reached from the account menu).
 // They are saved with the rest of your progress, with your account, so they follow you to every device.
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../../auth/AuthContext';
 import { CardRow } from '../components/Card';
-import { FeltPicker, useTablePrefs } from '../components/LiveExtras';
+import { FELTS, useTablePrefs } from '../components/LiveExtras';
 import { parseCards } from '../../engine/cards';
-import { sounds } from '../sounds';
-import type { PlaySpeed } from '../../persistence/storage';
+import { DEFAULT_VOLUME, sounds } from '../sounds';
+import type { AppData, PlaySpeed } from '../../persistence/storage';
 
 const SAMPLE = parseCards('As Kh Qd Jc');
 const SPEEDS: [PlaySpeed, string][] = [
@@ -15,17 +16,16 @@ const SPEEDS: [PlaySpeed, string][] = [
   ['normal', 'Normal'],
   ['fast', 'Fast'],
 ];
+/** What "Reset to defaults" puts back. */
+const DEFAULTS: Partial<AppData['prefs']> = { fourColor: false, showShortcuts: true, fastMode: false, playSpeed: 'normal', sound: true, volume: DEFAULT_VOLUME, amountsBB: false, felt: 'green' };
 
 export function SettingsPage() {
   const { status } = useAuth();
   if (status !== 'signed-in') {
     return (
       <div className="page settings-page">
-        <header className="page-head">
-          <p className="eyebrow">Preferences</p>
-          <h1>Settings</h1>
-        </header>
-        <div className="set-group set-signin">
+        <h1 className="set-title">Settings</h1>
+        <div className="set-card set-signin">
           {status === 'loading' ? (
             <p className="note">Checking your sign-in…</p>
           ) : status === 'off' ? (
@@ -51,135 +51,146 @@ function Settings() {
   const { data, update } = useStore();
   const [table, setTable] = useTablePrefs();
   const prefs = data.prefs;
-  const set = (p: Partial<typeof prefs>) => update((d) => ({ ...d, prefs: { ...d.prefs, ...p } }));
   const speed = prefs.playSpeed ?? 'normal';
+  const volume = prefs.volume ?? DEFAULT_VOLUME;
+
+  // a short "Saved" after each change
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const flash = () => {
+    setSaved(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaved(false), 1600);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const set = (p: Partial<AppData['prefs']>) => {
+    update((d) => ({ ...d, prefs: { ...d.prefs, ...p } }));
+    flash();
+  };
+  const setT = (p: Parameters<typeof setTable>[0]) => {
+    setTable(p);
+    flash();
+  };
+  const isDefault = Object.entries(DEFAULTS).every(([k, v]) => (prefs[k as keyof typeof prefs] ?? DEFAULTS[k as keyof typeof DEFAULTS]) === v);
 
   return (
     <div className="page settings-page">
-      <header className="page-head">
-        <p className="eyebrow">Preferences</p>
-        <h1>Settings</h1>
-        <p className="lead">Saved to your account, so they follow you to every device you sign in on. Changes apply straight away.</p>
-      </header>
+      <div className="set-top">
+        <h1 className="set-title">Settings</h1>
+        <span className={`set-saved ${saved ? 'on' : ''}`} role="status" aria-live="polite">
+          {saved ? '✓ Saved' : 'Saved to your account'}
+        </span>
+      </div>
 
-      <section className="set-group" aria-labelledby="set-cards">
-        <h2 id="set-cards">Cards and table</h2>
-        <div className="set-row">
-          <div className="set-text">
-            <label htmlFor="set-four">Four-colour deck</label>
-            <p className="note">Each suit gets its own colour, so hearts and diamonds (and spades and clubs) are easier to tell apart at a glance.</p>
-          </div>
-          <div className="set-control">
-            <input id="set-four" type="checkbox" checked={prefs.fourColor} onChange={(e) => set({ fourColor: e.target.checked })} />
-          </div>
-          <div className="set-preview" aria-hidden="true">
-            <CardRow cards={SAMPLE} size="sm" fourColor={prefs.fourColor} />
-          </div>
+      <section className="set-card" aria-labelledby="set-look">
+        <h2 id="set-look">Look</h2>
+        {/* what the table looks like with these choices */}
+        <div className={`set-preview felt-${table.felt}`} aria-hidden="true">
+          <CardRow cards={SAMPLE} size="sm" fourColor={prefs.fourColor} />
+          <span className="set-preview-stack">Stack {table.bb ? '62.5bb' : '125'}</span>
         </div>
-        <div className="set-row">
-          <div className="set-text">
-            <span id="set-felt-label">Felt colour</span>
-            <p className="note">The colour of the live tables.</p>
+        <Row label="Four-colour deck" hint="A colour for each suit." id="four">
+          <Switch id="four" on={prefs.fourColor} onChange={(fourColor) => set({ fourColor })} />
+        </Row>
+        <Row label="Felt" id="felt">
+          <div className="set-felts" role="radiogroup" aria-labelledby="set-felt">
+            {FELTS.map(([f, label]) => (
+              <button key={f} type="button" role="radio" aria-checked={table.felt === f} className={`swatch felt-${f}`} title={label} onClick={() => setT({ felt: f })}>
+                <span className="sr-only">{label}</span>
+              </button>
+            ))}
           </div>
-          <div className="set-control">
-            <FeltPicker value={table.felt} onChange={(felt) => setTable({ felt })} />
-          </div>
-        </div>
-        <div className="set-row">
-          <div className="set-text">
-            <label htmlFor="set-bb">Show amounts in big blinds at live tables</label>
-            <p className="note">Stacks, bets and pots as big blinds instead of chips. Practice always uses big blinds.</p>
-          </div>
-          <div className="set-control">
-            <input id="set-bb" type="checkbox" checked={table.bb} onChange={(e) => setTable({ bb: e.target.checked })} />
-          </div>
-        </div>
+        </Row>
+        <Row label="Live amounts in big blinds" hint="Instead of chips." id="bb">
+          <Switch id="bb" on={table.bb} onChange={(bb) => setT({ bb })} />
+        </Row>
       </section>
 
-      <section className="set-group" aria-labelledby="set-sound">
-        <h2 id="set-sound">Sound</h2>
-        <div className="set-row">
-          <div className="set-text">
-            <label htmlFor="set-sound-on">Table sounds</label>
-            <p className="note">A chime when it is your turn, chips for bets, and a few notes when you win a pot.</p>
-          </div>
-          <div className="set-control">
-            <input id="set-sound-on" type="checkbox" checked={table.sound} onChange={(e) => setTable({ sound: e.target.checked })} />
-            <button
-              className="btn small"
-              disabled={!table.sound}
-              onClick={() => sounds.turn()}
-            >
-              Play a test sound
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="set-group" aria-labelledby="set-practice">
-        <h2 id="set-practice">Practice</h2>
-        <div className="set-row">
-          <div className="set-text">
-            <span id="set-speed-label">Playback speed</span>
-            <p className="note">How quickly the other players’ actions play out before your decision.</p>
-          </div>
-          <div className="set-control">
-            <div className="seg" role="radiogroup" aria-labelledby="set-speed-label">
-              {SPEEDS.map(([v, label]) => (
-                <button key={v} role="radio" aria-checked={speed === v} className={speed === v ? 'on' : ''} onClick={() => set({ playSpeed: v })}>
-                  {label}
-                </button>
-              ))}
+      <section className="set-card" aria-labelledby="set-play">
+        <h2 id="set-play">Play</h2>
+        <Row label="Sounds" hint="Your turn, bets and wins." id="sound">
+          <Switch id="sound" on={table.sound} onChange={(sound) => setT({ sound })} />
+        </Row>
+        {table.sound && (
+          <Row label="Volume" id="volume" sub>
+            <div className="set-volume">
+              <input
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.1}
+                value={volume}
+                aria-labelledby="set-volume"
+                onChange={(e) => set({ volume: Number(e.target.value) })}
+                onPointerUp={() => sounds.turn()}
+                onKeyUp={() => sounds.turn()}
+              />
+              <button className="btn small ghost" onClick={() => sounds.turn()} aria-label="Play a test sound" title="Play a test sound">
+                ▶
+              </button>
             </div>
+          </Row>
+        )}
+        <Row label="Practice speed" hint="How fast other players act." id="speed">
+          <div className="seg set-seg" role="radiogroup" aria-labelledby="set-speed">
+            {SPEEDS.map(([v, label]) => (
+              <button key={v} role="radio" aria-checked={speed === v} className={speed === v ? 'on' : ''} onClick={() => set({ playSpeed: v })}>
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
-        <div className="set-row">
-          <div className="set-text">
-            <label htmlFor="set-fast">Fast mode</label>
-            <p className="note">After a hand where every decision was good, show a short result and deal the next hand straight away. Mistakes always stop for a full review.</p>
-          </div>
-          <div className="set-control">
-            <input id="set-fast" type="checkbox" checked={!!prefs.fastMode} onChange={(e) => set({ fastMode: e.target.checked })} />
-          </div>
-        </div>
-        <p className="note set-more">
-          What practice deals you (difficulty, positions, stack depths, opponents, help) is chosen on the <Link to="/practice">Practice</Link> page.
-        </p>
+        </Row>
+        <Row label="Fast mode" hint="Skip the full review when every decision was good." id="fast">
+          <Switch id="fast" on={!!prefs.fastMode} onChange={(fastMode) => set({ fastMode })} />
+        </Row>
+        <Row
+          label="Shortcut hints"
+          hint={
+            <>
+              Letters on action buttons, like <kbd>F</kbd> fold.
+            </>
+          }
+          id="kbd"
+        >
+          <Switch id="kbd" on={prefs.showShortcuts !== false} onChange={(showShortcuts) => set({ showShortcuts })} />
+        </Row>
       </section>
 
-      <section className="set-group" aria-labelledby="set-keys">
-        <h2 id="set-keys">Keyboard</h2>
-        <div className="set-row">
-          <div className="set-text">
-            <label htmlFor="set-kbd">Show keyboard shortcut hints</label>
-            <p className="note">
-              The small letters on the action buttons: <kbd>F</kbd> fold, <kbd>C</kbd> check or call, <kbd>B</kbd> or <kbd>R</kbd> bet or raise. The shortcuts work either
-              way.
-            </p>
-          </div>
-          <div className="set-control">
-            <input id="set-kbd" type="checkbox" checked={prefs.showShortcuts !== false} onChange={(e) => set({ showShortcuts: e.target.checked })} />
-          </div>
-        </div>
-      </section>
-
-      <section className="set-group" aria-labelledby="set-data">
-        <h2 id="set-data">Your data</h2>
-        <ul className="set-links">
-          <li>
-            <Link to="/progress">Progress</Link>: export your history, import a backup, or reset practice progress.
-          </li>
-          <li>
-            <Link to="/play/history">Your live hands</Link>: download session logs, or delete your live hand history.
-          </li>
-          <li>
-            <Link to="/account">Account</Link>: your name, signing out, and deleting your account.
-          </li>
-          <li>
-            <Link to="/privacy">Privacy</Link>: what is stored, where, and how to delete it.
-          </li>
-        </ul>
-      </section>
+      <div className="set-foot">
+        <button className="btn small ghost" disabled={isDefault} onClick={() => set(DEFAULTS)}>
+          Reset to defaults
+        </button>
+        <nav className="set-links" aria-label="Your data">
+          <Link to="/progress">Export or reset progress</Link>
+          <Link to="/play/history">Live hand history</Link>
+          <Link to="/account">Account</Link>
+          <Link to="/privacy">Privacy</Link>
+        </nav>
+      </div>
     </div>
+  );
+}
+
+/** One setting: its name (and a few words), then its control. */
+function Row({ label, hint, id, sub = false, children }: { label: string; hint?: ReactNode; id: string; sub?: boolean; children: ReactNode }) {
+  return (
+    <div className={`set-row ${sub ? 'sub' : ''}`}>
+      <div className="set-text">
+        <span id={`set-${id}`} className="set-label">
+          {label}
+        </span>
+        {hint && <span className="set-hint">{hint}</span>}
+      </div>
+      <div className="set-control">{children}</div>
+    </div>
+  );
+}
+
+/** An on/off switch. */
+function Switch({ id, on, onChange }: { id: string; on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-labelledby={`set-${id}`} className={`switch ${on ? 'on' : ''}`} onClick={() => onChange(!on)}>
+      <span className="switch-knob" aria-hidden="true" />
+    </button>
   );
 }
