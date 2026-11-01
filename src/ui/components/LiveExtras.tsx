@@ -6,6 +6,7 @@ import {
   BOMB_BB,
   BOMB_EVERY,
   BOUNTY_BB,
+  DOUBLE_BOARD,
   REACTIONS,
   TIME_BANK_MAX,
   TIME_BANK_PER_HAND,
@@ -26,7 +27,7 @@ type Money = (units: number) => string;
 /** The settings menus, for a new private table and for its host later. */
 export function SettingsFields({ value, onChange, idPrefix }: { value: TableSettings; onChange: (s: TableSettings) => void; idPrefix: string }) {
   const set = <K extends keyof TableSettings>(k: K, v: TableSettings[K]) => onChange({ ...value, [k]: v });
-  const select = (k: 'turnSecs' | 'bounty72' | 'bombEvery' | 'bombBB', label: string, options: number[], text: (n: number) => string) => (
+  const select = (k: 'turnSecs' | 'bounty72' | 'bombEvery' | 'bombBB' | 'doubleBoard', label: string, options: number[], text: (n: number) => string) => (
     <label className="ts-field" htmlFor={`${idPrefix}-${k}`}>
       <span>{label}</span>
       <select id={`${idPrefix}-${k}`} value={value[k]} onChange={(e) => set(k, Number(e.target.value))}>
@@ -44,6 +45,19 @@ export function SettingsFields({ value, onChange, idPrefix }: { value: TableSett
       {select('bounty72', '7-2 bounty', BOUNTY_BB, (n) => (n ? `${n} big blind${n === 1 ? '' : 's'} from each player` : 'Off'))}
       {select('bombEvery', 'Bomb pots', BOMB_EVERY, (n) => (n ? `Every ${n} hands` : 'Only when the host calls one'))}
       {select('bombBB', 'Bomb pot size', BOMB_BB, (n) => `${n} big blind${n === 1 ? '' : 's'} each`)}
+      {select('doubleBoard', 'Double board', DOUBLE_BOARD, (n) => ['Off', 'In bomb pots', 'Every hand'][n])}
+      <label className="ts-check">
+        <input type="checkbox" checked={value.straddle} onChange={(e) => set('straddle', e.target.checked)} />
+        <span>
+          <strong>Straddles</strong> — players can choose to put in two big blinds when under the gun, and act last before the flop
+        </span>
+      </label>
+      <label className="ts-check">
+        <input type="checkbox" checked={value.runItTwice} onChange={(e) => set('runItTwice', e.target.checked)} />
+        <span>
+          <strong>Run it twice</strong> — when everyone is all-in, they can agree to deal the rest of the board twice, each run winning half
+        </span>
+      </label>
       <label className="ts-check">
         <input type="checkbox" checked={value.approval} onChange={(e) => set('approval', e.target.checked)} />
         <span>
@@ -67,6 +81,9 @@ export function describeSettings(s: TableSettings, bbChips: number): string {
     s.rabbitHunt ? 'After a hand that ends early, anyone at the table can rabbit hunt.' : '',
     s.bounty72 ? `7-2 bounty: win a hand with 7-2 and show it to collect ${fmtChips(s.bounty72 * bbChips)} from everyone else dealt in.` : '',
     s.bombEvery ? `Every ${s.bombEvery}th hand is a bomb pot: everyone puts in ${fmtChips(s.bombBB * bbChips)} and the hand starts on the flop.` : '',
+    s.straddle ? `Players can straddle ${fmtChips(2 * bbChips)} when under the gun.` : '',
+    s.runItTwice ? 'When everyone is all-in, the players can agree to run it twice.' : '',
+    s.doubleBoard === 2 ? 'Every hand is dealt two boards, each winning half the pot.' : s.doubleBoard === 1 ? 'Bomb pots are dealt two boards, each winning half the pot.' : '',
     s.approval ? 'The host lets new players in.' : '',
   ];
   return parts.filter(Boolean).join(' ');

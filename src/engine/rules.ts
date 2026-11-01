@@ -47,7 +47,7 @@ export interface PlayerState {
 }
 
 export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise';
-export type RecordType = ActionType | 'post-sb' | 'post-bb' | 'post-ante';
+export type RecordType = ActionType | 'post-sb' | 'post-bb' | 'post-ante' | 'post-straddle';
 
 export interface ActionRecord {
   street: Street;
@@ -73,6 +73,8 @@ export interface PotResult {
   /** winning score (undefined when won uncontested) */
   score?: number;
   shares: Record<number, number>;
+  /** a hand with two boards (double board, or run twice): which board this half of the pot was played on (0 or 1) */
+  board?: number;
 }
 
 export interface HandResult {
@@ -111,6 +113,21 @@ export interface HandState {
    * began on the flop. Absent for every ordinary hand.
    */
   bomb?: number;
+  /** live tables: the player under the gun (players[0]) straddled for this amount */
+  straddle?: number;
+  /**
+   * A second board: dealt alongside the first all hand (double board), or only for the cards still
+   * to come once everyone was all-in (run it twice). Each pot is split between the two boards.
+   */
+  board2?: Card[];
+  /** every street deals a second board */
+  doubleBoard?: boolean;
+  /** the board was (or will be) run out twice */
+  runs?: 2;
+  /** stop before running out the board when everyone is all-in, so the players can choose to run it twice (see runOut) */
+  holdRunout?: boolean;
+  /** waiting for runOut(): betting is over, the rest of the board has not been dealt */
+  runoutPending?: boolean;
 }
 
 export interface LegalActions {
@@ -192,6 +209,12 @@ export interface NewHandOptions {
   names?: string[];
   /** a bomb pot: each player puts in this many chips (dead money, like an ante), and play starts on the flop */
   bomb?: number;
+  /** the player under the gun (players[0]) straddles: a live blind of two big blinds, and they act last preflop. Three or more players. */
+  straddle?: boolean;
+  /** deal two boards every street (deck order: flop 1, flop 2, turn 1, turn 2, river 1, river 2) */
+  doubleBoard?: boolean;
+  /** when everyone is all-in, wait for runOut() instead of dealing the rest of the board */
+  holdRunout?: boolean;
 }
 
 export function newHand(o: NewHandOptions): HandState {
@@ -235,8 +258,13 @@ export function newHand(o: NewHandOptions): HandState {
     lastAggressor: -1,
     preflopAggressor: -1,
   };
+  if (o.doubleBoard) {
+    s.doubleBoard = true;
+    s.board2 = [];
+  }
+  if (o.holdRunout && !o.doubleBoard) s.holdRunout = true;
   if (o.bomb && o.bomb > 0) postBomb(s, o.bomb);
-  else postBlinds(s);
+  else postBlinds(s, !!o.straddle);
   return s;
 }
 
@@ -268,7 +296,7 @@ function commit(s: HandState, p: PlayerState, amount: number, street = true): nu
   return a;
 }
 
-function postBlinds(s: HandState) {
+function postBlinds(s: HandState, straddle = false) {
   const { config } = s;
   const n = config.numPlayers;
   const rec = (player: number, type: RecordType, amount: number, potBefore: number) =>
@@ -305,7 +333,20 @@ function postBlinds(s: HandState) {
   s.currentBet = Math.max(sb.streetCommitted, bb.streetCommitted);
   s.minRaiseIncrement = config.bb;
   s.lastFullBetLevel = config.bb;
-  s.toAct = nextToAct(s, n === 2 ? -1 : bbIndex(n));
+  // a straddle: under the gun puts in two big blinds, live. It counts like a bigger big blind:
+  // the next raise must be to at least twice the straddle, and the straddler acts last preflop.
+  const utg = s.players[0];
+  if (straddle && n >= 3 && utg.stack > 2 * config.bb) {
+    pb = potSize(s);
+    rec(utg.index, 'post-straddle', commit(s, utg, 2 * config.bb), pb);
+    s.straddle = 2 * config.bb;
+    s.currentBet = 2 * config.bb;
+    s.minRaiseIncrement = 2 * config.bb;
+    s.lastFullBetLevel = 2 * config.bb;
+    s.toAct = nextToAct(s, utg.index);
+  } else {
+    s.toAct = nextToAct(s, n === 2 ? -1 : bbIndex(n));
+  }
   if (s.toAct === -1) finishRoundIfNeeded(s);
 }
 
@@ -526,6 +567,11 @@ function finishRoundIfNeeded(s: HandState) {
     settle(s, 'showdown');
     return;
   }
+  if (actors.length <= 1 && s.holdRunout) {
+    // everyone is all-in: the players choose whether to run the rest of the board once or twice
+    s.runoutPending = true;
+    return;
+  }
   advanceStreet(s);
   if (actors.length <= 1) {
     // run out the board: no more betting possible
@@ -543,8 +589,9 @@ function advanceStreet(s: HandState) {
   const next = NEXT[s.street];
   if (!next) return;
   const count = next === 'flop' ? 3 : 1;
-  if (s.deck.length < count) throw new Error('Deck exhausted');
+  if (s.deck.length < count * (s.doubleBoard ? 2 : 1)) throw new Error('Deck exhausted');
   s.board.push(...s.deck.splice(0, count));
+  if (s.doubleBoard) s.board2!.push(...s.deck.splice(0, count));
   s.street = next;
   s.currentBet = 0;
   s.minRaiseIncrement = s.config.bb;
@@ -603,25 +650,22 @@ function settle(s: HandState, reason: 'fold' | 'showdown') {
   const potsOut: PotResult[] = [];
   const pots = computePots(s);
   const live = livePlayers(s);
-  const scores: Record<number, number> = {};
+  // a second board (double board, or run twice) splits every contested pot between the boards
+  const boards = reason === 'showdown' && s.board2 ? [s.board, s.board2] : [s.board];
+  const scores: Record<number, number>[] = boards.map(() => ({}));
   if (reason === 'showdown') {
-    if (s.board.length !== 5) throw new Error('Showdown requires five board cards');
-    for (const p of live) {
-      if (p.hole.length !== 2) throw new Error(`Player ${p.index} has no hole cards at showdown`);
-      scores[p.index] = evaluate([...p.hole, ...s.board]);
-    }
+    boards.forEach((board, b) => {
+      if (board.length !== 5) throw new Error('Showdown requires five board cards');
+      for (const p of live) {
+        if (p.hole.length !== 2) throw new Error(`Player ${p.index} has no hole cards at showdown`);
+        scores[b][p.index] = evaluate([...p.hole, ...board]);
+      }
+    });
   }
-  for (const pot of pots) {
-    let winners: number[];
-    let score: number | undefined;
-    if (pot.eligible.length === 1 || reason === 'fold') {
-      winners = pot.eligible.length ? [pot.eligible[0]] : [live[0].index];
-    } else {
-      score = Math.max(...pot.eligible.map((i) => scores[i]));
-      winners = pot.eligible.filter((i) => scores[i] === score);
-    }
-    const share = Math.floor(pot.amount / winners.length);
-    let remainder = pot.amount - share * winners.length;
+  /** Pay `amount` to `winners`, odd chips going to the first seats left of the button. */
+  const pay = (amount: number, winners: number[]) => {
+    const share = Math.floor(amount / winners.length);
+    let remainder = amount - share * winners.length;
     const shares: Record<number, number> = {};
     for (const w of winners) shares[w] = share;
     for (const seat of order) {
@@ -632,7 +676,22 @@ function settle(s: HandState, reason: 'fold' | 'showdown') {
       }
     }
     for (const w of winners) payouts[w] += shares[w];
-    potsOut.push({ amount: pot.amount, eligible: pot.eligible, winners, score, shares });
+    return shares;
+  };
+  for (const pot of pots) {
+    if (pot.eligible.length === 1 || reason === 'fold') {
+      const winners = pot.eligible.length ? [pot.eligible[0]] : [live[0].index];
+      potsOut.push({ amount: pot.amount, eligible: pot.eligible, winners, shares: pay(pot.amount, winners) });
+      continue;
+    }
+    // each board plays for an equal part; an odd chip goes with the first board
+    const part = Math.floor(pot.amount / boards.length);
+    boards.forEach((_, b) => {
+      const amount = b === 0 ? pot.amount - part * (boards.length - 1) : part;
+      const score = Math.max(...pot.eligible.map((i) => scores[b][i]));
+      const winners = pot.eligible.filter((i) => scores[b][i] === score);
+      potsOut.push({ amount, eligible: pot.eligible, winners, score, shares: pay(amount, winners), ...(boards.length > 1 ? { board: b } : {}) });
+    });
   }
   const net: Record<number, number> = {};
   for (const p of s.players) {
@@ -641,6 +700,7 @@ function settle(s: HandState, reason: 'fold' | 'showdown') {
   }
   s.complete = true;
   s.toAct = -1;
+  s.runoutPending = false;
   s.result = {
     reason,
     pots: potsOut,
@@ -648,6 +708,25 @@ function settle(s: HandState, reason: 'fold' | 'showdown') {
     net,
     showdownPlayers: reason === 'showdown' ? live.map((p) => p.index) : [],
   };
+}
+
+/**
+ * Deal the rest of the board once everyone is all-in (a hand started with holdRunout), once or
+ * twice. Twice: the first run takes the next cards in the deck and the second run the cards after
+ * them; every pot is split between the two boards.
+ */
+export function runOut(prev: HandState, times: 1 | 2): HandState {
+  if (!prev.runoutPending || prev.complete) return prev;
+  const s = cloneState(prev);
+  s.runoutPending = false;
+  if (times === 2) {
+    const k = 5 - s.board.length;
+    s.board2 = [...s.board, ...s.deck.splice(k, k)];
+    s.runs = 2;
+  }
+  while (!s.complete && s.street !== 'river') advanceStreet(s);
+  if (!s.complete) settle(s, 'showdown');
+  return s;
 }
 
 /** Amount to call for the player to act (0 if none). */

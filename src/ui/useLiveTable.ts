@@ -331,6 +331,8 @@ export function useLiveTable(room: string, accountId: string | null = null) {
     show: () => send({ type: 'show' }),
     rabbit: () => send({ type: 'rabbit' }),
     react: (emoji: string) => send({ type: 'react', emoji }),
+    straddle: (on: boolean) => send({ type: 'straddle', on }),
+    runout: (twice: boolean) => send({ type: 'runout', twice }),
     reactions,
     host: {
       settings: (settings: TableSettings) => send({ type: 'host', settings }),
@@ -354,6 +356,7 @@ const VIEW_DEFAULTS: Omit<TableView, 'type' | 'you' | 'seats' | 'maxSeats' | 'au
   rabbit: [],
   shownBy: [],
   bounty: null,
+  runout: null,
 };
 
 /** How long a reaction stays by a seat. */

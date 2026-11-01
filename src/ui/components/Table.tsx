@@ -21,6 +21,7 @@ export function actionText(h: ActionRecord, bb: number, isHero = false): string 
     'post-sb': `posts small blind ${fmtBB(h.amount, bb)}`,
     'post-bb': `posts big blind ${fmtBB(h.amount, bb)}`,
     'post-ante': `posts ante ${fmtBB(h.amount, bb)}`,
+    'post-straddle': `straddles ${fmtBB(h.amount, bb)}`,
     fold: 'folds',
     check: 'checks',
     call: `calls ${fmtBB(h.amount, bb)}`,
@@ -216,7 +217,18 @@ export function Table({
   const won = live && state.complete && state.result ? state.result.payouts : null;
   const winners = new Set(live && state.complete && state.result ? state.players.filter((p) => (state.result!.net[p.index] ?? 0) > 0).map((p) => p.index) : []);
   // live tables name the exact hand ("Three Jacks"), matching the result line; practice describes it for teaching
-  const shownHand = (hole: HandState['board']) => (live ? describeScore(evaluate([...hole, ...state.board])) : describeHolding(hole, state.board));
+  const shownHand = (hole: HandState['board']) => {
+    const one = live ? describeScore(evaluate([...hole, ...state.board])) : describeHolding(hole, state.board);
+    if (state.board2?.length !== 5) return one;
+    // two boards: the hand on each, one per line
+    return (
+      <>
+        {one}
+        <br />
+        {describeScore(evaluate([...hole, ...state.board2]))}
+      </>
+    );
+  };
   // timer bar: restart for each new turn, starting from however much time is left
   const turnKey = `${deal}-${state.history.length}-${state.toAct}`;
   const timer = useMemo(() => {
@@ -264,9 +276,14 @@ export function Table({
           <div className="pot-pill" aria-live="polite" style={won ? { visibility: 'hidden' } : undefined}>
             {live ? 'Pot' : <Term id="pot">Pot</Term>} <strong data-testid="pot">{fmt(totalPot)}</strong>
           </div>
-          <div className="board" aria-label="Community cards">
-            <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} deal />
+          <div className={`board ${state.board2 ? 'two' : ''}`} aria-label={state.board2 ? (state.runs ? 'First run' : 'First board') : 'Community cards'}>
+            <CardRow cards={state.board} placeholders={5} size={state.board2 ? 'sm' : 'md'} fourColor={fourColor} deal />
           </div>
+          {state.board2 && (
+            <div className="board two second" aria-label={state.runs ? 'Second run' : 'Second board'}>
+              <CardRow cards={state.board2} placeholders={5} size="sm" fourColor={fourColor} deal />
+            </div>
+          )}
           {rabbit.length > 0 && (
             <div className="rabbit-row" aria-label="Rabbit hunt: the cards that would have come">
               <span>Would have come</span>
@@ -280,6 +297,8 @@ export function Table({
                 ? `${fmt(potBefore)} in the middle + ${fmt(streetBets)} bet this street`
                 : '\u00a0'}
             {state.bomb ? <span className="blinds-line bomb-line">Bomb pot · {fmt(state.bomb)} each</span> : null}
+            {state.straddle ? <span className="blinds-line">Straddle {fmt(state.straddle)}</span> : null}
+            {state.board2 && <span className="blinds-line">{state.runs ? 'Run twice: each run wins half the pot' : 'Double board: each board wins half the pot'}</span>}
             {state.config.anteType !== 'none' && state.config.ante > 0 && (
               <span className="blinds-line">
                 Blinds {fmt(state.config.sb)}/{fmt(state.config.bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmt(state.config.ante)}
@@ -487,6 +506,9 @@ export function HistoryList({ state, hero, showNames = false, money }: { state: 
                   case 'post-ante':
                     txt = `posts ante ${fmt(h.amount)}`;
                     break;
+                  case 'post-straddle':
+                    txt = `straddles ${fmt(h.amount)}`;
+                    break;
                   case 'fold':
                     txt = 'folds';
                     break;
@@ -503,7 +525,7 @@ export function HistoryList({ state, hero, showNames = false, money }: { state: 
                     txt = `raises to ${fmt(h.to)}`;
                     break;
                 }
-                if (h.player === hero) txt = txt.replace(/^(posts|folds|checks|calls|bets|raises)/, (w) => ({ posts: 'post', folds: 'fold', checks: 'check', calls: 'call', bets: 'bet', raises: 'raise' })[w] ?? w);
+                if (h.player === hero) txt = txt.replace(/^(posts|straddles|folds|checks|calls|bets|raises)/, (w) => ({ posts: 'post', straddles: 'straddle', folds: 'fold', checks: 'check', calls: 'call', bets: 'bet', raises: 'raise' })[w] ?? w);
                 if (h.allIn) txt += ' (all-in)';
                 if (h.type === 'post-ante' && state.config.anteType === 'each' && h.player !== hero) return null;
                 return (

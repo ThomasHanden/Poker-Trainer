@@ -345,8 +345,14 @@ function resultLines(h: HandState, me: number): string[] {
   }
   // a pot only one player could win is an uncalled bet coming back, not a win
   const pots = r.pots.filter((pot) => pot.eligible.length > 1);
-  return pots.map((pot, k) => {
-    const label = pots.length > 1 ? (k === 0 ? 'Main pot: ' : `Side pot${pots.length > 2 ? ` ${k}` : ''}: `) : '';
+  // two boards: each pot appears once per board
+  const boards = h.board2 ? 2 : 1;
+  const potCount = pots.length / boards;
+  return pots.map((pot, j) => {
+    const k = Math.floor(j / boards);
+    const board = pot.board === undefined ? '' : `${h.runs ? 'Run' : 'Board'} ${pot.board + 1}, `;
+    const name = potCount > 1 ? (k === 0 ? 'main pot' : `side pot${potCount > 2 ? ` ${k}` : ''}`) : '';
+    const label = board || name ? `${(board + name).replace(/, $/, '').replace(/^./, (c) => c.toUpperCase())}: ` : '';
     const hand = pot.score !== undefined ? ` with ${describeScore(pot.score).toLowerCase()}` : '';
     if (pot.winners.length > 1) {
       const names = pot.winners.map((i) => (i === me ? 'you' : h.players[i].name));
@@ -355,6 +361,33 @@ function resultLines(h: HandState, me: number): string[] {
     const w = pot.winners[0];
     return `${label}${who(w)} ${wins(w)} ${fmtChips(pot.amount)}${hand}.`;
   });
+}
+
+/** Everyone is all-in: run the rest of the board once or twice? One no means once. */
+function RunoutVote({ votes, me, names, deadline, offset, onVote }: { votes: Record<number, boolean | null>; me: number; names: string[]; deadline: number; offset: number; onVote: (twice: boolean) => void }) {
+  const left = useSecondsUntil(deadline, offset);
+  const mine = votes[me];
+  const others = Object.entries(votes).filter(([i]) => Number(i) !== me);
+  return (
+    <section className="live-card runout-vote" role="group" aria-label="Run it twice?">
+      <p>
+        <strong>Everyone is all-in.</strong> Run the rest of the board twice? Each run wins half the pot. Everyone has to agree{left !== null ? ` (${left}s)` : ''}.
+      </p>
+      {mine === null ? (
+        <div className="row">
+          <button className="btn primary" onClick={() => onVote(true)}>
+            Run it twice
+          </button>
+          <button className="btn" onClick={() => onVote(false)}>
+            Run it once
+          </button>
+        </div>
+      ) : (
+        <p className="note">You said {mine ? 'twice' : 'once'}. Waiting for the others…</p>
+      )}
+      <p className="note">{others.map(([i, v]) => `${names[Number(i)]}: ${v === null ? 'deciding' : v ? 'twice' : 'once'}`).join(' · ')}</p>
+    </section>
+  );
 }
 
 type PreAction = 'checkfold' | 'callany';
@@ -397,7 +430,7 @@ export function PlayTablePage() {
   const { data } = useStore();
   const { account } = useAuth();
   // signed in: you play, buy in and chat as your account; otherwise as this browser's guest
-  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat, show, rabbit, react, reactions, host } = useLiveTable(room, account?.id ?? null);
+  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat, show, rabbit, react, reactions, host, straddle, runout } = useLiveTable(room, account?.id ?? null);
   const [prefs, setPrefs] = useTablePrefs();
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
@@ -966,6 +999,9 @@ export function PlayTablePage() {
                 )}
               </div>
             )}
+            {view.runout && me >= 0 && view.runout.votes[me] !== undefined && (
+              <RunoutVote votes={view.runout.votes} me={me} names={h?.players.map((p) => p.name) ?? []} deadline={view.runout.deadline} offset={offset} onVote={runout} />
+            )}
             {mySeat && <ReactionBar onReact={react} />}
             {/* your controls keep one place on the page, so nothing jumps when your turn comes */}
             <div className={`live-controls ${myPlayer && live ? 'reserve' : ''}`}>
@@ -1003,6 +1039,12 @@ export function PlayTablePage() {
               <p className="note time-bank-note">
                 Time bank: {mySeat.timeBank}s · <Link to="/play/history">Your live hands</Link>
               </p>
+            )}
+            {mySeat && view.settings.straddle && (
+              <label className="ts-check straddle-toggle">
+                <input type="checkbox" checked={mySeat.straddle} onChange={(e) => straddle(e.target.checked)} />
+                <span>Straddle when I’m under the gun ({money(2 * stakes.bb)}, live: I act last before the flop)</span>
+              </label>
             )}
             {view.host === view.you && (
               <HostPanel settings={view.settings} paused={view.paused} bombNext={view.bombNext} requests={view.requests} seats={view.seats} you={view.you} money={money} on={host} />

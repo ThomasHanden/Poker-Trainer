@@ -3,7 +3,7 @@
 // can be unit tested; the server only passes messages in and sends views out.
 
 import { fullDeck, rankOf, type Card } from '../engine/cards';
-import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, validateAction, type HandState, type PlayerAction } from '../engine/rules';
+import { applyAction, buttonIndexFor, forfeit, legalActions, newHand, runOut, validateAction, type HandState, type PlayerAction } from '../engine/rules';
 import type { ProfileId } from '../opponents/profiles';
 import { BOT_BUY_IN_BB, BOT_PREFIX, BOT_STYLES, BOT_THINK_MS, botName, botView, practicePolicy, type BotPolicy } from './bots';
 import type { BankStatus } from './bank';
@@ -52,6 +52,8 @@ export const TIME_BANK_PER_HAND = 5_000;
 export const TIME_BANK_MAX = 60_000;
 /** Longest anyone waits for the host to let them sit before the request lapses. */
 export const REQUEST_MS = 10 * 60_000;
+/** How long players have to agree to run it twice; anyone who has not answered by then is a no. */
+export const RUNOUT_MS = 10_000;
 
 /** What the host of a private table chooses (public tables use the defaults). */
 export interface TableSettings {
@@ -67,12 +69,29 @@ export interface TableSettings {
   bombEvery: number;
   /** what each player puts in a bomb pot, in big blinds */
   bombBB: number;
+  /** players can choose to straddle (two big blinds, live) when they are under the gun */
+  straddle: boolean;
+  /** when everyone is all-in, the players can agree to run the rest of the board twice */
+  runItTwice: boolean;
+  /** two boards, each playing for half of every pot: 0 never, 1 in bomb pots, 2 every hand */
+  doubleBoard: number;
 }
 export const TURN_SECS = [15, 20, 30, 45, 60];
 export const BOUNTY_BB = [0, 1, 2, 5];
 export const BOMB_EVERY = [0, 5, 10, 20];
 export const BOMB_BB = [1, 2, 3, 5];
-export const DEFAULT_SETTINGS: TableSettings = { turnSecs: TURN_MS / 1000, approval: false, rabbitHunt: true, bounty72: 0, bombEvery: 0, bombBB: 2 };
+export const DOUBLE_BOARD = [0, 1, 2];
+export const DEFAULT_SETTINGS: TableSettings = {
+  turnSecs: TURN_MS / 1000,
+  approval: false,
+  rabbitHunt: true,
+  bounty72: 0,
+  bombEvery: 0,
+  bombBB: 2,
+  straddle: false,
+  runItTwice: false,
+  doubleBoard: 0,
+};
 
 /** Settings from a browser: anything not on the menus falls back to the default. */
 export function cleanSettings(raw: unknown): TableSettings {
@@ -85,6 +104,9 @@ export function cleanSettings(raw: unknown): TableSettings {
     bounty72: pick(r.bounty72, BOUNTY_BB, 0),
     bombEvery: pick(r.bombEvery, BOMB_EVERY, 0),
     bombBB: pick(r.bombBB, BOMB_BB, DEFAULT_SETTINGS.bombBB),
+    straddle: r.straddle === true,
+    runItTwice: r.runItTwice === true,
+    doubleBoard: pick(r.doubleBoard, DOUBLE_BOARD, 0),
   };
 }
 
@@ -162,6 +184,10 @@ export type ClientMessage =
   | { type: 'approve'; target: string; ok: boolean }
   /** a quick reaction, shown by the player's seat */
   | { type: 'react'; emoji: string }
+  /** straddle whenever you are under the gun (tables that allow it) */
+  | { type: 'straddle'; on: boolean }
+  /** everyone is all-in: your answer to running it twice */
+  | { type: 'runout'; twice: boolean }
   /** a signed-in connection's first message: its access token */
   | { type: 'auth'; token: string }
   | ChatClientMessage;
@@ -184,6 +210,8 @@ export interface SeatView {
   reserved: boolean;
   /** seconds of time bank left */
   timeBank: number;
+  /** straddles when under the gun */
+  straddle: boolean;
 }
 
 /** One person's chips at this table since it opened: what they brought, took away and have now. */
@@ -256,6 +284,8 @@ export interface TableView {
   bounty: { player: number; total: number } | null;
   /** how many people are watching without a seat (filled in by the server) */
   watching?: number;
+  /** everyone is all-in and the players are choosing to run it once or twice: each player's answer so far (by hand.players index), and the deadline */
+  runout: { deadline: number; votes: Record<number, boolean | null> } | null;
 }
 
 export type ServerMessage =
@@ -289,6 +319,8 @@ interface Seat {
   timeouts: number;
   /** time bank left, ms */
   timeBank: number;
+  /** a person who straddles when under the gun */
+  straddle?: boolean;
   /** a bot's playing style; people have none */
   bot?: ProfileId;
   /** someone waiting to take this bot's seat when the current hand ends */
@@ -392,6 +424,8 @@ export class LiveTable {
   /** the seat now drawing on its time bank, and when that started */
   private banking: { id: string; from: number; had: number } | null = null;
   private turnLength = TURN_MS;
+  /** run it twice: who has answered (hand.players index → yes/no), until the deadline */
+  private runoutVote: { deadline: number; votes: Map<number, boolean> } | null = null;
 
   constructor(opts: LiveTableOptions = {}) {
     this.stakes = opts.stakes ?? LOW_STAKES;
@@ -497,6 +531,15 @@ export class LiveTable {
         return null;
       case 'remove':
         return this.removePlayer(id, m.target);
+      case 'straddle': {
+        const seat = this.seatOf(id);
+        if (!seat || seat.bot) return 'Sit down first';
+        if (!this.settings.straddle) return 'This table does not allow straddles';
+        seat.straddle = m.on === true;
+        return null;
+      }
+      case 'runout':
+        return this.voteRunout(id, m.twice === true);
       default:
         return 'Unknown message';
     }
@@ -617,6 +660,9 @@ export class LiveTable {
     const bombDue = this.bombNext || (this.settings.bombEvery > 0 && (this.handNo + 1) % this.settings.bombEvery === 0);
     const bomb = bombDue && ordered.every((s) => s.stack > bombAmount);
     if (bomb) this.bombNext = false;
+    // the straddle is under the gun's (players[0]), when they asked for it and the table allows it
+    const straddle = !bomb && n >= 3 && this.settings.straddle && !!ordered[0].straddle && !ordered[0].bot;
+    const doubleBoard = this.settings.doubleBoard === 2 || (this.settings.doubleBoard === 1 && bomb);
     this.hand = newHand({
       config: { format: 'cash', numPlayers: n, sb: this.stakes.sb, bb: this.stakes.bb, ante: 0, anteType: 'none' },
       stacks: ordered.map((s) => s.stack),
@@ -625,6 +671,9 @@ export class LiveTable {
       deckOrder: deck,
       names: ordered.map((s) => s.name),
       bomb: bomb ? bombAmount : undefined,
+      straddle,
+      doubleBoard,
+      holdRunout: this.settings.runItTwice && !doubleBoard,
     });
     this.shown = new Set();
     this.rabbitCards = [];
@@ -649,7 +698,7 @@ export class LiveTable {
   nextDeadline(): number | null {
     const waits = [...this.seats.flatMap((s) => (s.reservedBy ? [reservationLapses(s.reservedBy)] : [])), ...this.requests.map((q) => q.at + REQUEST_MS)];
     const times = this.inHand()
-      ? [this.turnEndsAt, this.botAt, ...waits]
+      ? [this.turnEndsAt, this.botAt, this.runoutVote?.deadline ?? null, ...waits]
       : [this.nextHandAt, ...waits, ...this.seats.map((s) => (s.offlineSince === null ? null : s.offlineSince + RECONNECT_MS))];
     const due = times.filter((t): t is number => t !== null);
     return due.length ? Math.min(...due) : null;
@@ -670,6 +719,10 @@ export class LiveTable {
     this.requests = this.requests.filter((q) => now < q.at + REQUEST_MS);
     if (this.requests.length !== asked) lapsed = true;
     const h = this.hand;
+    if (h && !h.complete && this.runoutVote && now >= this.runoutVote.deadline) {
+      this.runItOut(1); // not everyone said yes in time
+      return true;
+    }
     if (h && !h.complete) {
       // the move is tied to this exact turn: anything that changes the hand reschedules or clears it
       if (this.botAt !== null && now >= this.botAt) {
@@ -730,6 +783,7 @@ export class LiveTable {
         bot: !!s.bot,
         reserved: !!s.reservedBy,
         timeBank: Math.round((this.banking?.id === s.id ? Math.max(0, this.banking.had - (this.clock() - this.banking.from)) : s.timeBank) / 1000),
+        straddle: !!s.straddle,
       })),
       maxSeats: MAX_SEATS,
       autoDeal: this.autoDeal,
@@ -763,7 +817,50 @@ export class LiveTable {
       rabbit: this.rabbitCards,
       shownBy: h?.complete ? [...this.shown] : [],
       bounty: this.bountyWon,
+      runout: this.runoutVote && h && !h.complete
+        ? { deadline: this.runoutVote.deadline, votes: Object.fromEntries(h.players.map((p, i) => [i, p.folded ? undefined : (this.runoutVote!.votes.get(i) ?? null)]).filter(([, v]) => v !== undefined)) }
+        : null,
     };
+  }
+
+  // ---------------- run it twice ----------------
+
+  /** Everyone is all-in: start the vote. Bots always agree; players who are away or leaving say no. */
+  private startRunoutVote() {
+    const h = this.hand!;
+    const votes = new Map<number, boolean>();
+    h.players.forEach((p, i) => {
+      if (p.folded) return;
+      const seat = this.seatOf(this.order[i]);
+      if (seat?.bot) votes.set(i, true);
+      else if (!seat || seat.leaving || seat.offlineSince !== null) votes.set(i, false);
+    });
+    this.runoutVote = { deadline: this.clock() + RUNOUT_MS, votes };
+    this.settleRunoutVote();
+  }
+
+  private voteRunout(id: string, twice: boolean): string | null {
+    const h = this.hand;
+    const k = this.order.indexOf(id);
+    if (!h?.runoutPending || !this.runoutVote || k < 0 || h.players[k].folded) return 'There is nothing to decide';
+    if (!this.runoutVote.votes.has(k)) this.runoutVote.votes.set(k, twice);
+    this.settleRunoutVote();
+    return null;
+  }
+
+  /** One no runs it once; everyone saying yes runs it twice; otherwise keep waiting. */
+  private settleRunoutVote() {
+    const h = this.hand!;
+    const v = this.runoutVote!;
+    const players = h.players.map((p, i) => (p.folded ? -1 : i)).filter((i) => i >= 0);
+    if (players.some((i) => v.votes.get(i) === false)) this.runItOut(1);
+    else if (players.every((i) => v.votes.get(i) === true)) this.runItOut(2);
+  }
+
+  private runItOut(times: 1 | 2) {
+    this.runoutVote = null;
+    this.hand = runOut(this.hand!, times);
+    this.afterChange();
   }
 
   // ---------------- private tables: the host ----------------
@@ -911,8 +1008,15 @@ export class LiveTable {
       if (seat) seat.timeBank = Math.max(0, this.banking.had - (this.clock() - this.banking.from));
       this.banking = null;
     }
+    if (!h.runoutPending) this.runoutVote = null;
     if (h.complete) {
       if (this.settled !== this.handNo) this.finishHand();
+      return;
+    }
+    if (h.runoutPending) {
+      // nobody acts until the players decide how to run out the board
+      this.turnEndsAt = null;
+      if (!this.runoutVote) this.startRunoutVote();
       return;
     }
     const seat = this.seatOf(this.order[h.toAct]);

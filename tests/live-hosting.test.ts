@@ -53,6 +53,9 @@ describe('hosting a private table', () => {
       bounty72: 0,
       bombEvery: 0,
       bombBB: 2,
+      straddle: false,
+      runItTwice: false,
+      doubleBoard: 0,
     });
   });
 
@@ -267,5 +270,88 @@ describe('bomb pots', () => {
       foldToEnd(every.t);
     }
     expect(bombs.map((b, k) => (b ? k + 1 : 0)).filter(Boolean)).toEqual([5, 10]);
+  });
+});
+
+describe('straddles', () => {
+  it('a player who opts in straddles when under the gun, if the table allows it', () => {
+    const { t } = setup(['ann', 'bob', 'cat', 'dan'], { straddle: true });
+    t.start();
+    const utg = t.order[0];
+    expect(t.hand!.straddle).toBeUndefined();
+    foldToEnd(t);
+    // whoever is under the gun next hand opts in now (everyone does, to be sure)
+    for (const n of ['ann', 'bob', 'cat', 'dan']) expect(t.handle(n, { type: 'straddle', on: true })).toBeNull();
+    t.handle('ann', { type: 'start' });
+    expect(t.hand!.straddle).toBe(2 * LOW_STAKES.bb);
+    expect(t.order[0]).not.toBe(utg);
+    expect(t.viewFor('ann').seats.every((s) => s.straddle)).toBe(true);
+  });
+
+  it('a table that does not allow it refuses', () => {
+    const { t } = setup(['ann', 'bob', 'cat']);
+    expect(t.handle('ann', { type: 'straddle', on: true })).toBe('This table does not allow straddles');
+  });
+});
+
+describe('run it twice at the table', () => {
+  const allIn = (settings: Partial<TableSettings> = { runItTwice: true }) => {
+    const x = setup(['ann', 'bob'], settings);
+    x.t.start();
+    x.t.act(toAct(x.t), { type: 'allin' });
+    x.t.act(toAct(x.t), { type: 'call' });
+    return x;
+  };
+
+  it('when everyone is all-in the players vote; both yes runs it twice', () => {
+    const { t } = allIn();
+    expect(t.inHand()).toBe(true);
+    expect(t.viewFor('ann').runout).toEqual({ deadline: expect.any(Number), votes: { 0: null, 1: null } });
+    expect(t.handle('ann', { type: 'runout', twice: true })).toBeNull();
+    expect(t.inHand()).toBe(true);
+    t.handle('bob', { type: 'runout', twice: true });
+    expect(t.hand!.complete).toBe(true);
+    expect(t.hand!.runs).toBe(2);
+    expect(t.hand!.board2).toHaveLength(5);
+    expect(t.seats.reduce((a, s) => a + s.stack, 0)).toBe(2 * STACK);
+  });
+
+  it('one no runs it once, at once', () => {
+    const { t } = allIn();
+    t.handle('bob', { type: 'runout', twice: false });
+    expect(t.hand!.complete).toBe(true);
+    expect(t.hand!.runs).toBeUndefined();
+  });
+
+  it('no answer in time runs it once', () => {
+    const { t, clock } = allIn();
+    t.handle('ann', { type: 'runout', twice: true });
+    expect(t.nextDeadline()).toBe(t.viewFor('ann').runout!.deadline);
+    clock.advance(10_000);
+    expect(t.tick()).toBe(true);
+    expect(t.hand!.complete).toBe(true);
+    expect(t.hand!.runs).toBeUndefined();
+  });
+
+  it('is off unless the table allows it: the board runs out straight away', () => {
+    const { t } = allIn({});
+    expect(t.hand!.complete).toBe(true);
+    expect(t.viewFor('ann').runout).toBeNull();
+  });
+});
+
+describe('double board at the table', () => {
+  it('every hand, or only in bomb pots', () => {
+    const every = setup(['ann', 'bob'], { doubleBoard: 2 });
+    every.t.start();
+    expect(every.t.hand!.board2).toEqual([]);
+    const bombs = setup(['ann', 'bob', 'cat'], { doubleBoard: 1 });
+    bombs.t.start();
+    expect(bombs.t.hand!.board2).toBeUndefined();
+    foldToEnd(bombs.t);
+    bombs.t.handle('ann', { type: 'bomb', on: true });
+    bombs.t.handle('ann', { type: 'start' });
+    expect(bombs.t.hand!.bomb).toBeDefined();
+    expect(bombs.t.hand!.board2).toHaveLength(3);
   });
 });

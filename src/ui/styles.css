@@ -8113,3 +8113,36 @@ label > span:first-child:not(.select-value) {
 .lh-foot {
   margin-top: 18px;
 }
+
+/* two boards (double board, run it twice): smaller cards, one row above the other */
+.board.two {
+  margin: 1px 0;
+}
+.board.two.second {
+  margin-top: 3px;
+}
+.runout-vote {
+  margin: 6px 0 10px;
+  border-color: var(--accent);
+}
+.runout-vote p {
+  margin: 0 0 8px;
+}
+.runout-vote .note:last-child {
+  margin: 8px 0 0;
+}
+.straddle-toggle {
+  justify-content: center;
+  margin: 0 0 10px;
+}
+/* two boards: the hand on each board, one per line, as wide as the longer one */
+.seat-showdown:has(br),
+.seat-win span:has(br) {
+  width: max-content;
+  text-align: center;
+  line-height: 1.3;
+}
+.seat-showdown:has(br) {
+  border-radius: 8px;
+  padding: 2px 8px;
+}

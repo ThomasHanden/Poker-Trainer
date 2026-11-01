@@ -146,6 +146,8 @@ export function handText(lh: LiveHand): string {
           ? `${who} posts the big blind ${fmtChips(r.amount)}`
           : r.type === 'post-ante'
             ? `${who} puts in ${fmtChips(r.amount)}`
+            : r.type === 'post-straddle'
+              ? `${who} straddles ${fmtChips(r.amount)}`
             : r.type === 'fold' || r.type === 'check'
               ? `${who} ${r.type}s`
               : r.type === 'call'
@@ -154,12 +156,15 @@ export function handText(lh: LiveHand): string {
     );
   }
   // a board run out after everyone was all-in comes after the last action
-  if (h.board.length && street && boardAt[street] < h.board.length) lines.push(`*** Board *** [${cards(h.board)}]`);
+  if (h.board.length && street && boardAt[street] < h.board.length) lines.push(`*** ${h.board2 ? (h.runs ? 'Run 1' : 'Board 1') : 'Board'} *** [${cards(h.board)}]`);
+  else if (h.board2) lines.push(`*** ${h.runs ? 'Run 1' : 'Board 1'} *** [${cards(h.board)}]`);
+  if (h.board2) lines.push(`*** ${h.runs ? 'Run 2' : 'Board 2'} *** [${cards(h.board2)}]`);
   const res = h.result;
   if (res) {
     for (const pot of res.pots.filter((p) => p.eligible.length > 1 || res.reason === 'fold')) {
       const hand = pot.score !== undefined ? ` with ${describeScore(pot.score).toLowerCase()}` : '';
-      lines.push(`${pot.winners.map(name).join(' and ')} ${pot.winners.length > 1 ? 'split' : 'wins'} ${fmtChips(pot.amount)}${hand}`);
+      const on = pot.board === undefined ? '' : ` on ${h.runs ? 'run' : 'board'} ${pot.board + 1}`;
+      lines.push(`${pot.winners.map(name).join(' and ')} ${pot.winners.length > 1 ? 'split' : 'wins'} ${fmtChips(pot.amount)}${on}${hand}`);
     }
   }
   return lines.join('\n');
