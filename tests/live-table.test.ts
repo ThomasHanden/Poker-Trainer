@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LiveTable, TURN_MS, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, checkBuyIn, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
+import { LiveTable, TURN_MS, TIME_BANK_START, NEXT_HAND_MS, RECONNECT_MS, MAX_SEATS, LOW_STAKES, HIGH_STAKES, isPublicTable, tableLabel, stakesFor, buyInFor, checkBuyIn, fmtChips, cleanName, type Cashout } from '../src/multiplayer/table';
 import { withdraw, deposit, playerId } from '../src/multiplayer/bank';
 import { totalChips } from '../src/engine/rules';
 
@@ -109,6 +109,10 @@ describe('live table: timeouts', () => {
     clock.advance(TURN_MS - 1);
     expect(t.tick()).toBe(false);
     clock.advance(1);
+    // out of time: the time bank comes first
+    expect(t.tick()).toBe(true);
+    expect(t.hand!.complete).toBe(false);
+    clock.advance(TIME_BANK_START);
     expect(t.tick()).toBe(true);
     // heads-up preflop the button faces the big blind, so a timeout folds
     expect(t.hand!.complete).toBe(true);
@@ -121,9 +125,14 @@ describe('live table: timeouts', () => {
     const untilSlow = () => {
       while (t.inHand() && toAct(t) !== slow) expect(callOrCheck(t)).toBeNull();
     };
+    // a timed-out turn: the turn, then whatever time bank is left, runs out
+    const timeOut = () => {
+      const n = t.hand!.history.length;
+      while (t.inHand() && t.hand!.history.length === n) runTimer(t, clock);
+    };
     t.start();
     untilSlow();
-    runTimer(t, clock); // timeout 1
+    timeOut(); // timeout 1
     playOut(t);
     runTimer(t, clock); // next deal
     untilSlow();
@@ -133,12 +142,12 @@ describe('live table: timeouts', () => {
     playOut(t);
     runTimer(t, clock);
     untilSlow();
-    runTimer(t, clock); // timeout 1 again
+    timeOut(); // timeout 1 again
     playOut(t);
     expect(ids(t)).toContain(slow);
     runTimer(t, clock);
     untilSlow();
-    runTimer(t, clock); // timeout 2 in a row
+    timeOut(); // timeout 2 in a row
     expect(t.viewFor('ann').seats.find((s) => s.id === slow)!.leaving).toBe(true);
     playOut(t);
     expect(ids(t)).not.toContain(slow);

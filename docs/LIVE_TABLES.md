@@ -7,6 +7,23 @@ in `src/multiplayer/` (`table.ts`, `bots.ts`, `bank.ts`, `chat.ts`), which has n
 and is unit tested (`tests/live-table.test.ts`, `tests/live-bots.test.ts`,
 `tests/daily-chips.test.ts`, `tests/chat.test.ts`).
 
+## Table extras (borrowed from home-game sites)
+
+| Feature | Rules | Where |
+|---|---|---|
+| Host | The person who creates a private table (the lobby's "Start a table" form) becomes its host. Public tables have none. The host can change the settings, pause the game (after the current hand), call a bomb pot, let in or turn away players asking to sit, and remove players (they stand up after their hand, get their chips back, and cannot sit there again). If the host goes, a pause is lifted and nobody needs approving. | `LiveTable.setHost`, `needsApproval`, `answerRequest`, `removePlayer`; `PokerTable.approve` |
+| Settings | Time to act (15–60s), approve players, rabbit hunting, 7-2 bounty (0, 1, 2 or 5 bb), bomb pots (every 5/10/20 hands or only when called) and their size (1–5 bb). Anything else falls back to the defaults. | `cleanSettings` |
+| Approvals | With approval on, a new player asks; nothing leaves their bank until the host says yes, then they buy in as usual. Requests lapse after 10 minutes or when the asker leaves. | `requestSeat`, `PokerTable.sit` |
+| Time bank | 30s to start, +5s per hand dealt, up to 60s. When a turn runs out, a connected player draws on it before being acted for; what they do not use is kept. | `tick`, `afterChange` |
+| Show cards | After a hand, anyone dealt in can show their cards (even after folding). | `show` |
+| Rabbit hunt | After a hand that ended before the river, anyone at the table can reveal the board cards that would have come (the next cards in the deck; there are no burns). | `rabbitHunt` |
+| 7-2 bounty | Win the whole hand (no split) holding 7-2 and have it seen (showdown, or shown afterwards): each other player dealt in who is still seated pays the bounty, up to their stack. Paid once per hand; chips only move between players. | `collectBounty` |
+| Bomb pots | Everyone puts in the bomb amount as dead money, there are no blinds, and the hand starts on the flop. Only dealt when every player can cover it. | `newHand({ bomb })` in `src/engine/rules.ts` |
+| Ledger | Per table, since it opened (memory only): bought in, cashed out, at the table, net. Bots are not listed. | `ledgerLines` |
+| Reactions | Eight emoji, from seated players, at most one every 1.5s, shown by the seat. | `PokerTable.onReact` |
+| Watchers | The number of people connected without a seat. | `PokerTable.update` |
+| In the browser | Sounds, amounts in chips or big blinds and the felt colour (Table options); your live hand history at `/play/history` with stats, replays and a downloadable text log (`src/ui/liveHands.ts`). | `LiveExtras.tsx`, `LiveHistory.tsx` |
+
 ## Who a player is
 
 There are no accounts yet. Each browser makes a random secret key (`playerKey()` in

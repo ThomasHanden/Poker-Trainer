@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PartySocket from 'partysocket';
 import type { PlayerAction } from '../engine/rules';
-import { PUBLIC_TABLES, type ClientMessage, type ServerMessage, type TableSummary, type TableView } from '../multiplayer/table';
+import { DEFAULT_SETTINGS, PUBLIC_TABLES, type ClientMessage, type ServerMessage, type TableSettings, type TableSummary, type TableView } from '../multiplayer/table';
 import type { BankStatus } from '../multiplayer/bank';
 import type { ChatMessage } from '../multiplayer/chat';
 
@@ -218,6 +218,8 @@ export function useLiveTable(room: string, accountId: string | null = null) {
   const [offset, setOffset] = useState(0);
   /** this table's chat, or null while you may not see it (not seated) */
   const [chat, setChat] = useState<ChatLine[] | null>(null);
+  /** the latest reaction from each player, shown by their seat for a few seconds */
+  const [reactions, setReactions] = useState<Record<string, { emoji: string; key: number }>>({});
   const ws = useRef<PartySocket | null>(null);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
@@ -231,7 +233,8 @@ export function useLiveTable(room: string, accountId: string | null = null) {
     // chat=1: this page understands chat messages (the server sends none to pages that do not).
     // Signed in: auth=1, then the access token as the first message on every (re)connect, so it
     // is never part of an address.
-    const query = accountId ? { auth: '1', chat: '1' } : { key: playerKey(), chat: '1' };
+    // react=1: this page understands reactions (pages from before them are never sent any)
+    const query = accountId ? { auth: '1', chat: '1', react: '1' } : { key: playerKey(), chat: '1', react: '1' };
     const socket = new PartySocket({ host: PARTY_HOST, party: 'poker-table', room, query });
     socket.addEventListener('open', () => {
       if (!current) return;
@@ -270,9 +273,17 @@ export function useLiveTable(room: string, accountId: string | null = null) {
         setChat((old) => old && old.map((l) => (l.state && l.cid === m.cid ? { ...l, state: 'failed', error: m.message } : l)));
       } else if (m.type === 'chat-closed') {
         setChat(null);
+      } else if (m.type === 'reaction') {
+        const key = Date.now() + Math.random();
+        setReactions((old) => ({ ...old, [m.from]: { emoji: m.emoji, key } }));
+        setTimeout(() => setReactions((old) => (old[m.from]?.key === key ? Object.fromEntries(Object.entries(old).filter(([id]) => id !== m.from)) : old)), REACTION_MS);
       } else {
-        setView(m);
+        // a table server from before hosts and ledgers sends none of those: fill in the defaults
+        setView({ ...VIEW_DEFAULTS, ...m });
         setOffset(m.now - Date.now());
+        // the person who created this private table sets it up and becomes its host
+        const settings = m.host === null ? takeHostSettings(room) : null;
+        if (settings) socket.send(JSON.stringify({ type: 'host', settings } satisfies ClientMessage));
       }
     });
     ws.current = socket;
@@ -317,5 +328,55 @@ export function useLiveTable(room: string, accountId: string | null = null) {
     leave: () => send({ type: 'leave' }),
     start: () => send({ type: 'start' }),
     act: (action: PlayerAction) => send({ type: 'action', action }),
+    show: () => send({ type: 'show' }),
+    rabbit: () => send({ type: 'rabbit' }),
+    react: (emoji: string) => send({ type: 'react', emoji }),
+    reactions,
+    host: {
+      settings: (settings: TableSettings) => send({ type: 'host', settings }),
+      pause: (paused: boolean) => send({ type: 'pause', paused }),
+      bomb: (on: boolean) => send({ type: 'bomb', on }),
+      remove: (target: string) => send({ type: 'remove', target }),
+      approve: (target: string, ok: boolean) => send({ type: 'approve', target, ok }),
+    },
   };
+}
+
+const VIEW_DEFAULTS: Omit<TableView, 'type' | 'you' | 'seats' | 'maxSeats' | 'autoDeal' | 'botSeats' | 'waiting' | 'stakes' | 'hand' | 'me' | 'handSeats' | 'handIds' | 'handNo' | 'turnEndsAt' | 'nextHandAt' | 'now'> = {
+  turnMs: 30_000,
+  timeBankOn: false,
+  settings: DEFAULT_SETTINGS,
+  host: null,
+  paused: false,
+  bombNext: false,
+  ledger: [],
+  requests: [],
+  rabbit: [],
+  shownBy: [],
+  bounty: null,
+};
+
+/** How long a reaction stays by a seat. */
+const REACTION_MS = 3500;
+const HOST_KEY = 'live-host:';
+
+/** Remember the settings chosen for a new private table, to send once its page connects. */
+export function rememberHostSettings(room: string, settings: TableSettings) {
+  try {
+    sessionStorage.setItem(HOST_KEY + room, JSON.stringify(settings));
+  } catch {
+    /* the table starts with the defaults */
+  }
+}
+
+/** The settings for a table this browser just created (once). */
+function takeHostSettings(room: string): TableSettings | null {
+  try {
+    const raw = sessionStorage.getItem(HOST_KEY + room);
+    if (!raw) return null;
+    sessionStorage.removeItem(HOST_KEY + room);
+    return JSON.parse(raw) as TableSettings;
+  } catch {
+    return null;
+  }
 }

@@ -5,7 +5,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { Server, routePartykitRequest, type Connection, type ConnectionContext, type WSMessage } from 'partyserver';
-import { BOT_SEATS, LiveTable, MAX_SEATS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
+import { BOT_SEATS, LiveTable, MAX_SEATS, REACTIONS, buyInFor, checkBuyIn, cleanName, fmtChips, isPublicTable, stakesFor } from '../src/multiplayer/table';
 import { KEY_PATTERN, claimDaily, deposit, moveGuestChips, playerId, rollDaily, status, upgrade, utcDay, withdraw, type Account, type BankStatus } from '../src/multiplayer/bank';
 import { ChatRoom } from '../src/multiplayer/chat';
 import { accountPlayerId, fetchDisplayName, nameIsTaken, verifyAccessToken, type AccountAuthConfig } from '../src/multiplayer/accounts';
@@ -31,6 +31,8 @@ async function accountFromToken(token: unknown, env: Env): Promise<string | null
 
 /** How long a signed-in connection has to send its token before it is closed. */
 const AUTH_WAIT_MS = 10_000;
+/** Each player may send one reaction this often. */
+const REACT_GAP_MS = 1500;
 
 /** Bots only sit at public tables, filling up to BOT_SEATS players. */
 function botSeatsFor(room: string, env: Env): number {
@@ -92,6 +94,8 @@ const bankOf = (env: Env) => env.Bank.get(env.Bank.idFromName('bank'));
 type ConnState = {
   pid: string;
   chat: boolean;
+  /** the page understands reactions */
+  react?: boolean;
   pending?: boolean;
   /** a signed-in player's account name: they sit under it, not whatever the browser sends */
   name?: string;
@@ -107,10 +111,14 @@ export class PokerTable extends Server<Env> {
   chatAccess = new Set<string>();
   /** seated people (id → name) as of the last update, to announce arrivals and departures */
   people = new Map<string, string>();
+  /** when each player last reacted, to keep reactions from flooding the table */
+  reacted = new Map<string, number>();
+  /** signed-in players' account names, for seat requests the host approves later */
+  accountNames = new Map<string, string>();
 
   async onStart() {
     // every table deals by itself once two players are sitting (or one person, and bots, at a public table)
-    this.table = new LiveTable({ stakes: stakesFor(this.name), botSeats: botSeatsFor(this.name, this.env) });
+    this.table = new LiveTable({ stakes: stakesFor(this.name), botSeats: botSeatsFor(this.name, this.env), hostable: !isPublicTable(this.name) });
     // The game lives in memory, so a restart (a deploy, or Cloudflare moving the table) loses it.
     // Give everyone who was seated (or waiting for a bot's seat) their chips back; an unfinished hand is called off.
     const saved = await this.ctx.storage.get<{ id: string; stack: number }[]>('seats');
@@ -136,19 +144,20 @@ export class PokerTable extends Server<Env> {
   async onConnect(conn: Connection, ctx: ConnectionContext) {
     const params = new URL(ctx.request.url).searchParams;
     const chat = params.get('chat') === '1';
+    const react = params.get('react') === '1';
     if (params.get('auth') === '1') {
-      conn.setState({ pid: '', chat, pending: true } satisfies ConnState);
+      conn.setState({ pid: '', chat, react, pending: true } satisfies ConnState);
       setTimeout(() => (conn.state as ConnState | null)?.pending && conn.close(4003, 'Sign-in not confirmed'), AUTH_WAIT_MS);
       return;
     }
     const key = params.get('key') ?? '';
     if (!KEY_PATTERN.test(key)) return conn.close(4001, 'Missing player key');
-    await this.joined(conn, await playerId(key), chat);
+    await this.joined(conn, await playerId(key), chat, undefined, react);
   }
 
   /** A connection now known to be this player: they are online, and get the table and their bank. */
-  async joined(conn: Connection, pid: string, chat: boolean, name?: string) {
-    conn.setState({ pid, chat, ...(name ? { name } : {}) } satisfies ConnState);
+  async joined(conn: Connection, pid: string, chat: boolean, name?: string, react = false) {
+    conn.setState({ pid, chat, react, ...(name ? { name } : {}) } satisfies ConnState);
     this.table.setOnline(pid, true);
     await this.update();
     await this.sendBank(pid);
@@ -173,12 +182,19 @@ export class PokerTable extends Server<Env> {
         return conn.close(4003, 'Sign-in not confirmed');
       }
       const name = await fetchDisplayName(m.token as string, authConfig(this.env));
-      return this.joined(conn, pid, st.chat, name ?? undefined);
+      return this.joined(conn, pid, st.chat, name ?? undefined, st.react);
     }
     const pid = st?.pid;
     if (!pid) return;
     if (m?.type === 'chat') return this.onChat(conn, pid, m.cid, m.text);
-    const err = m?.type === 'sit' ? await this.sit(pid, st?.name ?? m.name, m.seat, m.buyIn, !!st?.name) : this.table.handle(pid, msg);
+    if (m?.type === 'react') return this.onReact(pid, (m as { emoji?: unknown }).emoji);
+    if (st?.name) this.accountNames.set(pid, st.name);
+    const err =
+      m?.type === 'sit'
+        ? await this.sit(pid, st?.name ?? m.name, m.seat, m.buyIn, !!st?.name)
+        : m?.type === 'approve'
+          ? await this.approve(pid, (m as { target?: unknown }).target, (m as { ok?: unknown }).ok === true)
+          : this.table.handle(pid, msg);
     if (err) conn.send(JSON.stringify({ type: 'error', message: err }));
     await this.update();
   }
@@ -211,6 +227,8 @@ export class PokerTable extends Server<Env> {
     const { min, max } = buyInFor(this.table.stakes);
     const want = checkBuyIn(this.table.stakes, rawBuyIn);
     if (want === null) return `Buy in for between ${fmtChips(min)} and ${fmtChips(max)} chips.`;
+    // the host lets new players in: ask, and take nothing from the bank until they say yes
+    if (this.table.needsApproval(pid)) return this.table.requestSeat(pid, name, rawSeat as number, want);
     const bank = bankOf(this.env);
     this.buyingIn.add(pid);
     try {
@@ -227,6 +245,26 @@ export class PokerTable extends Server<Env> {
     } finally {
       this.buyingIn.delete(pid);
     }
+  }
+
+  /** The host's answer to someone asking to sit: yes buys them in from their bank as if they had just sat down. */
+  async approve(host: string, target: unknown, ok: boolean): Promise<string | null> {
+    const q = this.table.answerRequest(host, target, ok);
+    if (!q || 'error' in q) return q?.error ?? null;
+    const account = this.accountNames.get(q.id);
+    const err = await this.sit(q.id, account ?? q.name, q.seat, q.buyIn, !!account);
+    if (err) for (const c of this.getConnections()) if (this.pidOf(c) === q.id) c.send(JSON.stringify({ type: 'error', message: err }));
+    return null;
+  }
+
+  /** A quick reaction from someone seated, shown by their seat to everyone at the table. */
+  async onReact(pid: string, emoji: unknown) {
+    if (typeof emoji !== 'string' || !REACTIONS.includes(emoji) || !this.table.isSeated(pid)) return;
+    const now = Date.now();
+    if (now - (this.reacted.get(pid) ?? 0) < REACT_GAP_MS) return;
+    this.reacted.set(pid, now);
+    const msg = JSON.stringify({ type: 'reaction', from: pid, emoji, at: now });
+    for (const c of this.getConnections()) if ((c.state as ConnState | null)?.react) c.send(msg);
   }
 
   async sendBank(pid: string) {
@@ -288,9 +326,12 @@ export class PokerTable extends Server<Env> {
 
   /** Send everyone their view, pay out anyone who stood up, save the seats, and set the next timer. */
   async update() {
+    // people here without a seat (each counted once, however many tabs they have)
+    const ids = new Set([...this.getConnections()].map((c) => this.pidOf(c)).filter((p): p is string => !!p));
+    const watching = [...ids].filter((p) => !this.table.isSeated(p) && !this.table.reservationOf(p)).length;
     for (const c of this.getConnections()) {
       const pid = this.pidOf(c);
-      if (pid) c.send(JSON.stringify(this.table.viewFor(pid)));
+      if (pid) c.send(JSON.stringify({ ...this.table.viewFor(pid), watching }));
     }
     this.syncChat();
     if (this.timer) clearTimeout(this.timer);

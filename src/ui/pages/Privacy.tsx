@@ -24,6 +24,14 @@ export function PrivacyPage() {
         </li>
         <li>While you play, the table keeps your seat, your name and your stack. Other players at the table see your name, your chips and your actions.</li>
         <li>
+          Each table keeps a session ledger while it is open: everyone at the table can see each player’s name, what they bought in for, cashed out and have now.
+          It is kept in the table’s memory and is gone when the table restarts.
+        </li>
+        <li>
+          The hands you play at live tables are saved in your own browser (your live hand history), with your cards and any cards shown at the table. They are not
+          sent to us.
+        </li>
+        <li>
           Table chat is seen by the players seated at that table. It is kept in the table’s memory only: the last 50 messages, for up to an hour, and it is gone
           when the table restarts.
         </li>

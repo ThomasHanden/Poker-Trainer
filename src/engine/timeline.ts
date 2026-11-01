@@ -37,6 +37,7 @@ export function buildTimeline(final: HandState): TimelineStep[] | null {
       holes: final.players.map((p) => p.hole),
       deckOrder: [...final.board, ...final.deck],
       names: final.players.map((p) => p.name),
+      bomb: final.bomb,
     });
     const steps: TimelineStep[] = [];
     let s = start;

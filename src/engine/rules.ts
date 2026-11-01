@@ -106,6 +106,11 @@ export interface HandState {
   lastAggressor: number;
   /** player who made the last preflop raise */
   preflopAggressor: number;
+  /**
+   * A bomb pot (live tables): everyone put in this many chips instead of blinds, and the hand
+   * began on the flop. Absent for every ordinary hand.
+   */
+  bomb?: number;
 }
 
 export interface LegalActions {
@@ -185,6 +190,8 @@ export interface NewHandOptions {
   holes: Card[][]; // per player, may be empty for players whose cards are sampled later
   deckOrder?: Card[]; // remaining deck order (board cards drawn from the front)
   names?: string[];
+  /** a bomb pot: each player puts in this many chips (dead money, like an ante), and play starts on the flop */
+  bomb?: number;
 }
 
 export function newHand(o: NewHandOptions): HandState {
@@ -228,8 +235,27 @@ export function newHand(o: NewHandOptions): HandState {
     lastAggressor: -1,
     preflopAggressor: -1,
   };
-  postBlinds(s);
+  if (o.bomb && o.bomb > 0) postBomb(s, o.bomb);
+  else postBlinds(s);
   return s;
+}
+
+/**
+ * A bomb pot: no blinds and no preflop betting. Everyone puts the same amount in the middle, the
+ * flop is dealt, and the first player left of the button acts. The amounts are dead money (like
+ * antes), so every player still in can win all of it.
+ */
+function postBomb(s: HandState, amount: number) {
+  s.bomb = amount;
+  for (const p of s.players) {
+    const potBefore = potSize(s);
+    const a = commit(s, p, amount, false);
+    p.deadCommitted = (p.deadCommitted ?? 0) + a;
+    s.history.push({ street: 'preflop', player: p.index, type: 'post-ante', amount: a, to: 0, allIn: p.allIn, potBefore, toCallBefore: 0 });
+  }
+  advanceStreet(s);
+  s.toAct = nextToAct(s, s.buttonIndex);
+  if (s.toAct === -1) finishRoundIfNeeded(s);
 }
 
 function commit(s: HandState, p: PlayerState, amount: number, street = true): number {

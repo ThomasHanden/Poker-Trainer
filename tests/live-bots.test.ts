@@ -486,6 +486,9 @@ describe('bots: game integrity', () => {
     expect(x.t.nextDeadline()).toBe(x.t.turnEndsAt);
     expect(x.t.turnEndsAt! - x.now()).toBe(TURN_MS);
     const len = x.t.hand!.history.length;
+    // the turn runs out, then the time bank, and the person is acted for
+    x.runTimer();
+    expect(x.t.hand!.history.length).toBe(len);
     x.runTimer();
     expect(x.t.hand!.history.length).toBe(len + 1);
   });

@@ -5,6 +5,7 @@ import { PROFILES, ProfileId } from '../../opponents/profiles';
 import { Term } from './Term';
 import { describeHolding } from '../../engine/board';
 import { describeScore, evaluate } from '../../engine/evaluator';
+import type { Card } from '../../engine/cards';
 
 /** How a table shows an amount: big blinds by default, chips on live tables. */
 export type Money = (amount: number) => string;
@@ -148,6 +149,12 @@ export interface Seating {
 }
 
 
+/** A reaction shown by a seat; key changes with each new one so it animates again. */
+export interface Reaction {
+  emoji: string;
+  key: number;
+}
+
 export function Table({
   state,
   hero,
@@ -162,6 +169,9 @@ export function Table({
   turnMs,
   money,
   seating,
+  rabbit = [],
+  shown = [],
+  reactions,
 }: {
   state: HandState;
   hero: number;
@@ -182,6 +192,12 @@ export function Table({
   /** format amounts (live tables show chips); defaults to big blinds */
   money?: Money;
   seating?: Seating;
+  /** live: the board cards that would have come, after a hand that ended early */
+  rabbit?: Card[];
+  /** live: players who showed their cards after the hand (folded or not) */
+  shown?: number[];
+  /** live: reactions to show by each seat (by hand.players index, or by seat slot for seats not in the hand) */
+  reactions?: { byPlayer: Record<number, Reaction>; bySlot: Record<number, Reaction> };
 }) {
   const n = state.players.length;
   const bb = state.config.bb;
@@ -251,12 +267,19 @@ export function Table({
           <div className="board" aria-label="Community cards">
             <CardRow cards={state.board} placeholders={5} size="md" fourColor={fourColor} deal />
           </div>
+          {rabbit.length > 0 && (
+            <div className="rabbit-row" aria-label="Rabbit hunt: the cards that would have come">
+              <span>Would have come</span>
+              <CardRow cards={rabbit} size="sm" fourColor={fourColor} deal />
+            </div>
+          )}
           <div className="pot-sub">
             {sidePots.length > 1
               ? sidePots.map((amt, k) => `${k === 0 ? 'Main' : sidePots.length > 2 ? `Side ${k}` : 'Side'} ${fmt(amt)}`).join(' · ')
               : streetBets > 0 && potBefore > 0 && !state.complete
                 ? `${fmt(potBefore)} in the middle + ${fmt(streetBets)} bet this street`
                 : '\u00a0'}
+            {state.bomb ? <span className="blinds-line bomb-line">Bomb pot · {fmt(state.bomb)} each</span> : null}
             {state.config.anteType !== 'none' && state.config.ante > 0 && (
               <span className="blinds-line">
                 Blinds {fmt(state.config.sb)}/{fmt(state.config.bb)} · <Term id="ante">{state.config.anteType === 'bb' ? 'BB ante' : 'ante'}</Term> {fmt(state.config.ante)}
@@ -269,13 +292,14 @@ export function Table({
           const g = geo(i);
           const act = lastStreetAction(state, i);
           const isTurn = spotlight ? spotlight.seat === i : state.toAct === i && !state.complete;
-          const show = p.isHero || showdown.has(i) || revealAll;
+          const showed = shown.includes(i) && p.hole.length === 2;
+          const show = p.isHero || showdown.has(i) || revealAll || showed;
           const prof = profiles[i];
           const faceUp = p.hole.length === 2 && show;
           // dealt face up (yours) or face down, then flipped when shown at showdown
           const anim = faceUp && !p.isHero ? 'reveal' : 'deal';
           const bot = !!seating?.isBot(i);
-          const cards = p.folded ? null : (
+          const cards = p.folded && !showed ? null : (
             <div key={`${deal}-${faceUp ? 'up' : 'down'}`} className={`seat-cards ${p.isHero ? 'big' : ''} ${faceUp ? '' : 'backs'} ${anim}`}>
               {[0, 1].map((r) => (
                 <PlayingCard
@@ -312,6 +336,11 @@ export function Table({
                   )}
                 </div>
                 {!g.low && cards}
+                {reactions?.byPlayer[i] && (
+                  <span key={reactions.byPlayer[i].key} className="seat-react" aria-label={`${p.name} reacts ${reactions.byPlayer[i].emoji}`}>
+                    {reactions.byPlayer[i].emoji}
+                  </span>
+                )}
                 <div className="seat-tags">
                   {spotlight ? (
                     spotlight.seat === i && <div className="seat-action spot">{spotlight.label}</div>
@@ -358,6 +387,11 @@ export function Table({
                 </span>
                 <span className="plate-stack">{fmt(s.stack)}</span>
               </div>
+              {reactions?.bySlot[s.slot] && (
+                <span key={reactions.bySlot[s.slot].key} className="seat-react">
+                  {reactions.bySlot[s.slot].emoji}
+                </span>
+              )}
               <div className="seat-tags">
                 <div className="seat-action seat-wait">{s.note}</div>
               </div>

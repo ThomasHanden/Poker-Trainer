@@ -1,10 +1,13 @@
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../store';
-import { Table, HistoryList, dealMs, type Seating } from '../components/Table';
+import { Table, HistoryList, dealMs, fmtBB, type Reaction, type Seating } from '../components/Table';
 import { ActionBar, type AmountUnit } from '../components/ActionBar';
 import { LiveChat, useMutes } from '../components/LiveChat';
-import { PARTY_HOST, claimDailyChips, fetchBankroll, LOBBY_POLL_MS, occupancy, rememberTable, useLiveTable, usePublicTables, type Bankroll } from '../useLiveTable';
+import { PARTY_HOST, claimDailyChips, fetchBankroll, LOBBY_POLL_MS, occupancy, rememberHostSettings, rememberTable, useLiveTable, usePublicTables, type Bankroll } from '../useLiveTable';
+import { HostPanel, LedgerPanel, ReactionBar, SettingsFields, TableOptions, describeSettings, useTablePrefs } from '../components/LiveExtras';
+import { saveLiveHand } from '../liveHands';
+import { sounds } from '../sounds';
 import {
   CHIP,
   HIGH_PREFIX,
@@ -13,7 +16,7 @@ import {
   MAX_SEATS,
   NAME_MAX,
   PUBLIC_TABLES,
-  TURN_MS,
+  DEFAULT_SETTINGS,
   affordableTables,
   buyInFor,
   fmtChips,
@@ -21,6 +24,7 @@ import {
   stakesFor,
   tableLabel,
   type Stakes,
+  type TableSettings,
   type TableSummary,
 } from '../../multiplayer/table';
 import { DAILY_MAX, DAILY_MIN, buyInAfterClaim, claimCovers as claimCoversTable, nextUtcMidnight } from '../../multiplayer/bank';
@@ -203,6 +207,15 @@ function NotEnoughChips({ room, bank, onBank, tables, lost = false }: { room: st
 export function PlayLobbyPage() {
   const nav = useNavigate();
   const [code, setCode] = useState('');
+  const [newStakes, setNewStakes] = useState<'low' | 'high'>('low');
+  const [newSettings, setNewSettings] = useState<TableSettings>(DEFAULT_SETTINGS);
+  /** a new private table: you are its host, with the settings chosen here */
+  const createTable = (e: FormEvent) => {
+    e.preventDefault();
+    const room = `${newStakes === 'high' ? HIGH_PREFIX : ''}${newCode()}`;
+    rememberHostSettings(room, newSettings);
+    nav(`/play/${room}`);
+  };
   const tables = usePublicTables();
   const [bank, setBank] = useState<Bankroll | null>(null);
   useEffect(() => {
@@ -236,6 +249,9 @@ export function PlayLobbyPage() {
       </header>
       {!PARTY_HOST && <NotConfigured />}
       <Wallet bank={bank} onBank={setBank} />
+      <p className="note live-history-link">
+        <Link to="/play/history">Your live hands</Link>: replays, session stats and logs to download.
+      </p>
       <section className="live-card live-public" aria-labelledby="pub-title">
         <h2 id="pub-title">Public tables</h2>
         <p className="note">
@@ -273,15 +289,31 @@ export function PlayLobbyPage() {
       <div className="live-lobby">
         <section className="live-card">
           <h3>Start a table</h3>
-          <p className="note">Only people with the link can join. Up to {MAX_SEATS} players.</p>
-          <div className="row">
-            <button className="btn primary" onClick={() => nav(`/play/${newCode()}`)} disabled={!PARTY_HOST}>
-              Start {LOW_STAKES.label} table
+          <p className="note">
+            Set it up, share the link, deal the cards. Only people with the link can join, up to {MAX_SEATS} players. You are the host: you can pause the game, let
+            people in, call bomb pots and change the settings at any time.
+          </p>
+          <form onSubmit={createTable} className="new-table">
+            <div className="seg new-stakes" role="radiogroup" aria-label="Blinds">
+              {(
+                [
+                  ['low', LOW_STAKES],
+                  ['high', HIGH_STAKES],
+                ] as const
+              ).map(([k, st]) => (
+                <button key={k} type="button" role="radio" aria-checked={newStakes === k} className={newStakes === k ? 'on' : ''} onClick={() => setNewStakes(k)}>
+                  Blinds {st.label}
+                </button>
+              ))}
+            </div>
+            <details className="more">
+              <summary>More settings</summary>
+              <SettingsFields value={newSettings} onChange={setNewSettings} idPrefix="new" />
+            </details>
+            <button className="btn primary" type="submit" disabled={!PARTY_HOST}>
+              Start the table
             </button>
-            <button className="btn primary" onClick={() => nav(`/play/${HIGH_PREFIX}${newCode()}`)} disabled={!PARTY_HOST}>
-              Start {HIGH_STAKES.label} table
-            </button>
-          </div>
+          </form>
         </section>
         <section className="live-card">
           <h3>Join a table</h3>
@@ -365,7 +397,8 @@ export function PlayTablePage() {
   const { data } = useStore();
   const { account } = useAuth();
   // signed in: you play, buy in and chat as your account; otherwise as this browser's guest
-  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat } = useLiveTable(room, account?.id ?? null);
+  const { view, bank, setBank, error, status, offset, sit, leave, act, chat, sendChat, show, rabbit, react, reactions, host } = useLiveTable(room, account?.id ?? null);
+  const [prefs, setPrefs] = useTablePrefs();
   const stakes = view?.stakes ?? stakesFor(room);
   const buyIn = buyInFor(stakes);
   // buy-in choice, in whole chips: from the table minimum up to its maximum or what you have, whichever is less
@@ -391,6 +424,9 @@ export function PlayTablePage() {
   const live = !!h && !h.complete;
   const myTurn = live && me >= 0 && h!.toAct === me;
   const turnLeft = useSecondsUntil(view?.turnEndsAt ?? null, offset);
+  // amounts in chips, or in big blinds if you prefer
+  const money = prefs.bb ? (x: number) => fmtBB(x, stakes.bb) : fmtChips;
+  const myRequest = view?.requests.find((q) => q.id === view.you) ?? null;
   const dealIn = useSecondsUntil(view?.nextHandAt ?? null, offset);
   const ready = view ? view.seats.filter((s) => !s.away && !s.leaving).length : 0;
 
@@ -408,6 +444,10 @@ export function PlayTablePage() {
       rememberTable(room);
     }
   }, [seated, waiting, room]);
+  // asked the host for a seat: the buy-in window closes while they decide
+  useEffect(() => {
+    if (myRequest) setPicking(null);
+  }, [myRequest]);
   useEffect(() => {
     if (error) setSitting(false);
   }, [error]);
@@ -493,6 +533,37 @@ export function PlayTablePage() {
     act(a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, dealing, sent, pre]);
+
+  // sounds: your turn, each action, the deal and a win
+  const lastSound = useRef({ hand: 0, actions: 0, turn: false, won: 0 });
+  useEffect(() => {
+    if (!view || !h) return;
+    const s = lastSound.current;
+    if (view.handNo !== s.hand) {
+      s.hand = view.handNo;
+      s.actions = h.history.length;
+      if (me >= 0) sounds.deal();
+    } else if (h.history.length > s.actions) {
+      const r = h.history[h.history.length - 1];
+      s.actions = h.history.length;
+      if (r.type === 'fold') sounds.fold();
+      else if (r.type === 'check') sounds.check();
+      else if (!r.type.startsWith('post')) sounds.chips();
+    }
+    const turnNow = myTurn && !dealing;
+    if (turnNow && !s.turn) sounds.turn();
+    s.turn = turnNow;
+    if (h.complete && me >= 0 && (h.result?.net[me] ?? 0) > 0 && s.won !== view.handNo) {
+      s.won = view.handNo;
+      sounds.win();
+    }
+  }, [view, h, me, myTurn, dealing]);
+
+  // every finished hand you played goes into your live hand history (cards shown later are added)
+  useEffect(() => {
+    if (!view || !h?.complete || me < 0) return;
+    saveLiveHand({ id: `${room}:${view.handNo}:${h.players[me].hole.join('.')}`, room, handNo: view.handNo, at: Date.now(), me, hand: h });
+  }, [view, h, me, room]);
 
   // chat: open beside the table (desktop) or as a drawer (phones); it starts closed, and on a phone
   // it gets out of the way when it is your turn (your draft is kept)
@@ -678,6 +749,16 @@ export function PlayTablePage() {
   // with no open seat left, people can still take a bot's seat
   const botSeatsFree = !mySeat && !waiting && !seating.open.length ? (view?.seats ?? []).filter((s) => s.bot && !s.reserved) : [];
   const waitingFor = waiting ? holder(waiting.seat) : undefined;
+  // after a hand: show your cards (if they have not been seen), rabbit hunt (if the hand ended early)
+  const sawMine = !!h?.result && (view?.shownBy.includes(me) || (h.result.reason === 'showdown' && h.result.showdownPlayers.includes(me)));
+  const canShow = !!h?.complete && me >= 0 && !sawMine;
+  const canRabbit = !!h?.complete && !!view?.settings.rabbitHunt && h.board.length < 5 && !view.rabbit.length && (me >= 0 || !!mySeat);
+  const nextIsBomb = !!view && view.settings.bombEvery > 0 && (view.handNo + 1) % view.settings.bombEvery === 0;
+  // reactions by each seat: players in the hand by their place in it, others by their seat
+  const reactionsOnTable = {
+    byPlayer: Object.fromEntries(handIds.map((id, i) => [i, reactions[id]]).filter(([, r]) => r)) as Record<number, Reaction>,
+    bySlot: Object.fromEntries((view?.seats ?? []).filter((s) => !shown.has(s.id) && reactions[s.id]).map((s) => [s.seat, reactions[s.id]])) as Record<number, Reaction>,
+  };
 
   return (
     <div className={`page practice live ${(myTurn && !dealing) || canPre ? 'has-dock' : ''}`}>
@@ -690,6 +771,8 @@ export function PlayTablePage() {
             </span>
             <span className="pchip muted">Blinds {stakes.label}</span>
             {bank && <span className="pchip muted">Your chips: {fmtChips(bank.balance)}</span>}
+            {!!view?.watching && <span className="pchip muted">{view.watching} watching</span>}
+            {view?.host === view?.you && view?.host && <span className="pchip target">Host</span>}
           </div>
         </div>
         <div className="ph-side live-invite">
@@ -755,6 +838,18 @@ export function PlayTablePage() {
         </div>
       )}
 
+      {myRequest && (
+        <div className="banner info" role="status">
+          You asked the host to let you sit in seat {myRequest.seat + 1}. Nothing comes out of your chips until they say yes.
+        </div>
+      )}
+
+      {view?.paused && (
+        <div className="banner info" role="status">
+          {view.host === view.you ? 'You paused the game: no new hand starts until you resume it.' : 'The host has paused the game. The next hand starts when they resume it.'}
+        </div>
+      )}
+
       {mySeat?.leaving && (
         <div className="banner warn" role="status">
           You missed two turns in a row, so you will stand up after this hand.{' '}
@@ -769,7 +864,7 @@ export function PlayTablePage() {
           Connecting to the table…
         </div>
       ) : (
-        <div className={`live-layout ${chatOpen ? 'chat-open' : ''}`}>
+        <div className={`live-layout ${chatOpen ? 'chat-open' : ''}`} data-felt={prefs.felt}>
           <div className="practice-body">
             <Table
               state={h ?? emptyHand(stakes)}
@@ -780,25 +875,37 @@ export function PlayTablePage() {
               handKey={view.handNo}
               live
               turnEndsAt={view.turnEndsAt === null || dealing || botToAct ? null : view.turnEndsAt - offset}
-              turnMs={TURN_MS}
-              money={fmtChips}
+              turnMs={view.turnMs}
+              money={money}
               seating={seating}
+              rabbit={view.rabbit}
+              shown={view.shownBy}
+              reactions={reactionsOnTable}
             />
             <p className="live-status" aria-live="polite">
               {live && dealing
                 ? 'Dealing…'
                 : live
                   ? myTurn
-                    ? `Your turn · ${turnLeft ?? ''}s`
+                    ? `Your turn · ${turnLeft ?? ''}s${view.timeBankOn ? ' (time bank)' : ''}`
                     : botToAct
                       ? `${toActName} is thinking…`
-                      : `Waiting for ${toActName} · ${turnLeft ?? ''}s`
+                      : `Waiting for ${toActName} · ${turnLeft ?? ''}s${view.timeBankOn ? ' (time bank)' : ''}`
                   : results.map((line) => (
                       <span key={line} className="live-result">
                         {line}
                       </span>
                     ))}
-              {!live && dealIn !== null && <span className="live-next">{h ? 'Next hand' : 'First hand'} in {dealIn}s</span>}
+              {!live && view.bounty && h && (
+                <span className="live-result bounty-line">
+                  {view.bounty.player === me ? 'You win' : `${h.players[view.bounty.player].name} wins`} the 7-2 bounty: {money(view.bounty.total)}.
+                </span>
+              )}
+              {!live && dealIn !== null && (
+                <span className="live-next">
+                  {h ? 'Next hand' : 'First hand'} in {dealIn}s{view.bombNext || nextIsBomb ? ' · bomb pot' : ''}
+                </span>
+              )}
               {!live && ready < 2 && !waiting && (
                 <span className="live-next">
                   {mySeat
@@ -841,10 +948,25 @@ export function PlayTablePage() {
                 )}
                 <details className="more live-history">
                   <summary>Actions in that hand</summary>
-                  <HistoryList state={bustHand.state} hero={bustHand.me} showNames money={fmtChips} />
+                  <HistoryList state={bustHand.state} hero={bustHand.me} showNames money={money} />
                 </details>
               </div>
             )}
+            {h?.complete && (canShow || canRabbit) && (
+              <div className="row after-hand" role="group" aria-label="After the hand">
+                {canShow && (
+                  <button className="btn small" onClick={show}>
+                    Show my cards
+                  </button>
+                )}
+                {canRabbit && (
+                  <button className="btn small" onClick={rabbit}>
+                    Rabbit hunt
+                  </button>
+                )}
+              </div>
+            )}
+            {mySeat && <ReactionBar onReact={react} />}
             {/* your controls keep one place on the page, so nothing jumps when your turn comes */}
             <div className={`live-controls ${myPlayer && live ? 'reserve' : ''}`}>
               {canPre && (
@@ -866,7 +988,7 @@ export function PlayTablePage() {
                 <section className="decision-panel live-dock" aria-label="Your decision">
                   <ActionBar
                     live
-                    unit={CHIPS}
+                    unit={prefs.bb ? undefined : CHIPS}
                     state={h!}
                     disabled={sent}
                     onAct={(a) => {
@@ -877,18 +999,28 @@ export function PlayTablePage() {
                 </section>
               )}
             </div>
+            {mySeat && (
+              <p className="note time-bank-note">
+                Time bank: {mySeat.timeBank}s · <Link to="/play/history">Your live hands</Link>
+              </p>
+            )}
+            {view.host === view.you && (
+              <HostPanel settings={view.settings} paused={view.paused} bombNext={view.bombNext} requests={view.requests} seats={view.seats} you={view.you} money={money} on={host} />
+            )}
+            <LedgerPanel lines={view.ledger} you={view.you} money={money} />
             {h && (
               <details className="more live-history">
                 <summary>Hand history</summary>
-                <HistoryList state={h} hero={me} showNames money={fmtChips} />
+                <HistoryList state={h} hero={me} showNames money={money} />
               </details>
             )}
             <details className="more live-history">
               <summary>About this table</summary>
               <p className="note">
                 No-Limit Hold’em, blinds {stakes.label}. Buy in for {fmtChips(buyIn.min)}–{fmtChips(buyIn.max)} chips from your bank; your stack goes back when you
-                leave. You have {TURN_MS / 1000} seconds to act.
+                leave. {describeSettings(view.settings, stakes.bb)}
               </p>
+              {view.host && view.host !== view.you && <p className="note">This table has a host, who can pause the game, let people in and change these settings.</p>}
               {botTable && (
                 <p className="note">
                   Seats named Bot 1, Bot 2 and so on are played by the computer. Bots join only while someone is playing, see only their own cards, and give their
@@ -896,6 +1028,7 @@ export function PlayTablePage() {
                 </p>
               )}
             </details>
+            <TableOptions prefs={prefs} onChange={setPrefs} />
           </div>
           <LiveChat
             id="table-chat"

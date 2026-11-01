@@ -58,6 +58,7 @@ export function pageMeta(path: string): PageMeta | null {
     const l = LESSON_INDEX[decodeURIComponent(lesson[1])];
     return l ? { title: `${l.title} · ${SITE_NAME}`, heading: l.title, description: l.summary, lesson: l } : null;
   }
+  if (p === '/play/history') return page('Your live hands', 'Every live hand you played: replays, session stats and logs.', true);
   // tables are live games, not pages to find in search
   const room = p.match(/^\/play\/([^/]+)$/);
   if (room) return page(tableLabel(decodeURIComponent(room[1])), STATIC['/play'].description, true);
