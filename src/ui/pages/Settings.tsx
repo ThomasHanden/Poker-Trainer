@@ -116,10 +116,12 @@ function Settings() {
             <div className="set-volume">
               <input
                 type="range"
+                className="fill-slider"
                 min={0.1}
                 max={1}
                 step={0.1}
                 value={volume}
+                style={{ '--fill': `${((volume - 0.1) / 0.9) * 100}%` } as React.CSSProperties}
                 aria-labelledby="set-volume"
                 onChange={(e) => set({ volume: Number(e.target.value) })}
                 onPointerUp={() => sounds.turn()}

@@ -4390,6 +4390,8 @@ label.size-input input {
 }
 label.size-input .unit {
   position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   right: 10px;
   font-size: 0.8rem;
   color: var(--muted);
@@ -4646,7 +4648,7 @@ h3 {
 
 /* buttons */
 .btn {
-  border-radius: var(--radius-sm);
+  border-radius: var(--ctl-radius);
   font-weight: 500;
   box-shadow: none;
 }
@@ -5763,7 +5765,7 @@ label .select-btn {
 
 /* ---------- softer form controls (dropdowns, inputs, segmented buttons) ---------- */
 :root {
-  --ctl-radius: 10px;
+  --ctl-radius: 8px;
   --ctl-border: color-mix(in srgb, var(--border-strong) 70%, var(--border));
   --ctl-shadow: 0 1px 2px rgba(28, 26, 22, 0.05);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -5778,7 +5780,7 @@ textarea,
 }
 input:not([type='checkbox']):not([type='radio']):not([type='range']),
 .select-btn {
-  height: 44px;
+  height: 40px;
   padding: 0 14px;
 }
 input:not([type='checkbox']):not([type='radio']):not([type='range']):focus,
@@ -5874,15 +5876,16 @@ label > span:first-child:not(.select-value) {
   font-weight: 500;
   color: var(--text-2);
 }
-/* segmented buttons: rounded track with a raised selected pill */
+/* segmented buttons: rounded track with a raised selected pill, as tall as a button */
 .seg {
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 3px;
   border-color: var(--border);
   background: var(--surface-2);
 }
 .seg button {
-  border-radius: 9px;
+  height: 32px;
+  border-radius: 7px;
   transition: background 0.2s var(--ease), color 0.2s, box-shadow 0.2s var(--ease);
 }
 .seg button.on {
@@ -7515,7 +7518,12 @@ label > span:first-child:not(.select-value) {
   .practice-controls .fact-v {
     font-size: 0.86rem;
   }
+  /* short facts keep their width; the long one gives way with an ellipsis */
+  .practice-controls .fact:not(.wide) {
+    flex: none;
+  }
   .practice-controls .fact.wide .fact-v {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -7590,6 +7598,13 @@ label > span:first-child:not(.select-value) {
 /* bet amount box: keep room on the right for its unit ("bb") over the generic input padding */
 .sizing label.size-input input[type='number'] {
   padding-right: 30px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.sizing label.size-input input::-webkit-outer-spin-button,
+.sizing label.size-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* five hands on a concept: where you are, and the summary at the end */
@@ -7834,29 +7849,6 @@ label > span:first-child:not(.select-value) {
 }
 .live-lobby {
   align-items: start;
-}
-.seg {
-  display: inline-flex;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.seg button {
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 550;
-  padding: 7px 14px;
-  border: none;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.seg button + button {
-  border-left: 1px solid var(--border-strong);
-}
-.seg button.on {
-  background: var(--accent);
-  color: var(--accent-ink);
 }
 .new-table {
   display: flex;
@@ -8553,7 +8545,7 @@ label > span:first-child:not(.select-value) {
   height: 26px;
 }
 .set-seg button {
-  padding: 5px 11px;
+  padding: 0 11px;
   font-size: 0.85rem;
 }
 .set-volume {
@@ -8563,7 +8555,6 @@ label > span:first-child:not(.select-value) {
 }
 .set-volume input[type='range'] {
   width: 140px;
-  accent-color: var(--accent);
 }
 /* on/off switch */
 .switch {
@@ -8624,7 +8615,7 @@ label > span:first-child:not(.select-value) {
     width: 100px;
   }
   .set-seg button {
-    padding: 5px 8px;
+    padding: 0 8px;
   }
 }
 
